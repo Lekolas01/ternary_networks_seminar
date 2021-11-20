@@ -1,1 +1,1 @@
-# ternary_networks_seminar
+# Ternary_networks_seminar
