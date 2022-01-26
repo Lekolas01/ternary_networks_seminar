@@ -1,1 +1,1 @@
-# Ternary_networks_seminar
+# Practical Work in AI - Ternary Weight Networks
