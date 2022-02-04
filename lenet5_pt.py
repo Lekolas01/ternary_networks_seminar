@@ -20,8 +20,8 @@ DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 RANDOM_SEED = 42
 LEARNING_RATE = 0.001
 BATCH_SIZE = 64
-N_TRAIN_SAMPLES = 1000
-N_EPOCHS = 20
+N_TRAIN_SAMPLES = 10000
+N_EPOCHS = 2
 
 IMG_SIZE = 32
 N_CLASSES = 10
@@ -75,7 +75,7 @@ def plot_losses(train_losses, valid_losses):
     
     # change the plot style to default
     plt.style.use('default')
-    
+
 
 def train(train_loader, model, criterion, optimizer, device):
     '''
@@ -164,80 +164,45 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     
     return model, optimizer, (train_losses, valid_losses)
 
-# Data
 
-# define transforms
-# transforms.ToTensor() automatically scales the images to [0,1] range
-transforms = transforms.Compose([transforms.Resize((32, 32)),
-                                 transforms.ToTensor()])
+def run(args):
+    # define transforms
+    # transforms.ToTensor() automatically scales the images to [0,1] range
+    transform = transforms.Compose([transforms.Resize((32, 32)),
+                                    transforms.ToTensor()])
 
-# download and create datasets
-train_dataset = datasets.MNIST(root='data/', 
-                               train=True, 
-                               transform=transforms,
-                               download=True)
-train_dataset = data_utils.Subset(train_dataset, torch.arange(N_TRAIN_SAMPLES))
+    # download and create datasets
+    train_dataset = datasets.MNIST(root='data/', 
+                                train=True, 
+                                transform=transform,
+                                download=True)
+    #train_dataset = data_utils.Subset(train_dataset, torch.arange(N_TRAIN_SAMPLES))
 
 
-valid_dataset = datasets.MNIST(root='data/', 
-                               train=False, 
-                               transform=transforms)
+    valid_dataset = datasets.MNIST(root='data/', 
+                                train=False, 
+                                transform=transform)
 
-# define the data loaders
-train_loader = DataLoader(dataset=train_dataset, 
-                          batch_size=BATCH_SIZE, 
-                          shuffle=True)
+    # define the data loaders
+    train_loader = DataLoader(dataset=train_dataset, 
+                            batch_size=BATCH_SIZE, 
+                            shuffle=True)
 
-valid_loader = DataLoader(dataset=valid_dataset, 
-                          batch_size=BATCH_SIZE, 
-                          shuffle=False)
+    valid_loader = DataLoader(dataset=valid_dataset, 
+                            batch_size=BATCH_SIZE, 
+                            shuffle=False)
 
-# Plotting the images
+    # Implementing LeNet-5
+    torch.manual_seed(RANDOM_SEED)
 
-def show_images(batch, title=None, cmap=None, row_size=8, n_rows=8):
-    n_items = n_rows * row_size
-    if batch.shape[0] < n_items: 
-        n_items = batch.shape[0] / row_size
-    fig = plt.figure()
-    for index in range(1, n_items + 1):
-        plt.subplot(n_rows, row_size, index)
-        plt.axis('off')
-        plt.imshow(batch[index - 1][0], cmap=cmap)
-    fig.suptitle(title)
-    plt.show(block=False)
+    model = LeNet5(N_CLASSES).to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    criterion = nn.CrossEntropyLoss()
 
-show_images(next(iter(train_loader))[0], 'First Mini-Batch:', 'gray_r')
+    print("start training loop")
+    model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, N_EPOCHS, DEVICE)
+    print("end training loop")
 
-# Implementing LeNet-5
 
-torch.manual_seed(RANDOM_SEED)
-
-model = LeNet5(N_CLASSES).to(DEVICE)
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-criterion = nn.CrossEntropyLoss()
-
-print("start training loop")
-model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, N_EPOCHS, DEVICE)
-print("end training loop")
-
-# **Evaluating the predictions**
-
-ROW_IMG = 10
-N_ROWS = 5
-
-fig = plt.figure()
-for index in range(1, ROW_IMG * N_ROWS + 1):
-    plt.subplot(N_ROWS, ROW_IMG, index)
-    plt.axis('off')
-    plt.imshow(valid_dataset.data[index], cmap='gray_r')
-    
-    with torch.no_grad():
-        model.eval()
-        x = valid_dataset[index][0].unsqueeze(0).to(DEVICE)
-        _, probs = model(x)
-        
-    title = f'{torch.argmax(probs)} ({torch.max(probs * 100):.0f}%)'
-    
-    plt.title(title, fontsize=7)
-fig.suptitle('LeNet-5 - predictions');
-plt.show()
+if __name__ == '__main__':
+    run(None)
