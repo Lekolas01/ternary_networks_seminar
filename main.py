@@ -1,19 +1,17 @@
-import numpy as np
+import argparse
 from datetime import datetime
+import numpy as np
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data as data_utils
 from torch.utils.data import DataLoader
-from lenet5_model import LeNet5
-
 from torchvision import datasets, transforms
 
-import matplotlib.pyplot as plt
-
-# check device
-DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+import config
+from lenet5_model import LeNet5
 
 
 # parameters
@@ -23,7 +21,6 @@ BATCH_SIZE = 64
 N_TRAIN_SAMPLES = 10000
 N_EPOCHS = 2
 
-IMG_SIZE = 32
 N_CLASSES = 10
 
 # ## Helper Functions
@@ -165,7 +162,10 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     return model, optimizer, (train_losses, valid_losses)
 
 
-def run(args):
+def run(conf):
+    # check device
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
     # define transforms
     # transforms.ToTensor() automatically scales the images to [0,1] range
     transform = transforms.Compose([transforms.Resize((32, 32)),
@@ -176,8 +176,8 @@ def run(args):
                                 train=True, 
                                 transform=transform,
                                 download=True)
-    #train_dataset = data_utils.Subset(train_dataset, torch.arange(N_TRAIN_SAMPLES))
-
+    if (1 <= conf.n_train_samples < len(train_dataset)):
+        train_dataset = data_utils.Subset(train_dataset, torch.arange(conf.n_train_samples))
 
     valid_dataset = datasets.MNIST(root='data/', 
                                 train=False, 
@@ -185,24 +185,41 @@ def run(args):
 
     # define the data loaders
     train_loader = DataLoader(dataset=train_dataset, 
-                            batch_size=BATCH_SIZE, 
+                            batch_size=conf.batch_size, 
                             shuffle=True)
 
     valid_loader = DataLoader(dataset=valid_dataset, 
-                            batch_size=BATCH_SIZE, 
+                            batch_size=conf.batch_size, 
                             shuffle=False)
 
     # Implementing LeNet-5
-    torch.manual_seed(RANDOM_SEED)
+    torch.manual_seed(conf.seed)
 
-    model = LeNet5(N_CLASSES).to(DEVICE)
-    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    model = LeNet5(conf.n_classes).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
     criterion = nn.CrossEntropyLoss()
 
-    print("start training loop")
-    model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, N_EPOCHS, DEVICE)
-    print("end training loop")
+    print("start training loop...")
+    model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.n_epochs, device)
+    print("training loop done.")
 
 
 if __name__ == '__main__':
-    run(None)
+    conf = config.read_config('configs.json', yaml=False).lenet5
+    parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
+    parser.add_argument('--seed', type=int, default=42)
+    parser.add_argument('--no-cuda', action='store_true', default=False)
+    parser.add_argument('--save-model', action='store_true', default=False)
+    args = parser.parse_args()
+    
+    for arg in (arg for arg in dir(args) if not arg.startswith('_')):
+        conf.__setitem__(arg, getattr(args, arg))
+
+
+    print("Executing run with the following configuration:")
+    print("\t\tName\t|\tValue")
+    print("\t--------------------------")
+    for arg in conf:
+        print(f"\t{arg:>15} | {getattr(conf, arg):>11}")
+    
+    run(conf)

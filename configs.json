@@ -1,0 +1,9 @@
+{
+  "lenet5": {
+    "n_epochs": 1,
+    "lr": 0.001,
+    "batch_size": 64,
+    "n_train_samples": -1,
+    "n_classes": 10
+  }
+}
