@@ -1,4 +1,4 @@
-from torch import Tensor, flatten
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -25,7 +25,7 @@ class LeNet5(nn.Module):
 
     def forward(self, x):
         x = self.feature_extractor(x)
-        x = flatten(x, 1)
+        x = torch.flatten(x, 1)
         logits = self.classifier(x)
         probs = F.softmax(logits, dim=1)
         return logits, probs
@@ -38,7 +38,7 @@ class TernaryConv2d(nn.Module):
         self.weight = conv2d.weight
         self.bias = conv2d.bias
 
-    def forward(self, x: Tensor):
+    def forward(self, x: torch.Tensor):
         tanh_weight = F.tanh(self.weight)
         tanh_bias = F.tanh(self.bias) if hasattr(self, 'bias') else None
         return F.conv2d(x, tanh_weight, tanh_bias)
@@ -52,9 +52,9 @@ class TernaryLinear(nn.Module):
         self.bias = self.linear.bias
 
     def forward(self, x):
-        tanh_weight = F.tanh(self.linear.weight)
+        tanh_weight = torch.tanh(self.linear.weight)
         if (self.linear.bias is not None):
-            tanh_bias = F.tanh(self.linear.bias)
+            tanh_bias = torch.tanh(self.linear.bias)
         return F.linear(input=x, weight=tanh_weight, bias=tanh_bias)
 
 
@@ -81,7 +81,7 @@ class TernaryLeNet5(nn.Module):
 
     def forward(self, x):
         x = self.feature_extractor(x)
-        x = flatten(x, 1)
+        x = torch.flatten(x, 1)
         logits = self.classifier(x)
         probs = F.softmax(logits, dim=1)
         return logits, probs

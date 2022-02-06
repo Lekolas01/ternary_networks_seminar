@@ -5,23 +5,10 @@ import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.utils.data as data_utils
-from torch.utils.data import DataLoader
-from torchvision import datasets, transforms
 
 import config
-from lenet5_model import LeNet5
-
-
-# parameters
-RANDOM_SEED = 42
-LEARNING_RATE = 0.001
-BATCH_SIZE = 64
-N_TRAIN_SAMPLES = 10000
-N_EPOCHS = 2
-
-N_CLASSES = 10
+from models.lenet5 import LeNet5
+import utils
 
 # ## Helper Functions
 
@@ -30,7 +17,7 @@ def get_accuracy(model, data_loader, device):
     Function for computing the accuracy of the predictions over the entire data_loader
     '''
     
-    correct_pred = 0 
+    correct_pred = 0
     n = 0
     
     with torch.no_grad():
@@ -164,33 +151,10 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
 
 def run(conf):
     # check device
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if not conf.no_cuda and torch.cuda.is_available() else 'cpu'
 
-    # define transforms
-    # transforms.ToTensor() automatically scales the images to [0,1] range
-    transform = transforms.Compose([transforms.Resize((32, 32)),
-                                    transforms.ToTensor()])
-
-    # download and create datasets
-    train_dataset = datasets.MNIST(root='data/', 
-                                train=True, 
-                                transform=transform,
-                                download=True)
-    if (1 <= conf.n_train_samples < len(train_dataset)):
-        train_dataset = data_utils.Subset(train_dataset, torch.arange(conf.n_train_samples))
-
-    valid_dataset = datasets.MNIST(root='data/', 
-                                train=False, 
-                                transform=transform)
-
-    # define the data loaders
-    train_loader = DataLoader(dataset=train_dataset, 
-                            batch_size=conf.batch_size, 
-                            shuffle=True)
-
-    valid_loader = DataLoader(dataset=valid_dataset, 
-                            batch_size=conf.batch_size, 
-                            shuffle=False)
+    train_loader = utils.get_mnist_dataloader(True, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = utils.get_mnist_dataloader(False, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
@@ -199,27 +163,44 @@ def run(conf):
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
     criterion = nn.CrossEntropyLoss()
 
-    print("start training loop...")
+    print(f"start training loop (device = {device})...")
     model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.n_epochs, device)
-    print("training loop done.")
+    if (conf.save_path is not None):
+        try:
+            torch.save(model, conf.save_path)
+            print(f"Saved the trained model to {conf.save_path}.")
+        except:
+            print("Could not save model to {conf.save_path}.")
+    print("run done.")
 
 
-if __name__ == '__main__':
-    conf = config.read_config('configs.json', yaml=False).lenet5
-    parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
-    parser.add_argument('--seed', type=int, default=42)
-    parser.add_argument('--no-cuda', action='store_true', default=False)
-    parser.add_argument('--save-model', action='store_true', default=False)
-    args = parser.parse_args()
-    
-    for arg in (arg for arg in dir(args) if not arg.startswith('_')):
-        conf.__setitem__(arg, getattr(args, arg))
+def get_configuration(config_path, consider_cmd_args=True):
+    conf = config.read_config(config_path, yaml=False).lenet5
+    if (consider_cmd_args):
+        parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
+        parser.add_argument('--n_epochs', type=int, default=conf.n_epochs)
+        parser.add_argument('--n_train_samples', type=int, default=conf.n_train_samples)
+        parser.add_argument('--lr', type=float, default=conf.lr)
+        parser.add_argument('--batch_size', type=int, default=conf.batch_size)
+        parser.add_argument('--seed', type=int, default=42)
+        parser.add_argument('--no_cuda', action='store_true', default=False)
+        parser.add_argument('--save_path', required=False, type=str)
+        
+        args = parser.parse_args()
+        
+        for arg in (arg for arg in dir(args) if not arg.startswith('_')):
+            if (hasattr(conf, arg)):
+                conf.overwrite(arg, getattr(args, arg))
+            else:
+                conf.__setitem__(arg, getattr(args, arg))
 
 
     print("Executing run with the following configuration:")
     print("\t\tName\t|\tValue")
     print("\t--------------------------")
     for arg in conf:
-        print(f"\t{arg:>15} | {getattr(conf, arg):>11}")
-    
+        print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")
+
+if __name__ == '__main__':
+    conf = get_configuration('configs.json')
     run(conf)
