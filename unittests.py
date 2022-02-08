@@ -13,10 +13,10 @@ class TestTernaryLayers(unittest.TestCase):
         x = torch.zeros(size=(5, 5))
         x[2, 2] = 1
         ternary_linear = TernaryLinear(in_features=5, out_features=8, bias=True)
-        nn.init.zeros_(ternary_linear.weight)
-        nn.init.zeros_(ternary_linear.bias)
+        nn.init.zeros_(ternary_linear.module.weight)
+        nn.init.zeros_(ternary_linear.module.bias)
         with torch.no_grad():
-            ternary_linear.weight[2, 2] = 1
+            ternary_linear.module.weight[2, 2] = 1
         y = ternary_linear(x)
 
         self.assertAlmostEqual(torch.sum(y).item(), np.tanh(1))
@@ -27,10 +27,10 @@ class TestTernaryLayers(unittest.TestCase):
         x = torch.zeros(size=(10, 1, 5, 5))
         x[0, 0, 2, 2] = 1
         ternary_conv2d = TernaryConv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1, bias=True)
-        nn.init.zeros_(ternary_conv2d.weight)
-        nn.init.zeros_(ternary_conv2d.bias)
+        nn.init.zeros_(ternary_conv2d.module.weight)
+        nn.init.zeros_(ternary_conv2d.module.bias)
         with torch.no_grad():
-            ternary_conv2d.weight[0, 0, 2, 2] = 1
+            ternary_conv2d.module.weight[0, 0, 2, 2] = 1
         y = ternary_conv2d(x)
 
         self.assertAlmostEqual(torch.sum(y).item(), np.tanh(1))

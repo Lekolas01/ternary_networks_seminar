@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 import config
-from models.lenet5 import LeNet5
+from models.lenet5 import LeNet5, TernaryConv2d, TernaryLeNet5, TernaryLinear
 import utils
 
 # ## Helper Functions
@@ -40,6 +40,7 @@ def plot_losses(train_losses, valid_losses):
     '''
     Function for plotting training and validation losses
     '''
+    print("plot_losses()...")
     
     # temporarily change the style of the plots to seaborn 
     plt.style.use('seaborn')
@@ -55,13 +56,30 @@ def plot_losses(train_losses, valid_losses):
             xlabel='Epoch',
             ylabel='Loss') 
     ax.legend()
-    plt.show(block=False)
+    plt.show()
     
     # change the plot style to default
     plt.style.use('default')
 
 
-def train(train_loader, model, criterion, optimizer, device):
+def R(weights: torch.Tensor, a):
+    assert(weights.requires_grad)
+    s = torch.tanh(weights) ** 2
+    return torch.sum((a - s) * s)
+
+
+def get_loss(y_hat, y_true, criterion, parameters=None, a=0.1, b=0.1,  ternary=False):
+    if not ternary:
+        return criterion(y_hat, y_true)
+    else:
+        param_losses = [R(param, a) for param in parameters]
+        param_loss_sum = sum(param_losses)
+        c = criterion(y_hat, y_true)
+        regularization_term = torch.sum(param_loss_sum)
+        return b * regularization_term
+
+
+def train(train_loader, model, criterion, optimizer, device, ternary=False, a=None, b=None):
     '''
     Function for the training step of the training loop
     '''
@@ -77,9 +95,13 @@ def train(train_loader, model, criterion, optimizer, device):
         y_true = y_true.to(device)
     
         # Forward pass
-        y_hat, _ = model(X) 
-        loss = criterion(y_hat, y_true) 
+        y_hat, _ = model(X)
+        loss = get_loss(y_hat, y_true, criterion, model.parameters(), a, b, ternary)
+        
         running_loss += loss.item() * X.size(0)
+
+        #weights = torch.tanh(utils.get_all_weights(model))
+        #utils.plot_distribution(weights, bins=100)
 
         # Backward pass
         loss.backward()
@@ -111,7 +133,7 @@ def validate(valid_loader, model, criterion, device):
     return model, epoch_loss
 
 
-def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, print_every=1):
+def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, print_every=1):
     '''
     Function defining the entire training loop
     '''
@@ -124,13 +146,14 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     for epoch in range(0, epochs):
 
         # training
-        model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device)
-        train_losses.append(train_loss)
+        model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device, ternary, a, b)
+        train_losses.append(train_loss) 
 
         # validation
         with torch.no_grad():
             model, valid_loss = validate(valid_loader, model, criterion, device)
             valid_losses.append(valid_loss)
+                
 
         if epoch % print_every == (print_every - 1):
             
@@ -144,27 +167,42 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
                   f'Train accuracy: {100 * train_acc:.2f}\t'
                   f'Valid accuracy: {100 * valid_acc:.2f}')
 
+            #weights = torch.tanh(utils.get_all_weights(model))
+            #utils.plot_distribution(weights, bins=100) 
+
     plot_losses(train_losses, valid_losses)
     
     return model, optimizer, (train_losses, valid_losses)
+
+
+@torch.no_grad()
+def init_weights(m: nn.Module):
+    if (hasattr(m, 'weight') and m.weight is not None):
+        nn.init.normal_(m.weight)
+    if (hasattr(m, 'bias') and m.bias is not None):
+        nn.init.normal_(m.bias)
 
 
 def run(conf):
     # check device
     device = 'cuda' if not conf.no_cuda and torch.cuda.is_available() else 'cpu'
 
-    train_loader = utils.get_mnist_dataloader(True, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = utils.get_mnist_dataloader(False, shuffle=True, batch_size=conf.batch_size)
+    train_loader = utils.get_mnist_dataloader(train=True, n_samples=conf.n_train_samples, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = utils.get_mnist_dataloader(train=False, n_samples=conf.n_train_samples, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
 
-    model = LeNet5(conf.n_classes).to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
+    
+    model = LeNet5(conf.n_classes) if not conf.ternary else TernaryLeNet5(conf.n_classes)
+    model = model.to(device)
+    model.apply(init_weights)
+
     criterion = nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
 
     print(f"start training loop (device = {device})...")
-    model, optimizer, _ = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.n_epochs, device)
+    model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.n_epochs, device, conf.ternary, conf.a, conf.b)
     if (conf.save_path is not None):
         try:
             torch.save(model, conf.save_path)
@@ -172,6 +210,7 @@ def run(conf):
         except:
             print("Could not save model to {conf.save_path}.")
     print("run done.")
+    return errs
 
 
 def get_configuration(config_path, consider_cmd_args=True):
@@ -179,13 +218,15 @@ def get_configuration(config_path, consider_cmd_args=True):
     if (consider_cmd_args):
         parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
         parser.add_argument('--n_epochs', type=int, default=conf.n_epochs)
-        parser.add_argument('--n_train_samples', type=int, default=conf.n_train_samples)
         parser.add_argument('--lr', type=float, default=conf.lr)
         parser.add_argument('--batch_size', type=int, default=conf.batch_size)
+        parser.add_argument('--n_train_samples', type=int, default=conf.n_train_samples)
+        parser.add_argument('--ternary', action='store_true', default = conf.ternary)
+        parser.add_argument('--a', type=float, default = conf.a)
+        parser.add_argument('--b', type=float, default = conf.b)
         parser.add_argument('--seed', type=int, default=42)
         parser.add_argument('--no_cuda', action='store_true', default=False)
         parser.add_argument('--save_path', required=False, type=str)
-        
         args = parser.parse_args()
         
         for arg in (arg for arg in dir(args) if not arg.startswith('_')):
@@ -194,13 +235,16 @@ def get_configuration(config_path, consider_cmd_args=True):
             else:
                 conf.__setitem__(arg, getattr(args, arg))
 
+    return conf
+
+if __name__ == '__main__':
+    conf = get_configuration('configs.json')
 
     print("Executing run with the following configuration:")
     print("\t\tName\t|\tValue")
     print("\t--------------------------")
     for arg in conf:
         print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")
-
-if __name__ == '__main__':
-    conf = get_configuration('configs.json')
-    run(conf)
+    
+    # train model
+    ternary_train_err, ternary_valid_err = run(conf)
