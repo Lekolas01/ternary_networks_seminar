@@ -3,6 +3,9 @@ from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
 
+import torch
+import torch.nn as nn
+
 class Logger:
     """ Extracts and/or persists tracker information. """
     def __init__(self, path: str = None):
@@ -14,17 +17,17 @@ class Logger:
         """
         self.path = None if path is None else Path(path).expanduser().resolve() 
 
-    def log_loss(self, epoch: int, update: int, train_loss: float, valid_loss: float, train_acc: float, valid_acc: float):
+    def log(self, epoch, update, train_loss, valid_loss, train_acc, valid_acc):
         """
         Log the loss and other metrics of the current mini-batch.
 
         Parameters
         ----------
-        epoch : int
+        epoch 
             Rank of the current epoch.
-        update : int
+        update 
             Rank of the current update.
-        loss : float
+        loss 
             Loss value of the current batch.
         """
         pass
@@ -35,11 +38,11 @@ class Logger:
 
         Parameters
         ----------
-        epoch : int
+        epoch 
             Rank of the current epoch.
-        update : int
+        update 
             Rank of the current update.
-        avg_loss : float
+        avg_loss 
             Summary value of the current epoch.
         """
         pass
@@ -63,10 +66,10 @@ class Tracker:
             self.loggers.append(logger)
 
 
-    def track_loss(self, train_loss: float, valid_loss: float, train_acc: float, valid_acc: float):
+    def track_loss(self, train_loss, valid_loss, train_acc, valid_acc):
         self.epoch += 1
         for logger in self.loggers:
-            logger.log_loss(self.epoch, train_loss, valid_loss, train_acc, valid_acc)
+            logger.log(self.epoch, train_loss, valid_loss, train_acc, valid_acc)
         self.losses.append(train_loss)
 
 
@@ -92,7 +95,7 @@ class Progress(Logger):
         super().__init__(path)
 
 
-    def log_loss(self, epoch: int, train_loss:float, valid_loss:float, train_acc:float, valid_acc:float):
+    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
         if (self.path is None):
             print(f'{datetime.now().time().replace(microsecond=0)} --- '
                 f'Epoch: {epoch}\t'
@@ -120,7 +123,7 @@ class Plotter(Logger):
         super().__init__(path)
         self.train_losses = []
     
-    def log_loss(self, epoch: int, train_loss:float, valid_loss:float, train_acc:float, valid_acc:float):
+    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
         self.train_losses.append(train_loss)
         if (len(self.train_losses) == 1): 
             return
@@ -144,4 +147,31 @@ class Plotter(Logger):
         # don't close plot after last epoch
         plt.show(block=True)
 
+
+class Checkpoints(Logger):
+    DEFAULT_NAME = "config{epoch:03d}"
+    EXT = ".pth"
     
+    def __init__(self, network: nn.Module, path: str = None):
+        super().__init__(path)
+        self.network = network
+
+        if self.path.is_dir() or not self.path.suffix:
+            # assume path is directory
+            self.path = self.path / Checkpoints.DEFAULT_NAME
+        # assure correct extension
+        self.path = self.path.with_suffix(Checkpoints.EXT)
+        # create directory if necessary
+        self.path.parent.mkdir(exist_ok=True, parents=True)
+
+
+    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
+        try:
+            save_path = str(self.path).format(epoch=epoch)
+            torch.save(self.network, save_path)
+        except Exception as inst:
+            print(f"Could not save model to {save_path}: {inst}")
+
+    
+    def log_summary(self):
+        pass

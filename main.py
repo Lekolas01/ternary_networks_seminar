@@ -187,15 +187,11 @@ def run(conf):
     tracker = Tracker(Progress())
     if (conf.plot):
         tracker.add_logger(Plotter())
+    if (conf.save_path is not None):
+        tracker.add_logger(Checkpoints(network=model, path=conf.save_path))
 
     print(f"start training loop (device = {device})...")
     model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.epochs, device, conf.ternary, conf.a, conf.b, tracker=tracker)
-    if (conf.save_path is not None):
-        try:
-            torch.save(model, conf.save_path)
-            print(f"Saved the trained model to {conf.save_path}.")
-        except:
-            print("Could not save model to {conf.save_path}.")
     print("run done.")
     return errs
 
@@ -204,7 +200,7 @@ def get_configuration(config_path, consider_cmd_args=True):
     conf = config.read_config(config_path, yaml=False).lenet5
     if (consider_cmd_args):
         parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
-        parser.add_argument('--no_cuda', action='store_true', default=False)
+        parser.add_argument('--no_cuda', action='store_true', required=False)
         parser.add_argument('--seed', type=int, default=42)
         parser.add_argument('--save_path', required=False, type=str)
         parser.add_argument('--samples', type=int, default=conf.samples)
@@ -229,7 +225,7 @@ if __name__ == '__main__':
     conf = get_configuration('configs.json')
 
     print("Executing run with the following configuration:")
-    print("\t\tName\t|\tValue")
+    print("\t       Variable |\tValue")
     print("\t--------------------------")
     for arg in conf:
         print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")

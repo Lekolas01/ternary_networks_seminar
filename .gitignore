@@ -2,7 +2,7 @@
 .vscode/
 data/
 configs.json
-output/
+runs/
 
 
 # Byte-compiled / optimized / DLL files
