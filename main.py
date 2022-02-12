@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 
 import config
+from track import *
 from models.lenet5 import LeNet5, TernaryConv2d, TernaryLeNet5, TernaryLinear
 import utils
 
@@ -76,7 +77,7 @@ def get_loss(y_hat, y_true, criterion, parameters=None, a=0.1, b=0.1,  ternary=F
         param_loss_sum = sum(param_losses)
         c = criterion(y_hat, y_true)
         regularization_term = torch.sum(param_loss_sum)
-        return b * regularization_term
+        return c + b * regularization_term
 
 
 def train(train_loader, model, criterion, optimizer, device, ternary=False, a=None, b=None):
@@ -99,9 +100,6 @@ def train(train_loader, model, criterion, optimizer, device, ternary=False, a=No
         loss = get_loss(y_hat, y_true, criterion, model.parameters(), a, b, ternary)
         
         running_loss += loss.item() * X.size(0)
-
-        #weights = torch.tanh(utils.get_all_weights(model))
-        #utils.plot_distribution(weights, bins=100)
 
         # Backward pass
         loss.backward()
@@ -133,7 +131,7 @@ def validate(valid_loader, model, criterion, device):
     return model, epoch_loss
 
 
-def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, print_every=1):
+def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, print_every=1, tracker:Tracker=None):
     '''
     Function defining the entire training loop
     '''
@@ -144,7 +142,6 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
  
     # Train model
     for epoch in range(0, epochs):
-
         # training
         model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device, ternary, a, b)
         train_losses.append(train_loss) 
@@ -154,24 +151,13 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
             model, valid_loss = validate(valid_loader, model, criterion, device)
             valid_losses.append(valid_loss)
                 
-
-        if epoch % print_every == (print_every - 1):
-            
             train_acc = get_accuracy(model, train_loader, device=device)
             valid_acc = get_accuracy(model, valid_loader, device=device)
-                
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                  f'Epoch: {epoch}\t'
-                  f'Train loss: {train_loss:.4f}\t'
-                  f'Valid loss: {valid_loss:.4f}\t'
-                  f'Train accuracy: {100 * train_acc:.2f}\t'
-                  f'Valid accuracy: {100 * valid_acc:.2f}')
 
-            #weights = torch.tanh(utils.get_all_weights(model))
-            #utils.plot_distribution(weights, bins=100) 
-
-    plot_losses(train_losses, valid_losses)
+        tracker.track_loss(train_loss, valid_loss, train_acc, valid_acc)
+    #plot_losses(train_losses, valid_losses)
     
+    tracker.summarise()
     return model, optimizer, (train_losses, valid_losses)
 
 
@@ -187,22 +173,23 @@ def run(conf):
     # check device
     device = 'cuda' if not conf.no_cuda and torch.cuda.is_available() else 'cpu'
 
-    train_loader = utils.get_mnist_dataloader(train=True, n_samples=conf.n_train_samples, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = utils.get_mnist_dataloader(train=False, n_samples=conf.n_train_samples, shuffle=True, batch_size=conf.batch_size)
+    train_loader = utils.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = utils.get_mnist_dataloader(train=False, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
-
     
     model = LeNet5(conf.n_classes) if not conf.ternary else TernaryLeNet5(conf.n_classes)
     model = model.to(device)
-    model.apply(init_weights)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
+    tracker = Tracker(Progress())
+    if (conf.plot):
+        tracker.add_logger(Plotter())
 
     print(f"start training loop (device = {device})...")
-    model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.n_epochs, device, conf.ternary, conf.a, conf.b)
+    model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.epochs, device, conf.ternary, conf.a, conf.b, tracker=tracker)
     if (conf.save_path is not None):
         try:
             torch.save(model, conf.save_path)
@@ -217,16 +204,17 @@ def get_configuration(config_path, consider_cmd_args=True):
     conf = config.read_config(config_path, yaml=False).lenet5
     if (consider_cmd_args):
         parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
-        parser.add_argument('--n_epochs', type=int, default=conf.n_epochs)
-        parser.add_argument('--lr', type=float, default=conf.lr)
+        parser.add_argument('--no_cuda', action='store_true', default=False)
+        parser.add_argument('--seed', type=int, default=42)
+        parser.add_argument('--save_path', required=False, type=str)
+        parser.add_argument('--samples', type=int, default=conf.samples)
+        parser.add_argument('--epochs', type=int, default=conf.epochs)
         parser.add_argument('--batch_size', type=int, default=conf.batch_size)
-        parser.add_argument('--n_train_samples', type=int, default=conf.n_train_samples)
+        parser.add_argument('--lr', type=float, default=conf.lr)
+        parser.add_argument('--plot', required=False, action='store_true')
         parser.add_argument('--ternary', action='store_true', default = conf.ternary)
         parser.add_argument('--a', type=float, default = conf.a)
         parser.add_argument('--b', type=float, default = conf.b)
-        parser.add_argument('--seed', type=int, default=42)
-        parser.add_argument('--no_cuda', action='store_true', default=False)
-        parser.add_argument('--save_path', required=False, type=str)
         args = parser.parse_args()
         
         for arg in (arg for arg in dir(args) if not arg.startswith('_')):
