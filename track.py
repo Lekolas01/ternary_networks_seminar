@@ -8,7 +8,7 @@ import torch.nn as nn
 
 class Logger:
     """ Extracts and/or persists tracker information. """
-    def __init__(self, path: str = None):
+    def __init__(self, path: str = None, log_every: int=1):
         """
         Parameters
         ----------
@@ -16,6 +16,7 @@ class Logger:
             Path to where data will be logged.
         """
         self.path = None if path is None else Path(path).expanduser().resolve() 
+        self.log_every = log_every
 
     def log(self, epoch, update, train_loss, valid_loss, train_acc, valid_acc):
         """
@@ -58,7 +59,8 @@ class Tracker:
             One or more loggers for logging training information.
         """
         self.epoch = 0
-        self.losses = []
+        self.train_losses = []
+        self.valid_losses = []
         self.loggers = list(loggers)
 
     def add_logger(self, logger: Logger):
@@ -69,30 +71,27 @@ class Tracker:
     def track_loss(self, train_loss, valid_loss, train_acc, valid_acc):
         self.epoch += 1
         for logger in self.loggers:
-            logger.log(self.epoch, train_loss, valid_loss, train_acc, valid_acc)
-        self.losses.append(train_loss)
+            if (self.epoch % logger.log_every == 0):
+                logger.log(self.epoch, train_loss, valid_loss, train_acc, valid_acc)
+        self.train_losses.append(train_loss)
+        self.valid_losses.append(valid_loss)
 
 
     def summarise(self):
-        res = sum(self.losses) / max(len(self.losses), 1)
-        self.losses.clear()
-
         for logger in self.loggers:
             logger.log_summary()
-
-        self.epoch += 1
-        return res
+        return self.train_losses, self.valid_losses
 
 
 class Progress(Logger):
     " Log progress of epoch to stdout. "
 
-    def __init__(self, path: str=None):
+    def __init__(self, **base_args):
         """
         Parameters
         ----------
         """
-        super().__init__(path)
+        super().__init__(**base_args)
 
 
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
@@ -119,27 +118,34 @@ def get_parameters(fn: callable):
 
 class Plotter(Logger):
     "Dynamically updates a loss plot after every epoch."
-    def __init__(self, path: str=None):
-        super().__init__(path)
+    def __init__(self, **base_args):
+        super().__init__(**base_args)
         self.train_losses = []
+        self.valid_losses = []
+        self.epochs = []
     
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
+        self.epochs.append(epoch)
         self.train_losses.append(train_loss)
-        if (len(self.train_losses) == 1): 
+        self.valid_losses.append(valid_loss)
+        if (len(self.epochs) == 1): 
             return
         
-        if (len(self.train_losses) == 2):
+        if (len(self.epochs) == 2):
             plt.ion()
+            plt.style.use('seaborn')
             self.fig = plt.figure()
             self.ax = self.fig.add_subplot(111)
-            self.ax.update({'xlabel': 'Epoch', 'ylabel':'Train Loss'})
-            self.line, = self.ax.plot(self.train_losses)
+            self.ax.set(title='Loss over Epochs', xlabel='Epoch', ylabel='Loss')
+            self.train_line, = self.ax.plot(self.epochs, self.train_losses, label='Training Loss')
+            self.valid_line, = self.ax.plot(self.epochs, self.valid_losses, label='Validation Loss')
+            self.ax.legend()
 
-        x = range(len(self.train_losses))
-        self.line.set_data(x, self.train_losses)
-        self.ax.set_xlim(0, len(self.train_losses) - 1)
+        self.train_line.set_data(self.epochs, self.train_losses)
+        self.valid_line.set_data(self.epochs, self.valid_losses)
+        self.ax.set_xlim(min(self.epochs), max(self.epochs))
         self.ax.set_ylim(min(self.train_losses), max(self.train_losses))
-        self.ax.set_xticks(x)
+        self.ax.set_xticks(self.epochs)
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
         
@@ -152,8 +158,8 @@ class Checkpoints(Logger):
     DEFAULT_NAME = "config{epoch:03d}"
     EXT = ".pth"
     
-    def __init__(self, network: nn.Module, path: str = None):
-        super().__init__(path)
+    def __init__(self, network: nn.Module, **base_args):
+        super().__init__(**base_args)
         self.network = network
 
         if self.path.is_dir() or not self.path.suffix:

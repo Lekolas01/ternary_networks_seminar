@@ -1,5 +1,4 @@
 import argparse
-from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -8,7 +7,7 @@ import torch.nn as nn
 
 import config
 from track import *
-from models.lenet5 import LeNet5, TernaryConv2d, TernaryLeNet5, TernaryLinear
+from models.lenet5 import LeNet5, TernaryLeNet5
 import utils
 
 # ## Helper Functions
@@ -17,7 +16,6 @@ def get_accuracy(model, data_loader, device):
     '''
     Function for computing the accuracy of the predictions over the entire data_loader
     '''
-    
     correct_pred = 0
     n = 0
     
@@ -35,32 +33,6 @@ def get_accuracy(model, data_loader, device):
             correct_pred += (predicted_labels == y_true).sum()
 
     return correct_pred.float() / n
-
-
-def plot_losses(train_losses, valid_losses):
-    '''
-    Function for plotting training and validation losses
-    '''
-    print("plot_losses()...")
-    
-    # temporarily change the style of the plots to seaborn 
-    plt.style.use('seaborn')
-
-    train_losses = np.array(train_losses) 
-    valid_losses = np.array(valid_losses)
-
-    fig, ax = plt.subplots(figsize = (8, 4.5))
-
-    ax.plot(train_losses, color='blue', label='Training loss') 
-    ax.plot(valid_losses, color='red', label='Validation loss')
-    ax.set(title="Loss over epochs", 
-            xlabel='Epoch',
-            ylabel='Loss') 
-    ax.legend()
-    plt.show()
-    
-    # change the plot style to default
-    plt.style.use('default')
 
 
 def R(weights: torch.Tensor, a):
@@ -84,20 +56,17 @@ def train(train_loader, model, criterion, optimizer, device, ternary=False, a=No
     '''
     Function for the training step of the training loop
     '''
-
     model.train()
     running_loss = 0
     
-    for X, y_true in train_loader:
-
+    for X, y in train_loader:
         optimizer.zero_grad()
-        
         X = X.to(device)
-        y_true = y_true.to(device)
+        y = y.to(device)
     
         # Forward pass
-        y_hat, _ = model(X)
-        loss = get_loss(y_hat, y_true, criterion, model.parameters(), a, b, ternary)
+        logits, probs = model(X)
+        loss = get_loss(logits, y, criterion, model.parameters(), a, b, ternary)
         
         running_loss += loss.item() * X.size(0)
 
@@ -108,12 +77,11 @@ def train(train_loader, model, criterion, optimizer, device, ternary=False, a=No
     epoch_loss = running_loss / len(train_loader.dataset)
     return model, optimizer, epoch_loss
 
-
+@torch.no_grad()
 def validate(valid_loader, model, criterion, device):
     '''
     Function for the validation step of the training loop
     '''
-   
     model.eval()
     running_loss = 0
     
@@ -135,38 +103,22 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     '''
     Function defining the entire training loop
     '''
-    
-    # set objects for storing metrics
-    train_losses = []
-    valid_losses = []
- 
+
     # Train model
     for epoch in range(0, epochs):
         # training
         model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device, ternary, a, b)
-        train_losses.append(train_loss) 
 
         # validation
         with torch.no_grad():
             model, valid_loss = validate(valid_loader, model, criterion, device)
-            valid_losses.append(valid_loss)
-                
             train_acc = get_accuracy(model, train_loader, device=device)
             valid_acc = get_accuracy(model, valid_loader, device=device)
 
         tracker.track_loss(train_loss, valid_loss, train_acc, valid_acc)
-    #plot_losses(train_losses, valid_losses)
     
-    tracker.summarise()
+    train_losses, valid_losses = tracker.summarise()
     return model, optimizer, (train_losses, valid_losses)
-
-
-@torch.no_grad()
-def init_weights(m: nn.Module):
-    if (hasattr(m, 'weight') and m.weight is not None):
-        nn.init.normal_(m.weight)
-    if (hasattr(m, 'bias') and m.bias is not None):
-        nn.init.normal_(m.bias)
 
 
 def run(conf):
@@ -188,11 +140,11 @@ def run(conf):
     if (conf.plot):
         tracker.add_logger(Plotter())
     if (conf.save_path is not None):
-        tracker.add_logger(Checkpoints(network=model, path=conf.save_path))
+        tracker.add_logger(Checkpoints(network=model, path=conf.save_path, log_every=1 if conf.save_every is None else conf.save_every))
 
-    print(f"start training loop (device = {device})...")
+    print(f"Begin training (device = {device})...")
     model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.epochs, device, conf.ternary, conf.a, conf.b, tracker=tracker)
-    print("run done.")
+    print("Training done.")
     return errs
 
 
@@ -200,14 +152,18 @@ def get_configuration(config_path, consider_cmd_args=True):
     conf = config.read_config(config_path, yaml=False).lenet5
     if (consider_cmd_args):
         parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
-        parser.add_argument('--no_cuda', action='store_true', required=False)
         parser.add_argument('--seed', type=int, default=42)
-        parser.add_argument('--save_path', required=False, type=str)
+        parser.add_argument('--no_cuda', action='store_true', required=False)
         parser.add_argument('--samples', type=int, default=conf.samples)
         parser.add_argument('--epochs', type=int, default=conf.epochs)
         parser.add_argument('--batch_size', type=int, default=conf.batch_size)
         parser.add_argument('--lr', type=float, default=conf.lr)
+
+        parser.add_argument('--save_path', required=False, type=str)
+        parser.add_argument('--save_every', required=False, type=int, default=1)
         parser.add_argument('--plot', required=False, action='store_true')
+        parser.add_argument('--plot_every', required=False, type=int, default=1)
+
         parser.add_argument('--ternary', action='store_true', default = conf.ternary)
         parser.add_argument('--a', type=float, default = conf.a)
         parser.add_argument('--b', type=float, default = conf.b)
@@ -231,4 +187,5 @@ if __name__ == '__main__':
         print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")
     
     # train model
-    ternary_train_err, ternary_valid_err = run(conf)
+    train_err, valid_err = run(conf)
+    assert(len(train_err) == conf.epochs)
