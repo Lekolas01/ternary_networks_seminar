@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import numpy as np
 
 import torch
@@ -24,13 +23,6 @@ def get_mnist_dataloader(train, samples: int=None, **dl_args):
 
     return data_loader
     
-
-@torch.no_grad()
-def plot_distribution(x: torch.Tensor, **hist_args):
-    x = x.flatten().cpu().numpy()
-    plt.hist(x, **hist_args)
-    plt.show()
-
 
 def distance_from_int_precision(x: np.ndarray):
     """

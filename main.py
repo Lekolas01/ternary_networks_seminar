@@ -1,7 +1,5 @@
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
-import os, pathlib
+import os
 
 import torch
 import torch.nn as nn
@@ -71,7 +69,6 @@ def train(train_loader, model, criterion, optimizer, device, ternary, a, b):
         # Backward pass
         loss.backward()
         optimizer.step()
-        weights = utils.get_all_weights(model)
         
     epoch_loss = running_loss / len(train_loader.dataset)
     return model, optimizer, epoch_loss
@@ -85,7 +82,6 @@ def validate(valid_loader, model, criterion, device):
     running_loss = 0
     
     for X, y_true in valid_loader:
-    
         X = X.to(device)
         y_true = y_true.to(device)
 
@@ -126,7 +122,7 @@ def run(conf):
     device = 'cuda' if not conf.no_cuda and torch.cuda.is_available() else 'cpu'
 
     train_loader = utils.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = utils.get_mnist_dataloader(train=False, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = utils.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
@@ -176,14 +172,6 @@ def get_configuration(config_path, prop: str, consider_cmd_args=True):
     return conf
 
 
-@torch.no_grad()
-def init_weights(m: nn.Module):
-    if (hasattr(m, 'weight') and m.weight is not None):
-        nn.init.xavier_uniform(m.weight)
-    if (hasattr(m, 'bias') and m.bias is not None):
-        nn.init.xavier_uniform(m.bias)
-
-
 def clear_directory(dir_path):
     if not os.path.isdir(dir_path): return
     for file in os.listdir(dir_path):
@@ -194,11 +182,9 @@ def grid_search(conf_path, prop):
     grid = config.read_grid(conf_path, prop)
     for idx, conf in enumerate(grid):
         conf.save_path = 'runs/' + prop + '/' + str(idx)
-
         print(conf)
         # clear directory
         clear_directory(conf.save_path)
-
         train_err, _ = run(conf)
         assert(len(train_err) == conf.epochs)
 

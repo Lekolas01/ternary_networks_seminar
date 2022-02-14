@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-
 class LeNet5(nn.Module):
     def __init__(self, n_classes):
         super(LeNet5, self).__init__()
@@ -75,35 +74,6 @@ class TernaryLeNet5(nn.Module):
         self.classifier = nn.Sequential(
             TernaryLinear(in_features=120, out_features=84),
             nn.Dropout(p=0.5),
-            TernaryLinear(in_features=84, out_features=n_classes),
-        )
-
-    def forward(self, x):
-        x = self.feature_extractor(x)
-        x = torch.flatten(x, 1)
-        logits = self.classifier(x)
-        probs = F.softmax(logits, dim=1)
-        return logits, probs
-
-
-class PaperLeNet5(nn.Module):
-    def __init__(self, n_classes):
-        super(TernaryLeNet5, self).__init__()
-        
-        self.feature_extractor = nn.Sequential(
-            TernaryConv2d(in_channels=1, out_channels=32, kernel_size=5, stride=1),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=2),
-            TernaryConv2d(in_channels=32, out_channels=64, kernel_size=5, stride=1),
-            nn.Tanh(),
-            nn.MaxPool2d(kernel_size=2),
-            TernaryConv2d(in_channels=64, out_channels=120, kernel_size=5, stride=1),
-            nn.Tanh()
-        )
-
-        self.classifier = nn.Sequential(
-            TernaryLinear(in_features=120, out_features=84),
-            nn.Tanh(),
             TernaryLinear(in_features=84, out_features=n_classes),
         )
 

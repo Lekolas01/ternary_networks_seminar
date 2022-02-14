@@ -3,7 +3,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from models.lenet5 import TernaryLinear, TernaryConv2d
 
@@ -46,21 +45,6 @@ class TestTernaryLayers(unittest.TestCase):
             self.assertAlmostEqual(torch.sum(new_y).item(), np.tanh(1))
         test_for_bias(False)
         test_for_bias(True)
-
-
-class TestLossFunction(unittest.TestCase):
-    def R(weights: torch.Tensor, a):
-        s = torch.tanh(weights) ** 2
-        return torch.sum((a - s) * s)
-
-    def test_convergence(self):
-        """
-        When only taking the regularization term into account, all weights of a model should converge to {-1, 0, 1}
-        """
-        # We start with a ternary linear layer
-        tll = TernaryLinear(in_features=20, out_features=10, bias=True)
-        print(tll.parameters())
-        
 
 
 if __name__ == '__main__':

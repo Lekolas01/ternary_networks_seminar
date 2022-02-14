@@ -6,7 +6,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torchinfo
 
 
 class Logger:
@@ -193,34 +192,6 @@ class Checkpoints(Logger):
             print(f"Could not save model to {save_path}: {inst}")
 
     
-    def log_summary(self):
-        pass
-
-
-class Debugger(Logger):
-    def __init__(self, model: nn.Module, input_size, **base_args):
-        super().__init__(**base_args)
-        self.model = model
-        self.input_size = input_size
-        plt.style.use('seaborn')
-
-    
-    def log_init(self):
-        #print(f"Input size: {self.input_size}")
-        #torchinfo.summary(model=self.model, input_size=self.input_size, col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'])
-        weights = utils.get_all_weights(self.model).detach().cpu().numpy()
-        distances = utils.distance_from_int_precision(weights)
-        print(f"Avg. distance: {np.mean(distances)}")
-        #fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
-        #axs[0].hist(x=weights, bins=21)
-        #axs[0].set(title='Weights')
-        #axs[1].hist(x=distances, bins=21)
-        #axs[1].set(title='Distances')
-        #plt.show()
-
-    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
-        self.log_init()
-
     def log_summary(self):
         pass
 
