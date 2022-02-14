@@ -357,3 +357,20 @@ def write_config(config: Configuration, path: Path = None, yaml: bool = True) ->
         dump(config.dict, fp)
 
     return file
+
+
+def read_grid(path: str = None, prop: str=None) -> Configuration:
+    file = _config_path(path, '.json')
+    from json import load
+    with open(file, 'r') as fp:
+        data = load(fp)
+    if (prop is not None):
+        data = data[prop]
+    grid = Grid()
+    for attr in data:
+        if isinstance(data[attr], list):
+            grid.add_options(attr, data[attr])
+        else:
+            grid.add_option(attr, data[attr])
+    return grid
+

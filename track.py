@@ -1,10 +1,13 @@
-import inspect
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
+import utils
+import numpy as np
 
 import torch
 import torch.nn as nn
+import torchinfo
+
 
 class Logger:
     """ Extracts and/or persists tracker information. """
@@ -17,6 +20,9 @@ class Logger:
         """
         self.path = None if path is None else Path(path).expanduser().resolve() 
         self.log_every = log_every
+
+    def log_init(self):
+        pass
 
     def log(self, epoch, update, train_loss, valid_loss, train_acc, valid_acc):
         """
@@ -68,6 +74,11 @@ class Tracker:
             self.loggers.append(logger)
 
 
+    def track_init(self):
+        for logger in self.loggers:
+            logger.log_init()
+
+
     def track_loss(self, train_loss, valid_loss, train_acc, valid_acc):
         self.epoch += 1
         for logger in self.loggers:
@@ -86,34 +97,37 @@ class Tracker:
 class Progress(Logger):
     " Log progress of epoch to stdout. "
 
-    def __init__(self, **base_args):
+    def __init__(self, model:nn.Module, path=None, **base_args):
         """
         Parameters
         ----------
         """
         super().__init__(**base_args)
+        self.path = path + ".csv"
+        self.model = model
 
+    def log_init(self):
+        with open(self.path, 'w') as f:
+            f.write('Epoch,Train_Loss,Valid_Loss,Train_Accuracy,Valid_Accuracy,Distance\n')
 
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
-        if (self.path is None):
-            print(f'{datetime.now().time().replace(microsecond=0)} --- '
-                f'Epoch: {epoch}\t'
-                f'Train loss: {train_loss:.4f}\t'
-                f'Valid loss: {valid_loss:.4f}\t'
-                f'Train accuracy: {100 * train_acc:.2f}\t'
-                f'Valid accuracy: {100 * valid_acc:.2f}')
-        else:
-            print("NotImplemented")
+        weights = utils.get_all_weights(self.model).detach().cpu().numpy()
+        distance = np.mean(utils.distance_from_int_precision(weights))
+        print(f'{datetime.now().time().replace(microsecond=0)} --- '
+            f'Epoch: {epoch}\t'
+            f'Train loss: {train_loss:.4f}\t'
+            f'Valid loss: {valid_loss:.4f}\t'
+            f'Train accuracy: {100 * train_acc:.2f}\t'
+            f'Valid accuracy: {100 * valid_acc:.2f}\t'
+            f'Distance: {distance}')
+        if (self.path is not None):
+            log_line = '{epoch},{tl},{vl},{ta},{va},{d}\n' \
+                .format(epoch=epoch, tl=train_loss, vl=valid_loss, ta=train_acc, va=valid_acc, d=distance)
+            with open(self.path, 'a') as f:
+                f.write(log_line)
         
     def log_summary(self):
         pass
-
-
-def get_methods(obj):
-    return [m for m in dir(obj) if callable(getattr(obj, m)) and not m.startswith('_')]
-
-def get_parameters(fn: callable):
-    return inspect.getfullargspec(fn)
 
 
 class Plotter(Logger):
@@ -158,9 +172,9 @@ class Checkpoints(Logger):
     DEFAULT_NAME = "config{epoch:03d}"
     EXT = ".pth"
     
-    def __init__(self, network: nn.Module, **base_args):
+    def __init__(self, model: nn.Module, **base_args):
         super().__init__(**base_args)
-        self.network = network
+        self.model = model
 
         if self.path.is_dir() or not self.path.suffix:
             # assume path is directory
@@ -174,10 +188,39 @@ class Checkpoints(Logger):
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
         try:
             save_path = str(self.path).format(epoch=epoch)
-            torch.save(self.network, save_path)
+            torch.save(self.model, save_path)
         except Exception as inst:
             print(f"Could not save model to {save_path}: {inst}")
 
     
     def log_summary(self):
         pass
+
+
+class Debugger(Logger):
+    def __init__(self, model: nn.Module, input_size, **base_args):
+        super().__init__(**base_args)
+        self.model = model
+        self.input_size = input_size
+        plt.style.use('seaborn')
+
+    
+    def log_init(self):
+        #print(f"Input size: {self.input_size}")
+        #torchinfo.summary(model=self.model, input_size=self.input_size, col_names=['input_size', 'output_size', 'num_params', 'kernel_size', 'mult_adds'])
+        weights = utils.get_all_weights(self.model).detach().cpu().numpy()
+        distances = utils.distance_from_int_precision(weights)
+        print(f"Avg. distance: {np.mean(distances)}")
+        #fig, axs = plt.subplots(nrows=1, ncols=2, sharey=True)
+        #axs[0].hist(x=weights, bins=21)
+        #axs[0].set(title='Weights')
+        #axs[1].hist(x=distances, bins=21)
+        #axs[1].set(title='Distances')
+        #plt.show()
+
+    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
+        self.log_init()
+
+    def log_summary(self):
+        pass
+

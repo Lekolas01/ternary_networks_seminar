@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
+import os, pathlib
 
 import torch
 import torch.nn as nn
@@ -36,23 +37,20 @@ def get_accuracy(model, data_loader, device):
 
 
 def R(weights: torch.Tensor, a):
-    assert(weights.requires_grad)
     s = torch.tanh(weights) ** 2
     return torch.sum((a - s) * s)
 
 
-def get_loss(y_hat, y_true, criterion, parameters=None, a=0.1, b=0.1,  ternary=False):
+def get_loss(y_hat, y_true, criterion, a, b,  ternary, parameters):
     if not ternary:
         return criterion(y_hat, y_true)
     else:
-        param_losses = [R(param, a) for param in parameters]
-        param_loss_sum = sum(param_losses)
+        regularization_term = sum([R(param, a) for param in parameters])
         c = criterion(y_hat, y_true)
-        regularization_term = torch.sum(param_loss_sum)
         return c + b * regularization_term
 
 
-def train(train_loader, model, criterion, optimizer, device, ternary=False, a=None, b=None):
+def train(train_loader, model, criterion, optimizer, device, ternary, a, b):
     '''
     Function for the training step of the training loop
     '''
@@ -66,13 +64,14 @@ def train(train_loader, model, criterion, optimizer, device, ternary=False, a=No
     
         # Forward pass
         logits, probs = model(X)
-        loss = get_loss(logits, y, criterion, model.parameters(), a, b, ternary)
+        loss = get_loss(logits, y, criterion, a, b, ternary, model.parameters())
         
         running_loss += loss.item() * X.size(0)
 
         # Backward pass
         loss.backward()
         optimizer.step()
+        weights = utils.get_all_weights(model)
         
     epoch_loss = running_loss / len(train_loader.dataset)
     return model, optimizer, epoch_loss
@@ -99,13 +98,14 @@ def validate(valid_loader, model, criterion, device):
     return model, epoch_loss
 
 
-def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, print_every=1, tracker:Tracker=None):
+def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, tracker:Tracker=None):
     '''
     Function defining the entire training loop
     '''
 
+    tracker.track_init()
     # Train model
-    for epoch in range(0, epochs):
+    for epoch in range(epochs):
         # training
         model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device, ternary, a, b)
 
@@ -131,25 +131,24 @@ def run(conf):
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
     
-    model = LeNet5(conf.n_classes) if not conf.ternary else TernaryLeNet5(conf.n_classes)
+    model = LeNet5(10) if not conf.ternary else TernaryLeNet5(10)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
-    tracker = Tracker(Progress())
-    if (conf.plot):
+    progress = Progress(model, conf.save_path + "/logs" if conf.save_path else None)
+    tracker = Tracker(progress)
+    if (hasattr(conf, 'plot') and conf.plot):
         tracker.add_logger(Plotter())
-    if (conf.save_path is not None):
-        tracker.add_logger(Checkpoints(network=model, path=conf.save_path, log_every=1 if conf.save_every is None else conf.save_every))
+    if (hasattr(conf, 'save_path') and conf.save_path is not None):
+        tracker.add_logger(Checkpoints(model=model, path=conf.save_path, log_every=conf.save_every if hasattr(conf, 'save_every') else 1))
 
-    print(f"Begin training (device = {device})...")
     model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.epochs, device, conf.ternary, conf.a, conf.b, tracker=tracker)
-    print("Training done.")
     return errs
 
 
-def get_configuration(config_path, consider_cmd_args=True):
-    conf = config.read_config(config_path, yaml=False).lenet5
+def get_configuration(config_path, prop: str, consider_cmd_args=True):
+    conf = getattr(config.read_config(config_path, yaml=False), prop)
     if (consider_cmd_args):
         parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
         parser.add_argument('--seed', type=int, default=42)
@@ -174,18 +173,51 @@ def get_configuration(config_path, consider_cmd_args=True):
                 conf.overwrite(arg, getattr(args, arg))
             else:
                 conf.__setitem__(arg, getattr(args, arg))
-
     return conf
 
-if __name__ == '__main__':
-    conf = get_configuration('configs.json')
+
+@torch.no_grad()
+def init_weights(m: nn.Module):
+    if (hasattr(m, 'weight') and m.weight is not None):
+        nn.init.xavier_uniform(m.weight)
+    if (hasattr(m, 'bias') and m.bias is not None):
+        nn.init.xavier_uniform(m.bias)
+
+
+def clear_directory(dir_path):
+    if not os.path.isdir(dir_path): return
+    for file in os.listdir(dir_path):
+        os.remove(os.path.join(dir_path, file))
+
+
+def grid_search(conf_path, prop):
+    grid = config.read_grid(conf_path, prop)
+    for idx, conf in enumerate(grid):
+        conf.save_path = 'runs/' + prop + '/' + str(idx)
+
+        print(conf)
+        # clear directory
+        clear_directory(conf.save_path)
+
+        train_err, _ = run(conf)
+        assert(len(train_err) == conf.epochs)
+
+
+def single_run(conf_path, prop):
+    conf = get_configuration(conf_path, prop)
 
     print("Executing run with the following configuration:")
     print("\t       Variable |\tValue")
     print("\t--------------------------")
     for arg in conf:
         print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")
-    
-    # train model
+
+    #train model
     train_err, valid_err = run(conf)
     assert(len(train_err) == conf.epochs)
+
+
+if __name__ == '__main__':
+    #single_run('configs.json', 'single_run')
+    grid_search('configs.json', 'grid_search')
+ 
