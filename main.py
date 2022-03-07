@@ -48,7 +48,7 @@ def get_loss(y_hat, y_true, criterion, a, b,  ternary, parameters):
         return c + b * regularization_term
 
 
-def train(train_loader, model, criterion, optimizer, device, ternary, a, b):
+def train(train_loader, model, criterion, optimizer, ternary, a, b, device):
     '''
     Function for the training step of the training loop
     '''
@@ -61,8 +61,8 @@ def train(train_loader, model, criterion, optimizer, device, ternary, a, b):
         y = y.to(device)
     
         # Forward pass
-        logits, probs = model(X)
-        loss = get_loss(logits, y, criterion, a, b, ternary, model.parameters())
+        y_hat, probs = model(X)
+        loss = get_loss(y_hat, y, criterion, a, b, ternary, model.parameters())
         
         running_loss += loss.item() * X.size(0)
 
@@ -87,7 +87,7 @@ def validate(valid_loader, model, criterion, device):
 
         # Forward pass and record loss
         y_hat, _ = model(X)
-        loss = criterion(y_hat, y_true) 
+        loss = criterion(y_hat, y_true)
         running_loss += loss.item() * X.size(0)
 
     epoch_loss = running_loss / len(valid_loader.dataset)
@@ -103,7 +103,7 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     # Train model
     for epoch in range(epochs):
         # training
-        model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, device, ternary, a, b)
+        model, optimizer, train_loss = train(train_loader, model, criterion, optimizer, ternary, a, b, device)
 
         # validation
         with torch.no_grad():
@@ -117,9 +117,9 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     return model, optimizer, (train_losses, valid_losses)
 
 
-def run(conf):
+def run(conf, args):
     # check device
-    device = 'cuda' if not conf.no_cuda and torch.cuda.is_available() else 'cpu'
+    device = 'cuda' if not args.no_cuda and torch.cuda.is_available() else 'cpu'
 
     train_loader = utils.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
     valid_loader = utils.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
@@ -132,78 +132,59 @@ def run(conf):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
-    progress = Progress(model, conf.save_path + "/logs" if conf.save_path else None)
-    tracker = Tracker(progress)
-    if (hasattr(conf, 'plot') and conf.plot):
-        tracker.add_logger(Plotter())
-    if (hasattr(conf, 'save_path') and conf.save_path is not None):
-        tracker.add_logger(Checkpoints(model=model, path=conf.save_path, log_every=conf.save_every if hasattr(conf, 'save_every') else 1))
 
-    model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, conf.epochs, device, conf.ternary, conf.a, conf.b, tracker=tracker)
+    tracker = Tracker()
+    if (args.save_path is not None):
+        p = args.save_path + "/errors.csv"
+        tracker.add_logger(Progress(model, p, fixed_args={'idx':conf.idx}))
+        tracker.add_logger(Checkpoints(model=model, idx=conf.idx, path=args.save_path, log_every=args.save_every if args.save_every >= 1 else args.epochs))
+    else:
+        tracker.add_logger(Progress(model))
+
+    if (args.plot):
+        tracker.add_logger(Plotter())
+    
+    model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, args.epochs, device, conf.ternary, conf.a, conf.b, tracker)
     return errs
 
 
-def get_configuration(config_path, prop: str, consider_cmd_args=True):
-    conf = getattr(config.read_config(config_path, yaml=False), prop)
-    if (consider_cmd_args):
-        parser = argparse.ArgumentParser(description='Training Procedure for LeNet on MNIST')
-        parser.add_argument('--seed', type=int, default=42)
-        parser.add_argument('--no_cuda', action='store_true', required=False)
-        parser.add_argument('--samples', type=int, default=conf.samples)
-        parser.add_argument('--epochs', type=int, default=conf.epochs)
-        parser.add_argument('--batch_size', type=int, default=conf.batch_size)
-        parser.add_argument('--lr', type=float, default=conf.lr)
-
-        parser.add_argument('--save_path', required=False, type=str)
-        parser.add_argument('--save_every', required=False, type=int, default=1)
-        parser.add_argument('--plot', required=False, action='store_true')
-        parser.add_argument('--plot_every', required=False, type=int, default=1)
-
-        parser.add_argument('--ternary', action='store_true', default = conf.ternary)
-        parser.add_argument('--a', type=float, default = conf.a)
-        parser.add_argument('--b', type=float, default = conf.b)
-        args = parser.parse_args()
-        
-        for arg in (arg for arg in dir(args) if not arg.startswith('_')):
-            if (hasattr(conf, arg)):
-                conf.overwrite(arg, getattr(args, arg))
-            else:
-                conf.__setitem__(arg, getattr(args, arg))
-    return conf
+def get_arguments():
+    parser = argparse.ArgumentParser(description='Training Procedure for a NN on MNIST')
+    parser.add_argument('--config', default='config_1')
+    parser.add_argument('--epochs', default=5)
+    parser.add_argument('--no_cuda', action='store_true')
+    parser.add_argument('--save_path', type=str, required=False)
+    parser.add_argument('--save_every', default=0)
+    parser.add_argument('--plot', action='store_true')
+    args = parser.parse_args()
+    return args
 
 
-def clear_directory(dir_path):
+def prepare_directory(dir_path):
     if not os.path.isdir(dir_path): return
     for file in os.listdir(dir_path):
         os.remove(os.path.join(dir_path, file))
 
+    p = dir_path + "/errors.csv"
+    head = ['idx', 'epoch', 'train_loss', 'valid_loss', 'train_acc', 'valid_acc', 'distance']
+    with open(p, 'w') as f:
+        f.write(','.join(head) + '\n')
 
-def grid_search(conf_path, prop):
-    grid = config.read_grid(conf_path, prop)
+
+def run_grid(grid, args):
+    if args.save_path is not None:
+        args.save_path = 'runs/' + args.save_path
+        prepare_directory(args.save_path)
     for idx, conf in enumerate(grid):
-        conf.save_path = 'runs/' + prop + '/' + str(idx)
+        conf.idx = idx
         print(conf)
-        # clear directory
-        clear_directory(conf.save_path)
-        train_err, _ = run(conf)
-        assert(len(train_err) == conf.epochs)
-
-
-def single_run(conf_path, prop):
-    conf = get_configuration(conf_path, prop)
-
-    print("Executing run with the following configuration:")
-    print("\t       Variable |\tValue")
-    print("\t--------------------------")
-    for arg in conf:
-        print(f"\t{arg:>15} | {str(getattr(conf, arg)):>11}")
-
-    #train model
-    train_err, valid_err = run(conf)
-    assert(len(train_err) == conf.epochs)
+        train_err, _ = run(conf, args)
+        assert(len(train_err) == args.epochs)
 
 
 if __name__ == '__main__':
-    #single_run('configs.json', 'single_run')
-    grid_search('configs.json', 'grid_search')
- 
+    conf_path = 'configs.json'
+    args = get_arguments()
+    grid = config.read_grid(conf_path, args.config)
+    run_grid(grid, args)
+

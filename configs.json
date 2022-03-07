@@ -1,0 +1,20 @@
+{
+  "single_run": {
+    "seed": 0,
+    "lr": 0.001,
+    "batch_size": 128,
+    "samples": -1,
+    "ternary": true,
+    "a": 1.0,
+    "b": 0.0
+  },
+  "config_1": {
+    "seed": 0,
+    "lr": [0.0003, 0.001],
+    "batch_size": 128,
+    "samples": 256,
+    "ternary": true,
+    "a": [0.5, 1, 1.5],
+    "b": [0.001, 0.003, 0.01]
+  }
+}

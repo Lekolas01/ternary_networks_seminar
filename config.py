@@ -359,7 +359,7 @@ def write_config(config: Configuration, path: Path = None, yaml: bool = True) ->
     return file
 
 
-def read_grid(path: str = None, prop: str=None) -> Configuration:
+def read_grid(path: str = None, prop: str=None) -> Grid:
     file = _config_path(path, '.json')
     from json import load
     with open(file, 'r') as fp:

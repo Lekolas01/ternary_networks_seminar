@@ -96,18 +96,23 @@ class Tracker:
 class Progress(Logger):
     " Log progress of epoch to stdout. "
 
-    def __init__(self, model:nn.Module, path=None, **base_args):
+    def __init__(self, model:nn.Module, path=None, fixed_args=None, **base_args):
         """
         Parameters
         ----------
         """
         super().__init__(**base_args)
-        self.path = path + ".csv"
+        self.path = path
+        self.fixed_args = fixed_args
         self.model = model
 
+        if self.path is not None:
+            self.fixed_vals = ','.join([str(self.fixed_args[a]) for a in self.fixed_args])
+
+
     def log_init(self):
-        with open(self.path, 'w') as f:
-            f.write('Epoch,Train_Loss,Valid_Loss,Train_Accuracy,Valid_Accuracy,Distance\n')
+        pass
+
 
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
         weights = utils.get_all_weights(self.model).detach().cpu().numpy()
@@ -119,11 +124,12 @@ class Progress(Logger):
             f'Train accuracy: {100 * train_acc:.2f}\t'
             f'Valid accuracy: {100 * valid_acc:.2f}\t'
             f'Distance: {distance}')
-        if (self.path is not None):
+        if self.path is not None:
             log_line = '{epoch},{tl},{vl},{ta},{va},{d}\n' \
                 .format(epoch=epoch, tl=train_loss, vl=valid_loss, ta=train_acc, va=valid_acc, d=distance)
+            full_line = self.fixed_vals + ',' + log_line
             with open(self.path, 'a') as f:
-                f.write(log_line)
+                f.write(full_line)
         
     def log_summary(self):
         pass
@@ -168,12 +174,13 @@ class Plotter(Logger):
 
 
 class Checkpoints(Logger):
-    DEFAULT_NAME = "config{epoch:03d}"
+    DEFAULT_NAME = "config{idx:02d}_epoch{epoch:03d}"
     EXT = ".pth"
     
-    def __init__(self, model: nn.Module, **base_args):
+    def __init__(self, model: nn.Module, idx: int, **base_args):
         super().__init__(**base_args)
         self.model = model
+        self.idx = idx
 
         if self.path.is_dir() or not self.path.suffix:
             # assume path is directory
@@ -186,7 +193,7 @@ class Checkpoints(Logger):
 
     def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
         try:
-            save_path = str(self.path).format(epoch=epoch)
+            save_path = str(self.path).format(idx=self.idx, epoch=epoch)
             torch.save(self.model, save_path)
         except Exception as inst:
             print(f"Could not save model to {save_path}: {inst}")

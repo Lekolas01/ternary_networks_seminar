@@ -1,8 +1,10 @@
 # VS Code settings
 .vscode/
+
+# My files not to be tracked
 data/
-configs.json
 runs/
+testing.py
 
 
 # Byte-compiled / optimized / DLL files
