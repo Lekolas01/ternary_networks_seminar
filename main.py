@@ -7,7 +7,7 @@ import torch.nn as nn
 import config
 from track import *
 from models.lenet5 import LeNet5, TernaryLeNet5
-import utils
+import dataloading
 
 # ## Helper Functions
 
@@ -121,8 +121,8 @@ def run(conf, args):
     # check device
     device = 'cuda' if not args.no_cuda and torch.cuda.is_available() else 'cpu'
 
-    train_loader = utils.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = utils.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
+    train_loader = dataloading.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = dataloading.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
@@ -150,11 +150,11 @@ def run(conf, args):
 
 def get_arguments():
     parser = argparse.ArgumentParser(description='Training Procedure for a NN on MNIST')
-    parser.add_argument('--config', default='config_1')
-    parser.add_argument('--epochs', default=5)
-    parser.add_argument('--no_cuda', action='store_true')
+    parser.add_argument('--config', type=str, default='config_2')
     parser.add_argument('--save_path', type=str, required=False)
-    parser.add_argument('--save_every', default=0)
+    parser.add_argument('--epochs', type=int, default=5)
+    parser.add_argument('--save_every', type=int, default=0)
+    parser.add_argument('--no_cuda', action='store_true')
     parser.add_argument('--plot', action='store_true')
     args = parser.parse_args()
     return args

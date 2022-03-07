@@ -2,27 +2,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.utils.data as data_utils
-from torch.utils.data.dataloader import DataLoader
-from torchvision import datasets, transforms
 
-
-def get_mnist_dataloader(train, samples: int=None, **dl_args):
-    transform = transforms.Compose([transforms.Resize((32, 32)),
-        transforms.ToTensor()])
-
-    dataset = datasets.MNIST(root='data/', 
-        train=train, 
-        transform=transform,
-        download=True)
-
-    if (samples is not None and 1 <= samples < len(dataset)):
-        dataset = data_utils.Subset(dataset, torch.arange(samples))
-
-    data_loader = DataLoader(dataset, **dl_args)
-
-    return data_loader
-    
 
 def distance_from_int_precision(x: np.ndarray):
     """
