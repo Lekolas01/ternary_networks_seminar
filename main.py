@@ -1,17 +1,19 @@
-import argparse
-import os
+from argparse import *
 
 import torch
 import torch.nn as nn
+from torch.nn.parameter import Parameter
+from torch.utils.data.dataloader import DataLoader
+from torch.optim import Optimizer
 
-import config
-from track import *
-from models.lenet5 import LeNet5, TernaryLeNet5
+from config import Grid, Configuration, read_grid
+from tracking import *
+from models.lenet5 import get_model
 import dataloading
 
 # ## Helper Functions
 
-def get_accuracy(model, data_loader, device):
+def get_accuracy(model: nn.Module, data_loader: DataLoader, device: str):
     '''
     Function for computing the accuracy of the predictions over the entire data_loader
     '''
@@ -34,12 +36,12 @@ def get_accuracy(model, data_loader, device):
     return correct_pred.float() / n
 
 
-def R(weights: torch.Tensor, a):
+def R(weights: torch.Tensor, a: float):
     s = torch.tanh(weights) ** 2
     return torch.sum((a - s) * s)
 
 
-def get_loss(y_hat, y_true, criterion, a, b,  ternary, parameters):
+def get_loss(y_hat, y_true, criterion: nn.Module, a: float, b: float, ternary: bool, parameters: list[Parameter]):
     if not ternary:
         return criterion(y_hat, y_true)
     else:
@@ -48,7 +50,7 @@ def get_loss(y_hat, y_true, criterion, a, b,  ternary, parameters):
         return c + b * regularization_term
 
 
-def train(train_loader, model, criterion, optimizer, ternary, a, b, device):
+def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, ternary: bool, a: float, b: float, device: str):
     '''
     Function for the training step of the training loop
     '''
@@ -74,7 +76,7 @@ def train(train_loader, model, criterion, optimizer, ternary, a, b, device):
     return model, optimizer, epoch_loss
 
 @torch.no_grad()
-def validate(valid_loader, model, criterion, device):
+def validate(valid_loader: DataLoader, model: nn.Module, criterion: nn.Module, device: str):
     '''
     Function for the validation step of the training loop
     '''
@@ -94,12 +96,13 @@ def validate(valid_loader, model, criterion, device):
     return model, epoch_loss
 
 
-def training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, ternary, a=None, b=None, tracker:Tracker=None):
+def training_loop(model: nn.Module, criterion: nn.Module, optimizer: Optimizer, train_loader: DataLoader, \
+    valid_loader: DataLoader, epochs: int, device: str, ternary: bool, a: float=None, b: float=None, tracker:Tracker=None):
     '''
     Function defining the entire training loop
     '''
 
-    tracker.track_init()
+    tracker.loop_init(model)
     # Train model
     for epoch in range(epochs):
         # training
@@ -117,41 +120,30 @@ def training_loop(model, criterion, optimizer, train_loader, valid_loader, epoch
     return model, optimizer, (train_losses, valid_losses)
 
 
-def run(conf, args):
+def run(conf: Configuration, args: Namespace, tracker: Tracker):
     # check device
     device = 'cuda' if not args.no_cuda and torch.cuda.is_available() else 'cpu'
-
-    train_loader = dataloading.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = dataloading.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
 
     # Implementing LeNet-5
     torch.manual_seed(conf.seed)
     
-    model = LeNet5(10) if not conf.ternary else TernaryLeNet5(10)
+    model = get_model(10, conf.ternary, conf.a, conf.b)
     model = model.to(device)
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
 
-    tracker = Tracker()
-    if (args.save_path is not None):
-        p = args.save_path + "/errors.csv"
-        tracker.add_logger(Progress(model, p, fixed_args={'idx':conf.idx}))
-        tracker.add_logger(Checkpoints(model=model, idx=conf.idx, path=args.save_path, log_every=args.save_every if args.save_every >= 1 else args.epochs))
-    else:
-        tracker.add_logger(Progress(model))
+    train_loader = dataloading.get_mnist_dataloader(train=True, samples=conf.samples, shuffle=True, batch_size=conf.batch_size)
+    valid_loader = dataloading.get_mnist_dataloader(train=False, shuffle=True, batch_size=conf.batch_size)
 
-    if (args.plot):
-        tracker.add_logger(Plotter())
-    
     model, optimizer, errs = training_loop(model, criterion, optimizer, train_loader, valid_loader, args.epochs, device, conf.ternary, conf.a, conf.b, tracker)
     return errs
 
 
 def get_arguments():
-    parser = argparse.ArgumentParser(description='Training Procedure for a NN on MNIST')
+    parser = ArgumentParser(description='Training Procedure for a NN on MNIST')
     parser.add_argument('--config', type=str, default='config_2')
-    parser.add_argument('--save_path', type=str, required=False)
+    parser.add_argument('--save_path', type=str, required=False, default='run2')
     parser.add_argument('--epochs', type=int, default=5)
     parser.add_argument('--save_every', type=int, default=0)
     parser.add_argument('--no_cuda', action='store_true')
@@ -160,31 +152,32 @@ def get_arguments():
     return args
 
 
-def prepare_directory(dir_path):
-    if not os.path.isdir(dir_path): return
-    for file in os.listdir(dir_path):
-        os.remove(os.path.join(dir_path, file))
-
-    p = dir_path + "/errors.csv"
-    head = ['idx', 'epoch', 'train_loss', 'valid_loss', 'train_acc', 'valid_acc', 'distance']
-    with open(p, 'w') as f:
-        f.write(','.join(head) + '\n')
-
-
-def run_grid(grid, args):
+def run_grid(grid: Grid, args: Namespace):
     if args.save_path is not None:
         args.save_path = 'runs/' + args.save_path
-        prepare_directory(args.save_path)
+
+    if os.path.exists(args.save_path):
+        # delete all files within that directory
+        for file in os.listdir(args.save_path):
+            os.remove(os.path.join(args.save_path, file))
+
+    tracker = Tracker()
+    tracker.add_logger(Progress(log_every=1))
+    if (args.save_path is not None):
+        tracker.add_logger(Errors(path=args.save_path, log_every=1))
+        tracker.add_logger(Checkpoints(path=args.save_path, clear_dir=True, log_every=args.save_every if args.save_every >= 1 else args.epochs))
+    if (args.plot):
+        tracker.add_logger(Plotter())
+
     for idx, conf in enumerate(grid):
-        conf.idx = idx
         print(conf)
-        train_err, _ = run(conf, args)
+        train_err, _ = run(conf, args, tracker)
         assert(len(train_err) == args.epochs)
 
 
 if __name__ == '__main__':
     conf_path = 'configs.json'
     args = get_arguments()
-    grid = config.read_grid(conf_path, args.config)
+    grid = read_grid(conf_path, args.config)
     run_grid(grid, args)
 

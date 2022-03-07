@@ -60,8 +60,10 @@ class TernaryConv2d(nn.Module):
 
 
 class TernaryLeNet5(nn.Module):
-    def __init__(self, n_classes):
+    def __init__(self, n_classes: int, a: float, b: float):
         super(TernaryLeNet5, self).__init__()
+        self.a = a
+        self.b = b
         
         self.feature_extractor = nn.Sequential(
             TernaryConv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1),
@@ -83,3 +85,11 @@ class TernaryLeNet5(nn.Module):
         logits = self.classifier(x)
         probs = F.softmax(logits, dim=1)
         return logits, probs
+
+
+def get_model(n_classes: int, ternary:bool, a: float=None, b: float=None) -> nn.Module:
+    if not ternary:
+        return LeNet5(n_classes)
+    else:
+        assert(a is not None and b is not None)
+        return TernaryLeNet5(n_classes, a, b)
