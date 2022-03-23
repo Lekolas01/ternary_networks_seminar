@@ -1,20 +1,92 @@
-{
-  "config_1": {
+{  
+  "ternary": {
+  "seed": 0,
+  "lr": 0.003,
+  "batch_size": 64,
+  "ternary": true,
+  "a": 0.0,
+  "b": 0.1
+},
+  "no_ternary": {
     "seed": 0,
-    "lr": 0.001,
+    "lr": 0.003,
+    "batch_size": 64,
+    "ternary": false
+  },
+  "conf1": {
+    "seed": 0,
+    "lr": 0.003,
+    "batch_size": 64,
+    "ternary": true,
+    "a": [0.0, 0.003, 0.01, 0.2, 0.5],
+    "b": [0.0003, 0.001, 0.01]
+  },
+  "real_run": {
+    "seed": 0,
+    "lr": 0.01,
+    "schedule_lr": false,
     "batch_size": 128,
-    "samples": -1,
+    "ternary": true,
+    "a": 0.0001,
+    "b": 0.00001
+  },
+  "other_run": {
+    "seed": 0,
+    "lr": 0.01,
+    "schedule_lr": false,
+    "batch_size": 128,
+    "ternary": true,
+    "a": 0.001,
+    "b": 0.0001
+  },
+  "adult": {
+    "seed": 0,
+    "lr": 0.01,
+    "data": "adult",
+    "schedule_lr": true,
+    "batch_size": 128,
+    "ternary": false,
+    "a": 0.001,
+    "b": 0.0001
+  },
+  "adult_ternary": {
+    "seed": 0,
+    "lr": 0.01,
+    "data": "adult",
+    "schedule_lr": true,
+    "batch_size": 128,
     "ternary": true,
     "a": 1.0,
-    "b": 0.0
+    "b": 0.0001
   },
-  "config_2": {
+  "adult_ternary_a": {
     "seed": 0,
-    "lr": [0.0003, 0.001],
+    "lr": 0.01,
+    "data": "adult",
+    "schedule_lr": true,
     "batch_size": 128,
-    "samples": 256,
     "ternary": true,
-    "a": [0.5, 1, 1.5],
-    "b": [0.001, 0.003, 0.01]
+    "a": [0.01, 0.1, 0.3, 1.0],
+    "b": 0.0001
+  },
+  "mushroom_t": {
+    "seed": 0,
+    "lr": 0.01,
+    "data": "mushroom",
+    "schedule_lr": true,
+    "batch_size": 128,
+    "ternary": true,
+    "a": 1.0,
+    "b": 0.0001
+  },
+  "mushroom_ternary_grid": {
+    "seed": 0,
+    "lr": 0.01,
+    "data": "mushroom",
+    "schedule_lr": true,
+    "batch_size": 128,
+    "ternary": true,
+    "a": [0.01, 0.1, 0.3, 1.0],
+    "b": [0.00001, 0.0001, 0.001, 0.01]
   }
 }

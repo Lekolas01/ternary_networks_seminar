@@ -1,59 +1,92 @@
+from pathlib import Path
+import pandas as pd
 import torch
-import torch.nn.functional as F
-import torch.utils.data
 from torch.utils.data.dataloader import DataLoader
 from torchvision import datasets, transforms
 
-import pandas as pd
-import os, sys
 
-class AdultDataset(torch.utils.data.Dataset):
+class FileDataset(torch.utils.data.Dataset):
     """
-    A pytorch Dataset wrapper around the adult dataset: https://archive.ics.uci.edu/ml/datasets/adult
-    It assumes that the files have not been changed after download.
+    A generic Dataset wrapper around a dataset where all instances lie in one file.
+    The features can be both numerical as well as categorical.
     """
-    # all headers
-    NAMES = ['age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'capital-gain', 'capital-loss', 'hours-per-week', 'native-country', 'target']
-    # all features that have an order on its data defined, i.e. that can be label encoded instead of one-hot encoded
-    ORDINALS = ['age', 'education-num', 'capital-gain', 'capital-loss', 'hours-per-week']
+    def prepare_df(self, df: pd.DataFrame):
+        """ Dummy encode all categorical columns of df. """
+        for column in df:
+            if (df[column].dtype in ['float64', 'int64']): # numerical
+                # normalize column
+                mean = df[column].mean()
+                std = df[column].std()
+                df[column] = (df[column] - mean) / std
 
-    def __init__(self, path):
-        # TODO: ignore incomplete data
-         
-        self.adult_frame = pd.read_csv(path, names = self.NAMES)
-        #self.adult_frame.columns
+        for column in df:
+            if (df[column].dtype == 'object'): #i.e. categorical
+                df = pd.concat([df, pd.get_dummies(df[column], prefix=column, drop_first=True)], axis=1)
+                df.drop([column], axis=1, inplace=True)
+        return df
 
+    def __init__(self, root: str, train: bool, train_test_split: float, first_is_target: bool):
+        """
+        train: bool
+            Whether to access the train or test set.
+        train_test_split: float
+            Must be between 0 and 1. Says how much of the whole dataset is contained in train dataset.
+        first_is_target:
+            Whether the first or the last feature in the dataframe is the target variable.
+        """
+        df = pd.read_csv(root)
+        df = self.prepare_df(df)
+        self.df = df
+        self.train = train
+        self.n_samples = len(self.df)
+        self.n_train_samples = int(self.n_samples * train_test_split)
+        self.n_test_samples = self.n_samples - self.n_train_samples
+
+        if train:
+            x = df.iloc[:self.n_train_samples,1:].values
+            y = df.iloc[:self.n_train_samples,0].values
+        else:
+            x = df.iloc[self.n_train_samples:,1:].values
+            y = df.iloc[self.n_train_samples:,0].values
+
+        self.x = torch.tensor(x, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32)
+        pass
+        
     def __len__(self):
-        return len(self.adult_frame)
+        return len(self.y)
 
     def __getitem__(self, idx):
-        return None
+        return self.x[idx], self.y[idx]
 
 
-def get_mnist_dataloader(train, samples: int=None, **dl_args):
-    transform = transforms.Compose([transforms.Resize((32, 32)),
-        transforms.ToTensor()])
+def DataloaderFactory(ds: str, train: bool, **dl_args):
+    if (ds == 'mnist'):
+        transform = transforms.Compose([transforms.Resize((32, 32)),
+            transforms.ToTensor()])
+        dataset = datasets.MNIST(root='data/', 
+            train=train, 
+            transform=transform,
+            download=True)
+        return DataLoader(dataset, **dl_args)
 
-    dataset = datasets.MNIST(root='data/', 
-        train=train, 
-        transform=transform,
-        download=True)
+    elif (ds == 'adult'):
+        root = Path('data', 'adult', 'adult.all')
+        dataset = FileDataset(root=root, train=train, train_test_split=0.667, first_is_target=False)
+        return DataLoader(dataset=dataset, **dl_args)
 
-    if (samples is not None and 1 <= samples < len(dataset)):
-        dataset = torch.utils.data.Subset(dataset, torch.arange(samples))
+    elif (ds == 'mushroom'):
+        root = Path('data', 'mushroom', 'agaricus-lepiota.data')
+        dataset = FileDataset(root=root, train=train, train_test_split=0.8, first_is_target=True)
+        return DataLoader(dataset=dataset, **dl_args)
 
-    data_loader = DataLoader(dataset, **dl_args)
-
-    return data_loader
-
+    raise ValueError('Non-existing dataset: {d}'.format(d=ds))
+    
 
 if __name__ == '__main__':
-    path = os.path.join('data', 'adult', 'adult.data')
-    ds = AdultDataset(path)
-
-    print(len(ds))
-    print(ds)
-
-    print(sys.getsizeof(ds))
-    print(sys.getsizeof(ds.adult_frame))
-    print(ds.adult_frame.columns)
+    dl = DataloaderFactory(ds='adult', train=True, batch_size=64, shuffle=False)
+    print(len(dl))
+    x, y = next(iter(dl))
+    print(f"x.shape:{x.shape}")
+    print(f"y.shape:{y.shape}")
+    

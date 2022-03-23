@@ -3,10 +3,10 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import utils
 import numpy as np
-import os
 
 import torch
 import torch.nn as nn
+from config import Configuration
 
 
 class Logger:
@@ -20,7 +20,7 @@ class Logger:
         """
         self.log_every = log_every
 
-    def log_init(self):
+    def loop_init(self, idx: int, conf: Configuration):
         pass
 
     def log(self, epoch, update, train_loss, valid_loss, train_acc, valid_acc):
@@ -71,7 +71,7 @@ class Tracker:
             self.loggers.append(logger)
 
 
-    def loop_init(self, model):
+    def loop_init(self, model: nn.Module, **kwargs):
         self.model = model
         self.idx += 1
         self.epoch = 0
@@ -79,7 +79,7 @@ class Tracker:
         self.valid_losses = []
 
         for logger in self.loggers:
-            logger.log_init()
+            logger.loop_init(self.epoch, **kwargs)
 
 
     def track_loss(self, train_loss, valid_loss, train_acc, valid_acc):
@@ -108,22 +108,21 @@ class Progress(Logger):
         """
         super().__init__(**base_args)
 
-
-    def log_init(self):
+    def loop_init(self, epoch: int, **kwargs):
         pass
 
-
     def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
-        weights = utils.get_all_weights(model).detach().cpu().numpy()
-        distance = np.mean(utils.distance_from_int_precision(weights))
+        weights = np.tanh(utils.get_all_weights(model).detach().cpu().numpy())
+        d, (minus_ones, zeros, plus_ones) = utils.distance_from_int_precision(weights)
+        distance = np.mean(d)
         print(f'{datetime.now().time().replace(microsecond=0)} --- '
             f'Epoch: {epoch}\t'
             f'Train loss: {train_loss:.4f}\t'
             f'Valid loss: {valid_loss:.4f}\t'
             f'Train accuracy: {100 * train_acc:.2f}\t'
             f'Valid accuracy: {100 * valid_acc:.2f}\t'
-            f'Distance: {distance:.4f}')
-            
+            f'Distance: {distance:.4f}\t'
+            f'Spread: {minus_ones:.2f} {zeros:.2f} {plus_ones:.2f}\t')
         
     def log_summary(self):
         pass
@@ -137,7 +136,7 @@ class Plotter(Logger):
         self.valid_losses = []
         self.epochs = []
     
-    def log(self, epoch, train_loss, valid_loss, train_acc, valid_acc):
+    def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
         self.epochs.append(epoch)
         self.train_losses.append(train_loss)
         self.valid_losses.append(valid_loss)
@@ -167,51 +166,59 @@ class Plotter(Logger):
         plt.show(block=True)
 
 
-class FileLogger(Logger):
-    def __init__(self, path: str, clear_dir: bool=False, **base_args):
-        super().__init__(**base_args)
-        self.path = None if path is None else Path(path).expanduser().resolve()
-        # create directory if necessary
-        self.path.mkdir(exist_ok=True, parents=True)
-        assert(os.path.isdir(str(self.path)))
+class ResultsLogger(Logger):
+    ERROR_FILE = "errors.csv"
+    ERRORS_FORMAT = "{idx},{epoch},{tl:.4f},{vl:.4f},{ta:.4f},{va:.4f},{d:.4f},{m:.4f},{z:.4f},{p:.4f}\n"
 
+    CONFIGS_FILE = "configs.csv"
+    CONFIGS_FORMAT = "{seed},{lr},{batch_size},{samples},{ternary},{a},{b}\n"
 
-class Errors(FileLogger):
-    LINE_FORMAT = "{idx},{epoch},{tl:.4f},{vl:.4f},{ta:.4f},{va:.4f},{d:.4f}\n"
-    FILE_NAME = "errors.csv"
+    MODEL_FILE = "config{idx:02d}_epoch{epoch:03d}.pth"
 
-    def __init__(self, **base_args):
-        super().__init__(**base_args)
-        self.errors_path = self.path / self.FILE_NAME
+    def __init__(self, path: str, model_every=1):
+        super().__init__(log_every = 1)
+        assert(path is not None)
+        self.path = Path(path)
+        self.model_every = model_every
 
-        # add header to errors file
-        head = ['idx', 'epoch', 'train_loss', 'valid_loss', 'train_acc', 'valid_acc', 'distance']
+        self.errors_path = self.path / self.ERROR_FILE
+        self.configs_path = self.path / self.CONFIGS_FILE
+        self.model_path = self.path / self.MODEL_FILE
+
+        self.path.mkdir(exist_ok=False, parents=True)
+
+        # prepare configs file
+        with open(self.configs_path, 'w') as f:
+            f.write(self.CONFIGS_FORMAT.format(s='seed', lr='lr', bs='batch_size', sa='samples', t='ternary', a='a', b='b'))
+        
+        # prepare errors file
         with open(self.errors_path, 'w') as f:
-            f.write(','.join(head) + '\n')
+            f.write('idx,epoch,train_loss,valid_loss,train_acc,valid_acc,distance,minus_ones,zeros,plus_ones\n')
+
+
+    def loop_init(self, idx: int, seed, lr, batch_size, samples, ternary, a, b, **kwargs):
+        # log the configuration
+        with open(self.configs_path, 'a') as f:
+            f.write(self.CONFIGS_FORMAT.format(seed, lr, batch_size, samples, ternary, a, b))
 
 
     def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
-        weights = utils.get_all_weights(model).detach().cpu().numpy()
-        distance = np.mean(utils.distance_from_int_precision(weights))
+        weights = np.tanh(utils.get_all_weights(model).detach().cpu().numpy())
+        d, (minus_ones, zeros, plus_ones) = utils.distance_from_int_precision(weights)
+        distance = np.mean(d)
 
-        log_line = self.LINE_FORMAT \
-            .format(idx=idx, epoch=epoch, tl=train_loss, vl=valid_loss, ta=train_acc, va=valid_acc, d=distance)
+        # log errors
+        log_line = self.ERRORS_FORMAT \
+            .format(idx=idx, epoch=epoch, tl=train_loss, vl=valid_loss, ta=train_acc, va=valid_acc, d=distance, m=minus_ones, z=zeros, p=plus_ones)
         with open(self.errors_path, 'a') as f:
             f.write(log_line)
 
+        if epoch % self.model_every == 0:
+            print(self.model_every, idx)
+            # log model
+            try:
+                curr_model_path = str(self.model_path).format(idx=idx, epoch=epoch)
+                torch.save(model, curr_model_path)
+            except Exception as inst:
+                print(f"Could not save model to {curr_model_path}: {inst}")
 
-class Checkpoints(FileLogger):
-    DEFAULT_NAME = "config{idx:02d}_epoch{epoch:03d}"
-    EXT = ".pth"
-    
-    def __init__(self, **base_args):
-        super().__init__(**base_args)
-        self.model_path = (self.path / Checkpoints.DEFAULT_NAME).with_suffix(Checkpoints.EXT)
-
-
-    def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
-        try:
-            save_path = str(self.model_path).format(idx=idx, epoch=epoch)
-            torch.save(model, save_path)
-        except Exception as inst:
-            print(f"Could not save model to {save_path}: {inst}")

@@ -1,14 +1,13 @@
 import unittest
 import numpy as np
-
 import torch
 import torch.nn as nn
 
-from models.lenet5 import TernaryLinear, TernaryConv2d
+from models.ternary import TernaryLinear, TernaryConv2d
 
 
 class TestTernaryLayers(unittest.TestCase):
-    def test_ternary_linear(self):
+    def test_TernaryLinear(self):
         def test_for_bias(bias):
             x = torch.zeros(size=(5, 5))
             x[2, 2] = 1
@@ -28,7 +27,7 @@ class TestTernaryLayers(unittest.TestCase):
         test_for_bias(True)
 
         
-    def test_ternary_conv2d(self):
+    def test_TernaryConv2d(self):
         def test_for_bias(bias):
             x = torch.zeros(size=(10, 1, 5, 5))
             x[0, 0, 2, 2] = 1
@@ -46,6 +45,6 @@ class TestTernaryLayers(unittest.TestCase):
         test_for_bias(False)
         test_for_bias(True)
 
-
 if __name__ == '__main__':
     unittest.main()
+

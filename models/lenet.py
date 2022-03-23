@@ -1,13 +1,16 @@
+import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from .ternary import TernaryLinear, TernaryConv2d
 
-class LeNet5(nn.Module):
+
+class LeNet(nn.Module):
     def __init__(self, n_classes):
-        super(LeNet5, self).__init__()
+        super(LeNet, self).__init__()
         
-        self.feature_extractor = nn.Sequential(            
+        self.feature_extractor = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1),
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
@@ -32,36 +35,9 @@ class LeNet5(nn.Module):
         return logits, probs
 
 
-class TernaryLinear(nn.Module):
-    def __init__(self, **kwargs):
-        super().__init__()
-        module = nn.Linear(**kwargs)
-        self.weight = module.weight
-        self.bias = module.bias
-
-        
-    def forward(self, x: torch.Tensor):
-        weight = torch.tanh(self.weight)
-        bias = None if self.bias is None else torch.tanh(self.bias)
-        return F.linear(x, weight, bias)
-
-
-class TernaryConv2d(nn.Module):
-    def __init__(self, **kwargs):
-        super().__init__()
-        module = nn.Conv2d(**kwargs)
-        self.weight = module.weight
-        self.bias = module.bias
-    
-    def forward(self, x: torch.Tensor):
-        weight = torch.tanh(self.weight)
-        bias = None if self.bias is None else torch.tanh(self.bias)
-        return F.conv2d(x, weight, bias)
-
-
-class TernaryLeNet5(nn.Module):
-    def __init__(self, n_classes: int, a: float, b: float):
-        super(TernaryLeNet5, self).__init__()
+class TernaryLeNet(nn.Module):
+    def __init__(self, n_classes: int, a: float=0.0, b: float=0.0):
+        super(TernaryLeNet, self).__init__()
         self.a = a
         self.b = b
         
@@ -79,6 +55,7 @@ class TernaryLeNet5(nn.Module):
             TernaryLinear(in_features=84, out_features=n_classes),
         )
 
+
     def forward(self, x):
         x = self.feature_extractor(x)
         x = torch.flatten(x, 1)
@@ -87,9 +64,9 @@ class TernaryLeNet5(nn.Module):
         return logits, probs
 
 
-def get_model(n_classes: int, ternary:bool, a: float=None, b: float=None) -> nn.Module:
-    if not ternary:
-        return LeNet5(n_classes)
-    else:
-        assert(a is not None and b is not None)
-        return TernaryLeNet5(n_classes, a, b)
+    def regularization(self):
+        reg = torch.zeros(1)
+        for param in self.parameters():
+            reg = reg + R(param, self.a)
+        return self.b * reg
+
