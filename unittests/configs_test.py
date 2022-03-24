@@ -16,6 +16,7 @@ class TestConfigs(unittest.TestCase):
         for grid_key in grids:
             grid = read_grid(path=self.CONFIG_ROOT, prop=grid_key)
             for conf in grid:
+                if conf.data == "mnist": continue
                 run(conf, 1, dry_run=True)
 
 if __name__ == '__main__':

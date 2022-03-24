@@ -3,9 +3,8 @@ import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
-from config import Configuration
 
-from tracking import Tracker
+from tracking.tracker import Tracker
 
 
 def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, device: str, dry_run=False, **kwargs) -> float:

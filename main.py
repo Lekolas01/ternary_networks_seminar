@@ -4,7 +4,10 @@ import torch
 import torch.nn as nn
 
 from config import Configuration, Grid, read_grid
-from tracking import Tracker, Progress, Checkpoints, Plotter
+from tracking.tracker import Tracker
+from tracking.checkpoints import Checkpoints
+from tracking.loggers import Plotter, Progress
+
 from models.factory import ModelFactory
 from dataloading import DataloaderFactory
 from train_model import training_loop
@@ -58,7 +61,7 @@ if __name__ == '__main__':
     if (args.save_path is not None):
         #save_path = Path('runs') / 'mushroom/grid'
         save_path = Path('runs') / args.save_path
-        tracker.add_logger(Checkpoints(path=save_path))
+        tracker.add_logger(Checkpoints(path=save_path, model_every=args.epochs))
     if (args.plot):
         tracker.add_logger(Plotter())
 
