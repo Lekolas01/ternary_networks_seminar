@@ -1,11 +1,13 @@
 from pathlib import Path
 from datetime import datetime
 import matplotlib.pyplot as plt
-import utils
 import numpy as np
-
 import torch
 import torch.nn as nn
+from torch.utils.data.dataloader import DataLoader
+
+from models.ternary import TernaryModule
+import utils
 from config import Configuration
 
 
@@ -20,10 +22,13 @@ class Logger:
         """
         self.log_every = log_every
 
-    def loop_init(self, idx: int, conf: Configuration):
+    def loop_init(self, model: nn.Module, train_loader: DataLoader, valid_loader: DataLoader, **kwargs):
+        self.model = model
+        self.train_loader = train_loader
+        self.valid_loader = valid_loader
         pass
 
-    def log(self, epoch, update, train_loss, valid_loss, train_acc, valid_acc):
+    def log(self, **kwargs):
         """
         Log the loss and other metrics of the current mini-batch.
 
@@ -54,50 +59,6 @@ class Logger:
         pass
 
 
-class Tracker:
-    """ Tracks useful information on the current epoch. """
-    def __init__(self, *loggers: Logger):
-        """
-        Parameters
-        ----------
-        logger0, logger1, ... loggerN : Logger
-            One or more loggers for logging training information.
-        """
-        self.loggers = list(loggers)
-        self.idx = 0
-
-    def add_logger(self, logger: Logger):
-        if (logger not in self.loggers):
-            self.loggers.append(logger)
-
-
-    def loop_init(self, model: nn.Module, **kwargs):
-        self.model = model
-        self.idx += 1
-        self.epoch = 0
-        self.train_losses = []
-        self.valid_losses = []
-
-        for logger in self.loggers:
-            logger.loop_init(self.epoch, **kwargs)
-
-
-    def track_loss(self, train_loss, valid_loss, train_acc, valid_acc):
-        assert(isinstance(self.model, nn.Module))
-        self.epoch += 1
-        for logger in self.loggers:
-            if (self.epoch % logger.log_every == 0):
-                logger.log(self.idx, self.model, self.epoch, train_loss, valid_loss, train_acc, valid_acc)
-        self.train_losses.append(train_loss)
-        self.valid_losses.append(valid_loss)
-
-
-    def summarise(self):
-        for logger in self.loggers:
-            logger.log_summary()
-        return self.train_losses, self.valid_losses
-
-
 class Progress(Logger):
     " Log progress of epoch to stdout. "
 
@@ -108,21 +69,31 @@ class Progress(Logger):
         """
         super().__init__(**base_args)
 
-    def loop_init(self, epoch: int, **kwargs):
+    def loop_init(self, epoch: int, starting_loss: float, **kwargs):
+        super().__init__()
+        super().loop_init(**kwargs)
+        self.device = next(self.model.parameters()).device
         pass
 
-    def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
+    def log(self, idx, model: TernaryModule, epoch, train_loss, valid_loss, train_acc, valid_acc):
         weights = np.tanh(utils.get_all_weights(model).detach().cpu().numpy())
         d, (minus_ones, zeros, plus_ones) = utils.distance_from_int_precision(weights)
         distance = np.mean(d)
+        quantized_model = model.quantized().to(self.device)
+        q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device)
+        q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device)
+        temp = -1
+        # TODO: print quantized accuracy
         print(f'{datetime.now().time().replace(microsecond=0)} --- '
             f'Epoch: {epoch}\t'
-            f'Train loss: {train_loss:.4f}\t'
-            f'Valid loss: {valid_loss:.4f}\t'
-            f'Train accuracy: {100 * train_acc:.2f}\t'
-            f'Valid accuracy: {100 * valid_acc:.2f}\t'
+            #f'Train loss: {train_loss:.4f}\t'
+            #f'Valid loss: {valid_loss:.4f}\t'
+            f'Train: {100 * train_acc:.4f}\t'
+            f'Valid: {100 * valid_acc:.4f}\t'
+            f'Q Train: {100 * q_train_acc:.4f}\t'
+            f'Q Valid: {100 * q_valid_acc:.4f}\t'
             f'Distance: {distance:.4f}\t'
-            f'Spread: {minus_ones:.2f} {zeros:.2f} {plus_ones:.2f}\t')
+            f'Sparsity: {zeros:.4f}\t')
         
     def log_summary(self):
         pass
@@ -136,7 +107,7 @@ class Plotter(Logger):
         self.valid_losses = []
         self.epochs = []
     
-    def log(self, idx, model, epoch, train_loss, valid_loss, train_acc, valid_acc):
+    def log(self, epoch, train_loss, valid_loss, **kwargs):
         self.epochs.append(epoch)
         self.train_losses.append(train_loss)
         self.valid_losses.append(valid_loss)
@@ -166,7 +137,7 @@ class Plotter(Logger):
         plt.show(block=True)
 
 
-class ResultsLogger(Logger):
+class Results(Logger):
     ERROR_FILE = "errors.csv"
     ERRORS_FORMAT = "{idx},{epoch},{tl:.4f},{vl:.4f},{ta:.4f},{va:.4f},{d:.4f},{m:.4f},{z:.4f},{p:.4f}\n"
 
@@ -222,3 +193,53 @@ class ResultsLogger(Logger):
             except Exception as inst:
                 print(f"Could not save model to {curr_model_path}: {inst}")
 
+
+class Tracker:
+    """ Tracks useful information on the current epoch. """
+    def __init__(self, *loggers: Logger):
+        """
+        Parameters
+        ----------
+        logger0, logger1, ... loggerN : Logger
+            One or more loggers for logging training information.
+        """
+        self.loggers = list(loggers)
+        self.idx = 0
+
+    def add_logger(self, logger: Logger):
+        if (logger not in self.loggers):
+            self.loggers.append(logger)
+
+
+    def loop_init(self, model: nn.Module, train_loader: DataLoader, valid_loader: DataLoader, starting_loss: float, **kwargs):
+        self.model = model
+        self.train_loader = train_loader
+        self.valid_loader = valid_loader
+        self.idx += 1
+        self.epoch = 0
+        self.train_losses = []
+        self.valid_losses = []
+
+        for logger in self.loggers:
+            logger.loop_init(self.epoch, starting_loss, model=self.model, train_loader=self.train_loader, valid_loader=self.valid_loader, **kwargs)
+
+
+    def track_loss(self, train_loss, valid_loss):
+        assert(isinstance(self.model, nn.Module))
+        self.epoch += 1
+
+        device = next(self.model.parameters()).device
+        train_acc = utils.get_accuracy(self.model, self.train_loader, device)
+        valid_acc = utils.get_accuracy(self.model, self.valid_loader, device)
+
+        for logger in self.loggers:
+            if (self.epoch % logger.log_every == 0):
+                logger.log(self.idx, self.model, self.epoch, train_loss, valid_loss, train_acc, valid_acc)
+        self.train_losses.append(train_loss)
+        self.valid_losses.append(valid_loss)
+
+
+    def summarise(self):
+        for logger in self.loggers:
+            logger.log_summary()
+        return self.train_losses, self.valid_losses

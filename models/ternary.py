@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import copy
 
 
 def R(weights: torch.Tensor, a: float):
@@ -26,22 +27,20 @@ class TernaryModule(nn.Module):
         return self.b * reg
 
     def quantized(self):
-        seq = self.classifier
+        quantized_module = copy.deepcopy(self)
+        seq = quantized_module.classifier
+
         for idx, layer in enumerate(seq):
             layer.zero_grad()
             if isinstance(layer, TernaryLinear):
-                new_layer = nn.Linear(in_features=layer.weight.shape[1], out_features=layer.weight.shape[0], bias=True)
-                new_layer.requires_grad_(False)
-                new_layer.weight.copy_(torch.round(torch.tanh(layer.weight.detach())))
-                new_layer.bias.copy_(torch.round(torch.tanh(layer.bias.detach())))
-                seq[idx] = new_layer
+                with torch.no_grad():
+                    b = layer.bias is not None
+                    new_layer = nn.Linear(in_features=layer.weight.shape[1], out_features=layer.weight.shape[0], bias=b)
+                    new_layer.weight.copy_(torch.round(torch.tanh(layer.weight.detach())))
+                    new_layer.bias.copy_(torch.round(torch.tanh(layer.bias.detach())))
+                    seq[idx] = new_layer
             
-            if isinstance(layer, TernaryConv2d):
-                new_layer = nn.Conv2d(in_channels=layer.weight.shape[1], out_channels=layer.weight.shape[0], kernel_size=(layer.weight.shape[2], layer.weight.shape[3]), bias=True)
-                new_layer.requires_grad_(False)
-                new_layer.weight.copy_(torch.round(torch.tanh(layer.weight)))
-                new_layer.bias.copy_(torch.round(torch.tanh(layer.bias)))
-                seq[idx] = new_layer
+        return quantized_module
 
 
 class TernaryLayer(nn.Module):
