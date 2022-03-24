@@ -25,7 +25,7 @@ class FileDataset(torch.utils.data.Dataset):
                 df.drop([column], axis=1, inplace=True)
         return df
 
-    def __init__(self, root: str, train: bool, train_test_split: float, first_is_target: bool):
+    def __init__(self, root: str, train: bool, train_test_split: float, first_is_target: bool, names: list):
         """
         train: bool
             Whether to access the train or test set.
@@ -34,7 +34,7 @@ class FileDataset(torch.utils.data.Dataset):
         first_is_target:
             Whether the first or the last feature in the dataframe is the target variable.
         """
-        df = pd.read_csv(root)
+        df = pd.read_csv(root, names=names)
         df = self.prepare_df(df)
         self.df = df
         self.train = train
@@ -72,21 +72,30 @@ def DataloaderFactory(ds: str, train: bool, **dl_args):
 
     elif (ds == 'adult'):
         root = Path('data', 'adult', 'adult.all')
-        dataset = FileDataset(root=root, train=train, train_test_split=0.667, first_is_target=False)
+        names = ['age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 
+        'occupation', 'relationship', 'race', 'sex', 'capital-gain', 'capital-loss',
+        'hours-per-week', 'native-country']
+        dataset = FileDataset(root=root, train=train, train_test_split=2/3, first_is_target=False, names=names)
         return DataLoader(dataset=dataset, **dl_args)
 
     elif (ds == 'mushroom'):
         root = Path('data', 'mushroom', 'agaricus-lepiota.data')
+        names = ['edible', 'cap-shape', 'cap-surface', 'cap-color', 'bruises', 'odor', 'gill-attachment', 'gill-spacing',
+            'gill-size', 'gill-color', 'stalk-shape', 'stalk-root', 'stalk-surface-above-ring', 'stalk-surface-below-ring',
+            'stalk-color-above-ring', 'stalk-color-below-ring', 'veil-type', 'veil-color', 'ring-number', 'ring-type', 
+            'spore-print-color', 'population', 'habitat']
+        print(len(names))
         train_test_split = 1.0 if train else 0.0
-        dataset = FileDataset(root=root, train=train, train_test_split=train_test_split, first_is_target=True)
+        dataset = FileDataset(root=root, train=train, train_test_split=train_test_split, first_is_target=True, names=names)
         return DataLoader(dataset=dataset, **dl_args)
 
     raise ValueError('Non-existing dataset: {d}'.format(d=ds))
     
 
 if __name__ == '__main__':
-    dl = DataloaderFactory(ds='adult', train=True, batch_size=64, shuffle=False)
+    dl = DataloaderFactory(ds='mushroom', train=True, batch_size=64, shuffle=False)
     print(len(dl))
+    print(len(dl.dataset))
     x, y = next(iter(dl))
     print(f"x.shape:{x.shape}")
     print(f"y.shape:{y.shape}")

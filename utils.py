@@ -10,6 +10,8 @@ def get_accuracy(model: nn.Module, data_loader: DataLoader, device: str) -> floa
     '''
     correct_pred = 0
     n = 0
+    if (next(model.parameters()).device != device):
+        model = model.to(device)
     
     with torch.no_grad():
         model.eval()
