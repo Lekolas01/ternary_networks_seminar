@@ -58,8 +58,8 @@ class Tracker:
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
             quantized_model = self.model.quantized().to(self.device)
-            q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device)
-            q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device)
+            q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device).item()
+            q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
         else:
             q_train_acc, q_valid_acc = 0.0, 0.0
 

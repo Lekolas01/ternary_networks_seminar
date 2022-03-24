@@ -28,7 +28,7 @@ def run(conf: Configuration, epochs: int, tracker=Tracker(), **kwargs) -> list[f
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
     scheduler = None
     if (conf.schedule_lr):
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[100, 130], gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer=optimizer, milestones=[80], gamma=0.1)
 
     return training_loop(model, criterion, optimizer, train_loader, valid_loader, epochs, device, tracker, scheduler, conf=conf, **kwargs)
 

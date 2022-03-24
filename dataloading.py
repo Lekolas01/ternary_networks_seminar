@@ -77,7 +77,8 @@ def DataloaderFactory(ds: str, train: bool, **dl_args):
 
     elif (ds == 'mushroom'):
         root = Path('data', 'mushroom', 'agaricus-lepiota.data')
-        dataset = FileDataset(root=root, train=train, train_test_split=0.8, first_is_target=True)
+        train_test_split = 1.0 if train else 0.0
+        dataset = FileDataset(root=root, train=train, train_test_split=train_test_split, first_is_target=True)
         return DataLoader(dataset=dataset, **dl_args)
 
     raise ValueError('Non-existing dataset: {d}'.format(d=ds))
