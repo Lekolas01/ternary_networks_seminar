@@ -3,11 +3,12 @@ import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
+from config import Configuration
 
 from tracking import Tracker
 
 
-def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, device: str, dry_run=False) -> float:
+def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, device: str, dry_run=False, **kwargs) -> float:
     '''
     Function for the training step of the training loop
     '''
@@ -37,7 +38,7 @@ def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, opti
 
 
 @torch.no_grad()
-def validate(valid_loader: DataLoader, model: nn.Module, criterion: nn.Module, device: str, dry_run=False) -> float:
+def validate(valid_loader: DataLoader, model: nn.Module, criterion: nn.Module, device: str, dry_run=False, **kwargs) -> float:
     '''
     Function for the validation step of the training loop
     '''
@@ -63,8 +64,7 @@ def validate(valid_loader: DataLoader, model: nn.Module, criterion: nn.Module, d
 def training_loop(model: nn.Module, criterion: nn.Module, optimizer: Optimizer, train_loader: DataLoader, \
     valid_loader: DataLoader, epochs: int, device: str, tracker:Tracker=None, scheduler: MultiStepLR=None, **kwargs):
     
-    starting_loss = validate(valid_loader, model, criterion, device, **kwargs)
-    tracker.loop_init(model, train_loader, valid_loader, starting_loss, **kwargs)
+    tracker.loop_init(model, train_loader, valid_loader, **kwargs)
     # Train model
     for epoch in range(epochs):
         # training

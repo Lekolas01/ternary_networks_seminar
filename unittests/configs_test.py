@@ -16,7 +16,7 @@ class TestConfigs(unittest.TestCase):
         for grid_key in grids:
             grid = read_grid(path=self.CONFIG_ROOT, prop=grid_key)
             for conf in grid:
-                run(conf.seed, conf.data, conf.ternary, conf.batch_size, conf.lr, conf.schedule_lr, 1, conf.a, conf.b, dry_run=True)
+                run(conf, 1, dry_run=True)
 
 if __name__ == '__main__':
     unittest.main()

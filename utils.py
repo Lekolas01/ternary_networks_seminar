@@ -44,7 +44,7 @@ def distance_from_int_precision(x: np.ndarray):
     minus_ones = np.count_nonzero(x <= -0.5) / x.shape[0]
     plus_ones = np.count_nonzero(x >= 0.5) / x.shape[0]
     zeros = 1 - minus_ones - plus_ones
-    return ans, zeros
+    return np.mean(ans), zeros
 
 
 def get_all_weights(model: nn.Module):
