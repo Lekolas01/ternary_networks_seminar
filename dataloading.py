@@ -84,7 +84,6 @@ def DataloaderFactory(ds: str, train: bool, **dl_args):
             'gill-size', 'gill-color', 'stalk-shape', 'stalk-root', 'stalk-surface-above-ring', 'stalk-surface-below-ring',
             'stalk-color-above-ring', 'stalk-color-below-ring', 'veil-type', 'veil-color', 'ring-number', 'ring-type', 
             'spore-print-color', 'population', 'habitat']
-        print(len(names))
         train_test_split = 1.0 if train else 0.0
         dataset = FileDataset(root=root, train=train, train_test_split=train_test_split, first_is_target=True, names=names)
         return DataLoader(dataset=dataset, **dl_args)

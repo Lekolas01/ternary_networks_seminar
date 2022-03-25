@@ -94,7 +94,8 @@ class BestModels(Models):
         super().__init__(checkpoints, **kwargs)
         self.model_path = self.cp.path / self.MODEL_DIR / self.MODEL_FILE
         self.stats = []
-        os.mkdir(self.model_path.parent)
+        if not os.path.isdir(self.model_path.parent):
+            os.mkdir(self.model_path.parent)
 
 
     def is_optimal(self, stats: list[tuple[float, float]]) -> bool:
@@ -143,8 +144,9 @@ class Checkpoints(Logger):
         assert(path is not None)
 
         self.path.mkdir(exist_ok=True, parents=True)
-        for f in glob.glob(self.path.__str__() + '/*', recursive=True):
-            os.remove(f)
+        for f in glob.glob(self.path.__str__() + '/**', recursive=True):
+            print(f)
+            if not os.path.isdir(f): os.remove(f)
         self.error_logger = Errors(self, log_every=error_every)
         self.config_logger = Configs(self, log_every=config_every)
         self.model_logger = Models(self, log_every=model_every)

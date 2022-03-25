@@ -21,9 +21,9 @@ class AdultNet(nn.Module):
 class TernaryAdultNet(TernaryModule):
     def __init__(self, in_features: int, a: float, b: float, **kwargs):
         classifier = nn.Sequential(
-            TernaryLinear(in_features=in_features, out_features=80),
-            nn.ReLU(),
-            TernaryLinear(in_features=80, out_features=1),
+            TernaryLinear(in_features=in_features, out_features=10),
+            nn.Tanh(),
+            TernaryLinear(in_features=10, out_features=1),
             nn.Sigmoid()
         )
         super().__init__(classifier, a, b, **kwargs)

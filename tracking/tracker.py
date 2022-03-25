@@ -49,7 +49,8 @@ class Tracker:
         # calculate important metrics:
         # train- and test accuracy
         train_acc = utils.get_accuracy(self.model, self.train_loader, self.device)
-        valid_acc = utils.get_accuracy(self.model, self.valid_loader, self.device)
+        valid_acc = train_acc
+        #valid_acc = utils.get_accuracy(self.model, self.valid_loader, self.device)
 
         # mean distance from full-precision and sparsity
         weights = np.tanh(utils.get_all_weights(self.model).detach().cpu().numpy())
@@ -59,7 +60,8 @@ class Tracker:
         if isinstance(self.model, TernaryModule):
             quantized_model = self.model.quantized().to(self.device)
             q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device).item()
-            q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
+            q_valid_acc = q_train_acc
+            #q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
         else:
             q_train_acc, q_valid_acc = 0.0, 0.0
 
