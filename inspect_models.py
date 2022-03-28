@@ -80,15 +80,16 @@ def pretty_print_classifier(classifier, names, print_first_layer=True):
                     print(f"- {val} ", end="" )
                 elif (w[i,j] == 1):
                     print(f"+ {val} ", end="")
-            if (bias[i] == -1): print(f"- b", end="")
-            if (bias[i] == 1): print(f"+ b", end="")
+            if (bias is not None):
+                if (bias[i] == -1): print(f"- b", end="")
+                if (bias[i] == 1): print(f"+ b", end="")
             print()
 
     for idx, layer in enumerate(classifier):
         if isinstance(layer, nn.Linear):
             print(f"\tLayer {idx}:")
             w = layer.weight.detach().cpu().numpy().astype(np.int8)
-            b = layer.bias.detach().cpu().numpy().astype(np.int8)
+            b = layer.bias.detach().cpu().numpy().astype(np.int8) if layer.bias is not None else None
             pretty_print_linear_layer(w, b, names if idx == 0 else None)
         print()
 
@@ -98,12 +99,10 @@ def get_result(errors: pd.DataFrame, indices, epochs):
     return pd.concat(frames, axis=0)
 
 
-
-
 if __name__ == '__main__':
     base_path = Path('runs') / 'mushroom'
     runs = ['grid_few_hiddens', 'grid_tanh', 'grid_no_activation', 'grid_very_few_hiddens']
     dir_paths = [base_path / r for r in runs]
-    dir_path = Path('runs') / 'mushroom' / 'grid_very_few_hiddens'
+    dir_path = Path('runs') / 'mushroom' / 'grid_tanh'
     #inspect_fronts(dir_paths)
     inspect(dir_path)
