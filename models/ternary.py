@@ -52,8 +52,8 @@ class TernaryModule(nn.Module):
             reg = reg + R(param, self.a)
         return self.b * reg
     
-    def quantized(self, do_simplify: bool=False):
-        return QuantizedModel(self, do_simplify)
+    def quantized(self, simplify: bool=False):
+        return QuantizedModel(self, simplify)
 
 
 class QuantizedModel(nn.Module):
@@ -64,9 +64,6 @@ class QuantizedModel(nn.Module):
         self.device = next(self.classifier.parameters()).device
         self.tanh_and_round()
         
-        if self.do_simplify:
-            self.simplify()
-
         if self.do_simplify:
             self.simplify()
 
