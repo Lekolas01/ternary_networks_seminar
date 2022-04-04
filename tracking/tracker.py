@@ -8,8 +8,9 @@ from config import Configuration
 from .loggers import Logger
 
 
-
 class Tracker:
+    COMPLEXITY_LIMIT = 200
+
     """ Tracks useful information on the current epoch. """
     def __init__(self, *loggers: Logger):
         """
@@ -58,13 +59,15 @@ class Tracker:
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
-            quantized_model = self.model.quantized(False).to(self.device)
-            complexity = quantized_model.complexity()
+            quantized_model = self.model.quantized(simplify=False).to(self.device)
+            compl = quantized_model.complexity()
+            simple_model = self.model.quantized(simplify=True).to(self.device)
+            simple_compl = simple_model.complexity()
             q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device).item()
             q_valid_acc = q_train_acc
             #q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
         else:
-            q_train_acc, q_valid_acc, complexity = 0.0, 0.0, 0.0
+            q_train_acc, q_valid_acc, compl, simple_compl = 0.0, 0.0, 0.0, 0.0
 
         for logger in self.loggers:
             if (self.epoch % logger.log_every == 0):
@@ -74,10 +77,11 @@ class Tracker:
                     train_acc=train_acc, valid_acc=valid_acc, 
                     distance=distance, sparsity=sparsity, 
                     q_train_acc=q_train_acc, q_valid_acc=q_valid_acc, 
-                    complexity=complexity)
+                    compl=compl, simple_compl=simple_compl)
 
         self.train_losses.append(train_loss)
         self.valid_losses.append(valid_loss)
+        return simple_compl >= self.COMPLEXITY_LIMIT
 
 
     def summarise(self):

@@ -101,8 +101,8 @@ def get_result(errors: pd.DataFrame, indices, epochs):
 
 if __name__ == '__main__':
     base_path = Path('runs') / 'mushroom'
-    runs = ['grid_few_hiddens', 'grid_tanh', 'grid_no_activation', 'grid_very_few_hiddens']
+    runs = ['grid_few_hiddens', 'grid_tanh', 'grid_no_activation', 'grid_very_few_hiddens', 'can_so_delete2']
     dir_paths = [base_path / r for r in runs]
-    dir_path = Path('runs') / 'mushroom' / 'grid_tanh'
+    dir_path = Path('runs') / 'mushroom' / 'complexity' / 'run1'
     #inspect_fronts(dir_paths)
     inspect(dir_path)

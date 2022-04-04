@@ -128,8 +128,8 @@ class BestModels(Models):
         self.stats.append(tup)
 
 
-    def log(self, q_valid_acc, sparsity, complexity, **kwargs):
-        self.insert((q_valid_acc, -complexity, self.cp.t.conf_idx, self.cp.t.epoch), self.stats)
+    def log(self, q_valid_acc, simple_compl, **kwargs):
+        self.insert((q_valid_acc, -simple_compl, self.cp.t.conf_idx, self.cp.t.epoch), self.stats)
     
 
     def log_summary(self):

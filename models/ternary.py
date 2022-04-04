@@ -78,6 +78,8 @@ class QuantizedModel(nn.Module):
                     if b:
                         new_layer.bias.copy_(torch.round(torch.tanh(layer.bias.detach())))
                     self.classifier[idx] = new_layer
+            elif isinstance(layer, nn.Tanh):
+                self.classifier[idx] = Sign()
 
 
     def find_relevant_dims(self):
@@ -146,4 +148,12 @@ class QuantizedModel(nn.Module):
             x = torch.index_select(x, 1, self.relevant_dims[0])
         ans = self.classifier(x).flatten()
         return ans, ans
+
+
+class Sign(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.sign(x)
 

@@ -61,7 +61,7 @@ class Progress(Logger):
     def loop_init(self, **kwargs):
         super().loop_init(**kwargs)
 
-    def log(self, train_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, **kwargs):
+    def log(self, train_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, compl, simple_compl, **kwargs):
 
         print(f'{datetime.now().time().replace(microsecond=0)} --- '
             f'Epoch: {self.t.epoch}\t'
@@ -71,7 +71,8 @@ class Progress(Logger):
             f'Q-Train: {100 * q_train_acc:.4f}  \t'
             f'Q-Valid: {100 * q_valid_acc:.4f}  \t'
             f'Distance: {distance:.4f}\t'
-            f'Sparsity: {sparsity:.4f}\t')
+            f'Compl.: {compl}\t'
+            f'Simple Compl.: {simple_compl}\t')
         
     def log_summary(self):
         pass

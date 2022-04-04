@@ -48,7 +48,6 @@ def run_grid(grid: Grid, args: Namespace, tracker: Tracker):
     for idx, conf in enumerate(grid):
         print(idx, ':', conf)
         train_err, _ = run(conf, args.epochs, tracker=tracker)
-        assert(len(train_err) == args.epochs)
 
 
 if __name__ == '__main__':
