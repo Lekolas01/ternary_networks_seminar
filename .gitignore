@@ -5,7 +5,7 @@
 data/
 runs/
 testing.py
-
+*ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

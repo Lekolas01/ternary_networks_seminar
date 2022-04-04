@@ -51,22 +51,21 @@ class TernaryModule(nn.Module):
             reg = reg + R(param, self.a)
         return self.b * reg
     
-    def quantized(self):
-        return QuantizedModel(self)
+    def quantized(self, do_simplify: bool=False):
+        return QuantizedModel(self, do_simplify)
 
 
 class QuantizedModel(nn.Module):
-    def __init__(self, ternary_model: TernaryModule):
+    def __init__(self, ternary_model: TernaryModule, do_simplify: bool):
         super().__init__()
 
+        self.do_simplify = do_simplify
         self.classifier = copy.deepcopy(ternary_model.classifier)
         self.device = next(self.classifier.parameters()).device
         self.tanh_and_round()
-        print("Before:")
-        pretty_print_classifier(self.classifier, None, False)
 
-        self.simplify()
-
+        if self.do_simplify:
+            self.simplify()
 
     def tanh_and_round(self):
         for idx, layer in enumerate(self.classifier):
@@ -124,6 +123,7 @@ class QuantizedModel(nn.Module):
 
 
     def forward(self, x):
-        x = torch.index_select(x, 1, self.relevant_dims[0])
+        if self.do_simplify:
+            x = torch.index_select(x, 1, self.relevant_dims[0])
         ans = self.classifier(x).flatten()
         return ans, ans
