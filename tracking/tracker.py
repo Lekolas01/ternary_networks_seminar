@@ -58,12 +58,13 @@ class Tracker:
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
-            quantized_model = self.model.quantized().to(self.device)
+            quantized_model = self.model.quantized(False).to(self.device)
+            complexity = quantized_model.complexity()
             q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device).item()
             q_valid_acc = q_train_acc
             #q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
         else:
-            q_train_acc, q_valid_acc = 0.0, 0.0
+            q_train_acc, q_valid_acc, complexity = 0.0, 0.0, 0.0
 
         for logger in self.loggers:
             if (self.epoch % logger.log_every == 0):
@@ -72,7 +73,8 @@ class Tracker:
                     train_loss=train_loss, valid_loss=valid_loss, 
                     train_acc=train_acc, valid_acc=valid_acc, 
                     distance=distance, sparsity=sparsity, 
-                    q_train_acc=q_train_acc, q_valid_acc=q_valid_acc)
+                    q_train_acc=q_train_acc, q_valid_acc=q_valid_acc, 
+                    complexity=complexity)
 
         self.train_losses.append(train_loss)
         self.valid_losses.append(valid_loss)

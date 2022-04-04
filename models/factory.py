@@ -1,7 +1,8 @@
 import torch.nn as nn
 
-from .lenet import LeNet, TernaryLeNet
-from .adult import AdultNet, TernaryAdultNet
+from models.lenet import LeNet, TernaryLeNet
+from models.adult import AdultNet, TernaryAdultNet
+from models.mushroom import MushroomNet, TernaryMushroomNet
 
 
 def ModelFactory(data: str, ternary: bool, a: float=None, b: float=None) -> nn.Module:
@@ -16,4 +17,3 @@ def ModelFactory(data: str, ternary: bool, a: float=None, b: float=None) -> nn.M
         return AdultNet(in_features=in_features) if not ternary else TernaryAdultNet(in_features, a, b)
     else:
         raise ValueError(f'Non-existing model: ' + data)
-
