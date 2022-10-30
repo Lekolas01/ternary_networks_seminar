@@ -57,9 +57,10 @@ class TernaryModule(nn.Module):
 
 
 class QuantizedModel(nn.Module):
-    def __init__(self, ternary_model: TernaryModule, do_simplify: bool):
+    def __init__(self, ternary_model: TernaryModule, do_simplify: bool, quantize_tanh=False):
         super().__init__()
         self.do_simplify = do_simplify
+        self.quantize_tanh = quantize_tanh
         self.classifier = copy.deepcopy(ternary_model.classifier)
         self.device = next(self.classifier.parameters()).device
         self.tanh_and_round()
@@ -80,6 +81,9 @@ class QuantizedModel(nn.Module):
                     self.classifier[idx] = new_layer
             elif isinstance(layer, nn.Tanh):
                 self.classifier[idx] = Sign()
+            elif isinstance(layer, nn.Sigmoid):
+                self.classifier[idx] = Greater_one_half()
+            
 
 
     def find_relevant_dims(self):
@@ -157,3 +161,10 @@ class Sign(nn.Module):
     def forward(self, x):
         return torch.sign(x)
 
+
+class Greater_one_half(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        return torch.where(x > 0.5, 1.0, 0.0)

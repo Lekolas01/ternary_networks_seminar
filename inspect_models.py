@@ -5,7 +5,6 @@ import numpy as np
 import glob, os
 import torch
 import torch.nn as nn
-from utils import get_accuracy
 import utils
 from dataloading import DataloaderFactory
 
@@ -28,19 +27,19 @@ def get_stats_of_dir_path(dir_path):
 
     indices, epochs = get_indices_epochs(base_model_paths)
     best_models = [torch.load(p) for p in model_paths]
-    best_quantized_models = [m.quantized() for m in best_models]
+    best_quantized_models = [m.quantized(simplify=True) for m in best_models]
     results = get_result(errors, indices, epochs)
-    #results = results.sort_values('sparsity', axis=0)
+    results = results.sort_values('simple_complexity', axis=0)
     return errors, results, best_quantized_models
 
 
 def inspect(dir_path):
     errors, results, best_quantized_models = get_stats_of_dir_path(dir_path)
-    sorted_results = results.sort_values('sparsity', axis=0)
+    sorted_results = results.sort_values('complexity', axis=0)
     
-    plt.plot(sorted_results['sparsity'], sorted_results['quantized_valid_acc'])
-    plt.xlabel('sparsity')
-    plt.ylabel('quantized accuracy')
+    plt.plot(sorted_results['simple_complexity'], sorted_results['quantized_valid_acc'])
+    plt.xlabel('complexity of quantized/simplified NN')
+    plt.ylabel('Accuracy')
     plt.title(os.path.basename(dir_path))
     plt.show()
     valid_loader = DataloaderFactory(ds='mushroom', train=False, shuffle=True, batch_size=128)
@@ -49,21 +48,19 @@ def inspect(dir_path):
     for i, qm in enumerate(best_quantized_models):
         curr_result = results.iloc[i]
         weights = np.tanh(utils.get_all_weights(qm).detach().cpu().numpy())
-        distance, sparsity = utils.distance_from_int_precision(weights)
-        print(f"Model {i}: Accuracy = {curr_result['quantized_valid_acc']} | Sparsity = {curr_result['sparsity']}")# | Calc Sparsity = {sparsity}")
-
+        print(f"Model {i}: Accuracy = {curr_result['quantized_valid_acc']} | Simple Complexity = {curr_result['simple_complexity']}")
         pretty_print_classifier(qm.classifier, names)
 
 
 def inspect_fronts(dir_paths):
     fronts = []
-    plt.xlabel('sparsity')
+    plt.xlabel('simple complexity')
     plt.ylabel('quantized accuracy')
     plt.title('Comparison of multiple Fronts')
     for dir_path in dir_paths:
         errors, results, best_quantized_models = get_stats_of_dir_path(dir_path)
-        sorted_results = results.sort_values('sparsity')
-        plt.plot(sorted_results['sparsity'], sorted_results['quantized_valid_acc'], label=dir_path)
+        sorted_results = results.sort_values('simple_complexity')
+        plt.plot(sorted_results['simple_complexity'], sorted_results['quantized_valid_acc'], label=dir_path)
     plt.legend()
     plt.show()
 
@@ -100,9 +97,9 @@ def get_result(errors: pd.DataFrame, indices, epochs):
 
 
 if __name__ == '__main__':
-    base_path = Path('runs') / 'mushroom'
-    runs = ['grid_few_hiddens', 'grid_tanh', 'grid_no_activation', 'grid_very_few_hiddens', 'can_so_delete2']
+    base_path = Path('runs') / 'mushroom' / 'complexity'
+    runs = ['sigmoid', 'small_sigmoid', ]
     dir_paths = [base_path / r for r in runs]
-    dir_path = Path('runs') / 'mushroom' / 'complexity' / 'run1'
+    dir_path = Path('runs') / 'mushroom' / 'complexity' / 'small_sigmoid'
     #inspect_fronts(dir_paths)
     inspect(dir_path)

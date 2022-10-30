@@ -1,5 +1,6 @@
 from datetime import datetime
 import matplotlib.pyplot as plt
+import torch
 
 
 class Logger:
@@ -52,10 +53,6 @@ class Progress(Logger):
     " Log progress of epoch to stdout. "
 
     def __init__(self, **kwargs):
-        """
-        Parameters
-        ----------
-        """
         super().__init__(**kwargs)
 
     def loop_init(self, **kwargs):
@@ -114,3 +111,23 @@ class Plotter(Logger):
     def log_summary(self):
         # don't close plot after last epoch
         plt.show(block=True)
+
+
+class SwitchHills(Logger):
+    "Keeps track for every parameter weight how often it switched hill sides (i.e. the hills in the regularization loss, see paper)."
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.model = self.t.model
+        counts = torch.zeros_like()
+
+
+    def loop_init(self, **kwargs):
+        super().loop_init(**kwargs)
+
+    def log(self, train_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, compl, simple_compl, **kwargs):
+
+        pass
+
+    def log_summary(self):
+        pass

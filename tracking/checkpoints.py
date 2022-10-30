@@ -7,8 +7,8 @@ from .loggers import Logger
 
 class Errors(Logger):
     ERROR_FILE = "errors.csv"
-    ERRORS_HEADER_FORMAT = "{idx},{epoch},{tl},{vl},{ta},{va},{qta},{qva},{dist},{sp}\n"
-    ERRORS_FORMAT = "{idx},{epoch},{tl:.4f},{vl:.4f},{ta:.4f},{va:.4f},{qta:.4f},{qva:.4f},{dist:.4f},{sp:.4f}\n"
+    ERRORS_HEADER_FORMAT = "{idx},{epoch},{tl},{vl},{ta},{va},{qta},{qva},{dist},{sp},{compl},{s_compl}\n"
+    ERRORS_FORMAT = "{idx},{epoch},{tl:.4f},{vl:.4f},{ta:.4f},{va:.4f},{qta:.4f},{qva:.4f},{dist:.4f},{sp:.4f},{compl},{s_compl}\n"
 
     def __init__(self, checkpoints, **kwargs):
         super().__init__(**kwargs)
@@ -22,11 +22,11 @@ class Errors(Logger):
                 tl='train_loss', vl='valid_loss',
                 ta='train_acc', va='valid_acc',
                 qta='quantized_train_acc', qva='quantized_valid_acc',
-                dist='distance', sp='sparsity')
+                dist='distance', sp='sparsity', compl='complexity', s_compl='simple_complexity')
             f.write(new_var)
 
 
-    def log(self, train_loss, valid_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, **kwargs):
+    def log(self, train_loss, valid_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, compl, simple_compl, **kwargs):
         # log errors
         with open(self.errors_path, 'a') as f:
             f.write(self.ERRORS_FORMAT.format(
@@ -34,7 +34,8 @@ class Errors(Logger):
                 tl=train_loss, vl=valid_loss,
                 ta=train_acc, va=valid_acc,
                 qta=q_train_acc, qva=q_valid_acc,
-                dist=distance, sp=sparsity
+                dist=distance, sp=sparsity,
+                compl=compl, s_compl=simple_compl
             ))
 
     
@@ -145,7 +146,7 @@ class Checkpoints(Logger):
 
         self.path.mkdir(exist_ok=True, parents=True)
         for f in glob.glob(self.path.__str__() + '/**', recursive=True):
-            print(f)
+            print(f"Deleting {f}...")
             if not os.path.isdir(f): os.remove(f)
         self.error_logger = Errors(self, log_every=error_every)
         self.config_logger = Configs(self, log_every=config_every)

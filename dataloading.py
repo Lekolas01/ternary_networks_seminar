@@ -25,6 +25,7 @@ class FileDataset(torch.utils.data.Dataset):
                 df.drop([column], axis=1, inplace=True)
         return df
 
+
     def __init__(self, root: str, train: bool, train_test_split: float, first_is_target: bool, names: list):
         """
         train: bool
@@ -53,8 +54,10 @@ class FileDataset(torch.utils.data.Dataset):
         self.y = torch.tensor(y, dtype=torch.float32)
         pass
         
+
     def __len__(self):
         return len(self.y)
+        
 
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
