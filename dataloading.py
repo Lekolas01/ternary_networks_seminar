@@ -26,17 +26,23 @@ class FileDataset(torch.utils.data.Dataset):
         return df
 
 
-    def __init__(self, root: str, train: bool, train_test_split: float, first_is_target: bool, names: list):
+    def __init__(self, root: str, train: bool, train_test_split: float, names: list, target: str):
         """
         train: bool
             Whether to access the train or test set.
         train_test_split: float
-            Must be between 0 and 1. Says how much of the whole dataset is contained in train dataset.
-        first_is_target:
-            Whether the first or the last feature in the dataframe is the target variable.
+            Must be between 0 and 1. ratio of train set to whole dataset.
+        target:
+            Specifies which of the columns is the target variable.
         """
+        assert target in names, 'name of target variable must be in names'
         df = pd.read_csv(root, names=names)
+        print(f"len(df.columns): {len(df.columns)}")
+        print(f"df.columns: {list(df.columns)}")
         df = self.prepare_df(df)
+        print(f"len(df.columns): {len(df.columns)}")
+        print(f"df.columns: {list(df.columns)}")
+        
         self.df = df
         self.train = train
         self.n_samples = len(self.df)
@@ -52,6 +58,8 @@ class FileDataset(torch.utils.data.Dataset):
 
         self.x = torch.tensor(x, dtype=torch.float32)
         self.y = torch.tensor(y, dtype=torch.float32)
+        print(f"self.x.shape: {self.x.shape}")
+        print(f"self.y.shape: {self.y.shape}")
         pass
         
 
@@ -74,12 +82,13 @@ def DataloaderFactory(ds: str, train: bool, **dl_args):
         return DataLoader(dataset, **dl_args)
 
     elif (ds == 'adult'):
-        root = Path('data', 'adult', 'adult.all')
+        root = Path('data', 'adult', 'adult.full')
         names = ['age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 
         'occupation', 'relationship', 'race', 'sex', 'capital-gain', 'capital-loss',
-        'hours-per-week', 'native-country']
-        dataset = FileDataset(root=root, train=train, train_test_split=2/3, first_is_target=False, names=names)
-        return DataLoader(dataset=dataset, **dl_args)
+        'hours-per-week', 'native-country', 'less_than_50']
+        dataset = FileDataset(root=root, train=train, train_test_split=2/3, names=names, target='less_than_50')
+        dl = DataLoader(dataset=dataset, **dl_args)
+        return dl
 
     elif (ds == 'mushroom'):
         root = Path('data', 'mushroom', 'agaricus-lepiota.data')
@@ -95,10 +104,11 @@ def DataloaderFactory(ds: str, train: bool, **dl_args):
     
 
 if __name__ == '__main__':
-    dl = DataloaderFactory(ds='mushroom', train=True, batch_size=64, shuffle=False)
-    print(len(dl))
-    print(len(dl.dataset))
+    dl = DataloaderFactory(ds='adult', train=True, batch_size=64, shuffle=False)
+    print(f"len(dl): {len(dl)}")
+    print(f"len(dl.dataset): {len(dl.dataset)}")
     x, y = next(iter(dl))
-    print(f"x.shape:{x.shape}")
-    print(f"y.shape:{y.shape}")
+    print(f"x.shape: {x.shape}")
+    print(f"y.shape: {y.shape}")
+    
     

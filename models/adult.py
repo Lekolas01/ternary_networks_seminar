@@ -4,7 +4,7 @@ from .ternary import TernaryModule, TernaryLinear
 
 
 class AdultNet(nn.Module):
-    def __init__(self, in_features=100, **kwargs):
+    def __init__(self, in_features=101, **kwargs):
         super().__init__(**kwargs)
         self.classifier = nn.Sequential(
             nn.Linear(in_features=in_features, out_features=80),

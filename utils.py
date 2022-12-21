@@ -4,7 +4,7 @@ import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 
 
-def get_accuracy(model: nn.Module, data_loader: DataLoader, device: str) -> float:
+def accuracy(model: nn.Module, data_loader: DataLoader, device: str) -> float:
     '''
     Function for computing the accuracy of the predictions over the entire data_loader
     '''
@@ -27,7 +27,6 @@ def get_accuracy(model: nn.Module, data_loader: DataLoader, device: str) -> floa
                 _, predicted_labels = torch.max(y_prob, 1)
             correct_pred += (predicted_labels == y_true).sum()
             n += y_true.size(0)
-
     return correct_pred.float() / n
 
 
@@ -50,8 +49,6 @@ def distance_from_int_precision(x: np.ndarray):
 
 
 def get_all_weights(model: nn.Module):
-    params = []
-    for param in model.parameters():
-        params.append(param.view(-1))
+    params = [param.view(-1) for param in model.parameters()]
     params = torch.cat(params)
     return params

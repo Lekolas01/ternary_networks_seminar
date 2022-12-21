@@ -73,10 +73,9 @@ def training_loop(model: nn.Module, criterion: nn.Module, optimizer: Optimizer, 
         with torch.no_grad():
             valid_loss = validate(valid_loader, model, criterion, device, **kwargs)
 
-        stop = tracker.track_loss(train_loss, valid_loss)
+        tracker.track_loss(train_loss, valid_loss)
         if scheduler is not None:
             scheduler.step()
-        if stop: break
     
     train_losses, valid_losses = tracker.summarise()
     return (train_losses, valid_losses)

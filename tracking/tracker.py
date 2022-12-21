@@ -9,8 +9,6 @@ from .loggers import Logger
 
 
 class Tracker:
-    COMPLEXITY_LIMIT = 200
-
     """ Tracks useful information on the current epoch. """
     def __init__(self, *loggers: Logger):
         """
@@ -67,9 +65,9 @@ class Tracker:
 
         # calculate important metrics:
         # train- and test accuracy
-        train_acc = utils.get_accuracy(self.model, self.train_loader, self.device)
+        train_acc = utils.accuracy(self.model, self.train_loader, self.device)
         valid_acc = train_acc
-        #valid_acc = utils.get_accuracy(self.model, self.valid_loader, self.device)
+        #valid_acc = utils.accuracy(self.model, self.valid_loader, self.device)
 
         # mean distance from full-precision and sparsity
         weights = np.tanh(utils.get_all_weights(self.model).detach().cpu().numpy())
@@ -77,13 +75,13 @@ class Tracker:
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
-            quantized_model = self.model.quantized(simplify=False).to(self.device)
+            quantized_model = self.model.quantized(prune=False).to(self.device)
             compl = quantized_model.complexity()
-            simple_model = self.model.quantized(simplify=True).to(self.device)
+            simple_model = self.model.quantized(prune=True).to(self.device)
             simple_compl = simple_model.complexity()
-            q_train_acc = utils.get_accuracy(quantized_model, self.train_loader, self.device).item()
+            q_train_acc = utils.accuracy(quantized_model, self.train_loader, self.device).item()
             q_valid_acc = q_train_acc
-            #q_valid_acc = utils.get_accuracy(quantized_model, self.valid_loader, self.device).item()
+            #q_valid_acc = utils.accuracy(quantized_model, self.valid_loader, self.device).item()
         else:
             q_train_acc, q_valid_acc, compl, simple_compl = 0.0, 0.0, 0.0, 0.0
 
@@ -99,7 +97,7 @@ class Tracker:
 
         self.train_losses.append(train_loss)
         self.valid_losses.append(valid_loss)
-        return simple_compl >= self.COMPLEXITY_LIMIT
+        return simple_compl
 
 
     def summarise(self):

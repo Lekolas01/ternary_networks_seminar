@@ -52,21 +52,21 @@ class TernaryModule(nn.Module):
             reg = reg + R(param, self.a)
         return self.b * reg
     
-    def quantized(self, simplify: bool=False):
-        return QuantizedModel(self, simplify)
+    def quantized(self, prune: bool=False):
+        return QuantizedModel(self, prune)
 
 
 class QuantizedModel(nn.Module):
-    def __init__(self, ternary_model: TernaryModule, do_simplify: bool, quantize_tanh=False):
+    def __init__(self, ternary_model: TernaryModule, do_prune: bool, quantize_tanh=False):
         super().__init__()
-        self.do_simplify = do_simplify
+        self.do_prune = do_prune
         self.quantize_tanh = quantize_tanh
         self.classifier = copy.deepcopy(ternary_model.classifier)
         self.device = next(self.classifier.parameters()).device
         self.tanh_and_round()
         
-        if self.do_simplify:
-            self.simplify()
+        if self.do_prune:
+            self.prune()
 
     def tanh_and_round(self):
         for idx, layer in enumerate(self.classifier):
@@ -83,7 +83,6 @@ class QuantizedModel(nn.Module):
                 self.classifier[idx] = Sign()
             elif isinstance(layer, nn.Sigmoid):
                 self.classifier[idx] = Greater_one_half()
-            
 
 
     def find_relevant_dims(self):
@@ -93,7 +92,6 @@ class QuantizedModel(nn.Module):
                 if isinstance(layer, nn.Linear):
                     ans = idx
             return ans
-
 
         relevant_dims = []
         last_lin = last_linear_layer_()
@@ -121,7 +119,7 @@ class QuantizedModel(nn.Module):
         return ans
 
 
-    def simplify(self):
+    def prune(self):
         self.relevant_dims = self.find_relevant_dims()
         
         i = 0
@@ -148,7 +146,7 @@ class QuantizedModel(nn.Module):
 
 
     def forward(self, x):
-        if self.do_simplify:
+        if self.do_prune:
             x = torch.index_select(x, 1, self.relevant_dims[0])
         ans = self.classifier(x).flatten()
         return ans, ans

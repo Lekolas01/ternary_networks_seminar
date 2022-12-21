@@ -27,7 +27,7 @@ def get_stats_of_dir_path(dir_path):
 
     indices, epochs = get_indices_epochs(base_model_paths)
     best_models = [torch.load(p) for p in model_paths]
-    best_quantized_models = [m.quantized(simplify=True) for m in best_models]
+    best_quantized_models = [m.quantized(prune=True) for m in best_models]
     results = get_result(errors, indices, epochs)
     results = results.sort_values('simple_complexity', axis=0)
     return errors, results, best_quantized_models

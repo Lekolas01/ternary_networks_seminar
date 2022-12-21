@@ -34,7 +34,7 @@ def run(conf: Configuration, epochs: int, tracker=Tracker(), **kwargs) -> list[f
 
 
 def get_arguments() -> Namespace:
-    parser = ArgumentParser(description='Generic Training Procedure for a NN with parameters specified in a configuration.')
+    parser = ArgumentParser(description='Generic Training Procedure for a NN with hyperparameters specified by a configuration.')
     parser.add_argument('config', nargs=1, help='The name of the training configuration.')
     parser.add_argument('-s', '--save_path', type=str, required=False, help='If specified, will save the trained model and training information to this path.')
     parser.add_argument('-e', '--epochs', type=int, default=5, help='For how many epochs you want to train.')

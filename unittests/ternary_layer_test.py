@@ -42,6 +42,7 @@ class TestTernaryLayers(unittest.TestCase):
             self.assertAlmostEqual(torch.sum(y).item(), np.tanh(1))
             new_y = ternary_conv2d(x) # also check for idempotence
             self.assertAlmostEqual(torch.sum(new_y).item(), np.tanh(1))
+            
         test_for_bias(False)
         test_for_bias(True)
 

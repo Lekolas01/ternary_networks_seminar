@@ -43,8 +43,8 @@ class TestSimplification(unittest.TestCase):
     def test_fully_connected(self):
         """Bias enabled and all weights and bias parameters set to 1."""
         model = self.TestModel(bias=True, fill_value=0.7)
-        q_model = model.quantized(simplify=False)
-        simple_model = model.quantized(simplify=True)
+        q_model = model.quantized(prune=False)
+        simple_model = model.quantized(prune=True)
         
         for idx, layer in enumerate(q_model.classifier):
             assert(
@@ -64,8 +64,8 @@ class TestSimplification(unittest.TestCase):
     def test_full_connected_no_bias(self):
         """Bias is disabled and therefore None."""
         model = self.TestModel(bias=False, fill_value=0.7)
-        q_model = model.quantized(simplify=False)
-        simple_model = model.quantized(simplify=True)
+        q_model = model.quantized(prune=False)
+        simple_model = model.quantized(prune=True)
 
         for idx, layer in enumerate(model.classifier):
             assert(q_model.classifier[idx].weight.shape == simple_model.classifier[idx].weight.shape == layer.weight.shape)
@@ -81,8 +81,8 @@ class TestSimplification(unittest.TestCase):
         """Bias is enabled, but set to 0. Other weights set to 1."""
         model = self.TestModel(bias=True, fill_value=0.7)
         model.fill_bias(0.0)
-        q_model = model.quantized(simplify=False)
-        simple_model = model.quantized(simplify=True)
+        q_model = model.quantized(prune=False)
+        simple_model = model.quantized(prune=True)
 
         for idx, layer in enumerate(model.classifier):
             assert(model.classifier[idx].weight.shape == q_model.classifier[idx].weight.shape == simple_model.classifier[idx].weight.shape)
@@ -116,8 +116,8 @@ class TestSimplification(unittest.TestCase):
             model.classifier[0].weight[:] = w1
             model.classifier[1].weight[:] = w2
 
-        q_model = model.quantized(simplify=False)
-        simple_model = model.quantized(simplify=True)
+        q_model = model.quantized(prune=False)
+        simple_model = model.quantized(prune=True)
 
         for idx, layer in enumerate(q_model.classifier):
             assert(model.classifier[idx].weight.shape == model.classifier[idx].weight.shape == layer.weight.shape)
@@ -139,8 +139,8 @@ class TestSimplification(unittest.TestCase):
             model.classifier[1].weight[:] = w2
             model.classifier[1].bias[:] = b2
 
-        q_model = model.quantized(simplify=False)
-        simple_model = model.quantized(simplify=True)
+        q_model = model.quantized(prune=False)
+        simple_model = model.quantized(prune=True)
 
         for idx, layer in enumerate(q_model.classifier):
             assert(model.classifier[idx].weight.shape == model.classifier[idx].weight.shape == layer.weight.shape)
