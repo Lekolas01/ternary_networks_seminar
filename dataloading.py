@@ -51,21 +51,15 @@ class FileDataset(torch.utils.data.Dataset):
         # dumme encode target variable and move it to the far right
         df = pd.concat([df, pd.get_dummies(df[target], prefix=target, drop_first=True)], axis=1)
         df.drop([target], axis=1, inplace=True)
+        n_rows = len(df)
+        ix_low, ix_high = int(range[0] * n_rows), int(range[1] * n_rows)
         
-        self.df = df
-        ix_low, ix_high = int(range[0] * len(self)), int(range[1] * len(self))
-        
-        x = df.iloc[ix_low:ix_high, :-1].values
-        y = df.iloc[ix_low:ix_high,  -1].values
+        self.x = torch.tensor(df.iloc[ix_low:ix_high, :-1].values, dtype=torch.float32)
+        self.y = torch.tensor(df.iloc[ix_low:ix_high,  -1].values, dtype=torch.float32)
 
-        self.x = torch.tensor(x, dtype=torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32)
-        print(f"self.x.shape: {self.x.shape}")
-        print(f"self.y.shape: {self.y.shape}")
-        
 
     def __len__(self):
-        return len(self.df)
+        return len(self.y)
         
 
     def __getitem__(self, idx):
