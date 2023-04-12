@@ -21,9 +21,8 @@ def run(conf: Configuration, epochs: int, tracker=Tracker(), **kwargs) -> list[f
     
     model = ModelFactory(conf.data, conf.ternary, conf.a, conf.b).to(device)
 
-    train_loader = DataloaderFactory(ds=conf.data, train=True, shuffle=True, batch_size=conf.batch_size)
-    valid_loader = DataloaderFactory(ds=conf.data, train=False, shuffle=True, batch_size=conf.batch_size)
-
+    train_loader, valid_loader = DataloaderFactory(ds=conf.data, shuffle=True, batch_size=conf.batch_size)
+    
     criterion = nn.CrossEntropyLoss if conf.data == 'mnist' else nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
     scheduler = None
