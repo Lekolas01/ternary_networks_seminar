@@ -34,10 +34,9 @@ def run(conf: Configuration, epochs: int, tracker=Tracker(), **kwargs) -> list[f
 
 def get_arguments() -> Namespace:
     parser = ArgumentParser(description='Generic Training Procedure for a NN with hyperparameters specified by a configuration.')
-    parser.add_argument('config', nargs=1, help='The name of the training configuration.')
-    parser.add_argument('-s', '--save_path', type=str, required=False, help='If specified, will save the trained model and training information to this path.')
+    parser.add_argument('config', help='The name of the training configuration.')
     parser.add_argument('-e', '--epochs', type=int, default=5, help='For how many epochs you want to train.')
-    parser.add_argument('--save_every', type=int, default=1, help='After how many epochs you want to create checkpoints. Only meaningful when saving the model.')
+    parser.add_argument('-s', '--save', action='store_true', help='If specified, will save the trained model in a dedicated folder (named after config).')
     parser.add_argument('-p', '--plot', action='store_true', help='If true, will plot the current loss at each iteration.')
     args = parser.parse_args()
     return args
@@ -52,13 +51,12 @@ def run_grid(grid: Grid, args: Namespace, tracker: Tracker):
 if __name__ == '__main__':
     conf_path = 'configs.json'
     args = get_arguments()
-    grid = read_grid(conf_path, args.config[0])
+    grid = read_grid(conf_path, args.config)
 
     tracker = Tracker()
     tracker.add_logger(Progress(log_every=1))
-    if (args.save_path is not None):
-        #save_path = Path('runs') / 'mushroom/grid'
-        save_path = Path('runs') / args.save_path
+    if (args.save):
+        save_path = Path('runs') / args.config
         tracker.add_logger(Checkpoints(path=save_path, model_every=args.epochs))
     if (args.plot):
         tracker.add_logger(Plotter())

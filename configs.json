@@ -78,5 +78,15 @@
     "ternary": true,
     "a": [0.2, 0.4, 0.6, 0.75, 1.0],
     "b": [0.00001, 0.0003, 0.01]
+  },
+  "logical_AND": {
+    "seed": 0,
+    "lr": 0.01,
+    "data": "logical_AND",
+    "schedule_lr": false,
+    "batch_size": 64,
+    "ternary": false,
+    "a": [0.75],
+    "b": [0.01]
   }
 }

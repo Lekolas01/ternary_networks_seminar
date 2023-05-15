@@ -335,7 +335,6 @@ def write_config(config: Configuration, path: Path = None, yaml: bool = True) ->
     yaml : bool, optional
         If `True`, the file is assumed to be in the YAML format (the default).
         Otherwise, the file is expected to be in the JSON format.
-
     Returns
     -------
     file : Path

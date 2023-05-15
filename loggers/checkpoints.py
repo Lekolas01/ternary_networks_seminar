@@ -26,7 +26,7 @@ class Errors(Logger):
             f.write(new_var)
 
 
-    def log(self, train_loss, valid_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, compl, simple_compl, **kwargs):
+    def epoch_end(self, train_loss, valid_loss, train_acc, valid_acc, q_train_acc, q_valid_acc, distance, sparsity, compl, simple_compl, **kwargs):
         # log errors
         with open(self.errors_path, 'a') as f:
             f.write(self.ERRORS_FORMAT.format(
@@ -55,7 +55,7 @@ class Configs(Logger):
                 batch_size='batch_size', ternary='ternary', 
                 a='a', b='b'))
 
-    def loop_init(self, **kwargs):
+    def training_start(self, **kwargs):
         conf = self.cp.t.conf
         # log the configuration
         with open(self.configs_path, 'a') as f:
@@ -73,12 +73,12 @@ class Models(Logger):
         self.cp = checkpoints
         self.model_path = self.cp.path / self.MODEL_FILE
 
-    def log(self, **kwargs):
+    def epoch_end(self, **kwargs):
         self.save_model()
 
     def save_model(self):
+        curr_model_path = str(self.model_path).format(idx=self.cp.t.conf_idx, epoch=self.cp.t.epoch)
         try:
-            curr_model_path = str(self.model_path).format(idx=self.cp.t.conf_idx, epoch=self.cp.t.epoch)
             torch.save(self.cp.t.model, curr_model_path)
         except Exception as inst:
             print(f"Could not save model to {curr_model_path}: {inst}")
@@ -123,17 +123,17 @@ class BestModels(Models):
             del self.stats[idx]
 
         # add the model to the directory
-        to_save_path = str(self.model_path).format(idx=tup[2], epoch=tup[3])
+        to_save_path = str(self.model_path).format(idx=tup[0], epoch=tup[1])
         print(f"Saving into {to_save_path}...")
         torch.save(self.cp.t.model, to_save_path)
         self.stats.append(tup)
 
 
-    def log(self, q_valid_acc, simple_compl, **kwargs):
-        self.insert((q_valid_acc, -simple_compl, self.cp.t.conf_idx, self.cp.t.epoch), self.stats)
+    def epoch_end(self, q_valid_acc, simple_compl, **kwargs):
+        #self.insert((q_valid_acc, -simple_compl, self.cp.t.conf_idx, self.cp.t.epoch), self.stats)
+        pass
     
-
-    def log_summary(self):
+    def training_end(self):
         print(self.stats)
         print()
 
@@ -155,16 +155,16 @@ class Checkpoints(Logger):
         self.loggers = [self.error_logger, self.config_logger, self.best_model_logger]
 
 
-    def loop_init(self):
-        super().loop_init()
+    def training_start(self):
+        super().training_start()
         for logger in self.loggers:
-                logger.loop_init()
+                logger.training_start()
 
-    def log(self, **kwargs):
+    def epoch_end(self, **kwargs):
         for logger in self.loggers:
             if (self.t.epoch % logger.log_every == 0):
-                logger.log(**kwargs)
+                logger.epoch_end(**kwargs)
     
-    def log_summary(self):
+    def training_end(self):
         for logger in self.loggers:
             logger.log_summary()

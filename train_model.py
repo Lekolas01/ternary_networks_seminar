@@ -1,82 +1,92 @@
+from typing import Optional
 import torch
-import torch.nn as nn
+from torch.nn import Module
 from torch.utils.data.dataloader import DataLoader
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
+from loggers.loggers import Tracker
+from torch.types import Device
 
-from tracking.tracker import Tracker
 
-
-def train(train_loader: DataLoader, model: nn.Module, criterion: nn.Module, optimizer: Optimizer, device: str, dry_run=False, **kwargs) -> float:
-    '''
+def train(
+    dl: DataLoader,
+    model: Module,
+    loss_fn: Module,
+    optim: Optimizer,
+    device: Device,
+    tracker=Tracker(),
+) -> list[float]:
+    """
     Function for the training step of the training loop
-    '''
+    """
     model.train()
-    running_loss = 0
+    losses = []
 
-    for X, y in train_loader:
-        optimizer.zero_grad()
+    for X, y in dl:
+        tracker.batch_start()
         X = X.to(device)
         y = y.to(device)
-    
-        y_hat, probs = model(X)
-        loss = criterion(y_hat, y)
-        if (hasattr(model, 'regularization')):
-            loss = loss + model.regularization()
-        
-        running_loss += loss.item() * X.size(0)
-
+        optim.zero_grad()
+        y_hat, _ = model(X)
+        loss = loss_fn(y_hat, y)
+        print(f"{X = } | {y.item() = } | {y_hat.item() = } | {loss.item() = }")
+        # losses.append(loss.item() * X.size(0))
+        losses.append(loss.item())
         loss.backward()
-        optimizer.step()
-        if dry_run: 
-            epoch_loss = running_loss / len(train_loader.dataset)
-            return epoch_loss
-        
-    epoch_loss = running_loss / len(train_loader.dataset)
-    return epoch_loss
+        optim.step()
+        tracker.batch_end()
+
+    return losses
 
 
 @torch.no_grad()
-def validate(valid_loader: DataLoader, model: nn.Module, criterion: nn.Module, device: str, dry_run=False, **kwargs) -> float:
-    '''
+def validate(
+    dl: DataLoader, model: Module, loss_fn: Module, device: Device, tracker=Tracker()
+) -> list[float]:
+    """
     Function for the validation step of the training loop
-    '''
+    """
     model.eval()
-    running_loss = 0
-    
-    for X, y_true in valid_loader:
+    losses = []
+
+    for X, y_true in dl:
+        tracker.batch_start()
         X = X.to(device)
         y_true = y_true.to(device)
+        y_hat, _ = model(X)
+        loss = loss_fn(y_hat, y_true)
+        losses.append(loss.item())
+        tracker.batch_end()
 
-        y_hat, probs = model(X)
-        loss = criterion(y_hat, y_true)
-        running_loss += loss.item() * X.size(0)
-
-        if dry_run: 
-            epoch_loss = running_loss / len(valid_loader.dataset)
-            return epoch_loss
-
-    epoch_loss = running_loss / len(valid_loader.dataset)
-    return epoch_loss
+    return losses
 
 
-def training_loop(model: nn.Module, criterion: nn.Module, optimizer: Optimizer, train_loader: DataLoader, \
-    valid_loader: DataLoader, epochs: int, device: str, tracker:Tracker=None, scheduler: MultiStepLR=None, **kwargs):
-    
-    tracker.loop_init(model, train_loader, valid_loader, **kwargs)
+def training_loop(
+    model: Module,
+    criterion: Module,
+    optimizer: Optimizer,
+    train_loader: DataLoader,
+    valid_loader: DataLoader,
+    epochs: int,
+    device: Device = "cpu",
+    tracker: Tracker = Tracker(),
+    scheduler: Optional[MultiStepLR] = None,
+    **kwargs,
+) -> tuple[list[float], list[float]]:
+    tracker.training_start(model, train_loader, valid_loader, criterion, **kwargs)
     # Train model
     for epoch in range(epochs):
+        tracker.epoch_start()
         # training
-        train_loss = train(train_loader, model, criterion, optimizer, device, **kwargs)
+        train_loss = train(train_loader, model, criterion, optimizer, device, tracker)
 
         # validation
         with torch.no_grad():
-            valid_loss = validate(valid_loader, model, criterion, device, **kwargs)
+            valid_loss = validate(valid_loader, model, criterion, device, tracker)
 
-        tracker.track_loss(train_loss, valid_loss)
         if scheduler is not None:
             scheduler.step()
-    
-    train_losses, valid_losses = tracker.summarise()
-    return (train_losses, valid_losses)
 
+        tracker.epoch_end(train_loss, valid_loss)
+
+    return tracker.training_end()
