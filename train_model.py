@@ -41,7 +41,7 @@ def train(
 
 @torch.no_grad()
 def validate(
-    dl: DataLoader, model: Module, loss_fn: Module, device: Device, tracker=Tracker()
+    dl: DataLoader, model: Module, loss_fn: Module, device: Device
 ) -> list[float]:
     """
     Function for the validation step of the training loop
@@ -50,13 +50,11 @@ def validate(
     losses = []
 
     for X, y_true in dl:
-        tracker.batch_start()
         X = X.to(device)
         y_true = y_true.to(device)
         y_hat, _ = model(X)
         loss = loss_fn(y_hat, y_true)
         losses.append(loss.item())
-        tracker.batch_end()
 
     return losses
 
@@ -82,7 +80,7 @@ def training_loop(
 
         # validation
         with torch.no_grad():
-            valid_loss = validate(valid_loader, model, criterion, device, tracker)
+            valid_loss = validate(valid_loader, model, criterion, device)
 
         if scheduler is not None:
             scheduler.step()
