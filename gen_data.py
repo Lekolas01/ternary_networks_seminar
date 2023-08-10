@@ -5,7 +5,7 @@ import os
 
 
 def main(path, n_rows, n_vars, sep=","):
-    assert os.access(path, os.W_OK), f"path {path} must be writable."
+    # assert os.access(path, os.W_OK), f"path {path} must be writable."
     assert (
         isinstance(n_rows, int) and n_rows >= 1
     ), f"n_rows must be int type and greater than 0."
@@ -13,7 +13,6 @@ def main(path, n_rows, n_vars, sep=","):
         isinstance(n_vars, int) and n_vars >= 1
     ), f"n_vrs must be int type and greater than 0."
 
-    split = 0.2
     vars = [f"x{i}" for i in range(n_vars)]  # create variable names
     vars.append("target")
 
@@ -24,6 +23,7 @@ def main(path, n_rows, n_vars, sep=","):
     with open(path, "w") as of:
         # header line
         of.writelines(f"{sep.join(vars)}\n")
+
         for i in range(n_rows):
             if i >= thresholds[0]:
                 thresholds.pop(0)
@@ -45,6 +45,9 @@ if __name__ == "__main__":
     This script creates a dataset following a logical formula.
     """
     formula_name = "logical_AND"
-    path = Path("data", "generated", formula_name, "data.csv")
+    dir_path = Path("./data", "generated", formula_name)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    file_path = os.path.join(dir_path, "data.csv")
     n_rows, n_vars = 100, 2
-    main(path, n_rows, n_vars)
+    main(file_path, n_rows, n_vars)

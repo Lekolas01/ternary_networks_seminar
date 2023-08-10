@@ -69,9 +69,8 @@ def training_loop(
     device: Device = "cpu",
     tracker: Tracker = Tracker(),
     scheduler: Optional[MultiStepLR] = None,
-    **kwargs,
 ) -> tuple[list[float], list[float]]:
-    tracker.training_start(model, train_loader, valid_loader, criterion, **kwargs)
+    tracker.training_start(model, train_loader, valid_loader, criterion)
     # Train model
     for epoch in range(epochs):
         tracker.epoch_start()

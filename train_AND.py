@@ -19,6 +19,7 @@ dataset = FileDataset(str(data_path))
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=False)
 
 print_model_with_params(model)
+exit(0)
 
 loss_fn = nn.BCEWithLogitsLoss()
 optim = torch.optim.SGD(model.parameters(), 1)

@@ -43,7 +43,8 @@ class Tree:
 
 def sum_2_dnf(weights: np.ndarray, bias: float):
     """
-    Create a formula in DNF that is logically equivalent to the sign activation function applied to the linear combination.
+    Create a formula in DNF that is logically equivalent to the sign activation function applied to the linear combination with some weights.
+    For example: [2.5*x1 + 3.0*x2 >= 4.0] -> [x1 AND x2]
     """
     ans = []
     assert len(weights) >= 1
