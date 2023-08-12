@@ -132,7 +132,7 @@ class Plotter(Logger):
         plt.show(block=True)
 
 
-class Debug(Logger):
+class LogModel(Logger):
     "Log current model."
 
     def __init__(self, **kwargs):

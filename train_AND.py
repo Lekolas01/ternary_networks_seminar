@@ -5,7 +5,6 @@ from models.logical_AND import ANDNet
 from dataloading import FileDataset
 from torch.utils.data import DataLoader
 import torch.nn as nn
-from utils import print_model_with_params
 from train_model import training_loop
 from loggers.loggers import *
 import torch.utils.data.sampler
@@ -18,14 +17,13 @@ dataset = FileDataset(str(data_path))
 
 dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=False)
 
-print_model_with_params(model)
-exit(0)
+print(model)
 
-loss_fn = nn.BCEWithLogitsLoss()
+loss_fn = nn.BCELoss()
 optim = torch.optim.SGD(model.parameters(), 1)
 t = Tracker()
 t.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc", "valid_acc"]))
-t.add_logger(Debug())
+#t.add_logger(LogModel())
 losses = training_loop(model, loss_fn, optim, dataloader, dataloader, 50, "cpu", t)
 
 print(len(dataset))

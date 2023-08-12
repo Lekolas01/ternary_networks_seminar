@@ -19,11 +19,11 @@ def accuracy(model: nn.Module, data_loader: DataLoader, device: Device) -> float
             X = X.to(device)
             y_true = y_true.to(device)
 
-            _, y_prob = model(X)
-            if y_prob.dim() == 1:
-                predicted_labels = torch.round(y_prob)
+            y_hat = model(X)
+            if y_hat.dim() == 1:
+                predicted_labels = torch.round(y_hat)
             else:
-                _, predicted_labels = torch.max(y_prob, 1)
+                _, predicted_labels = torch.max(y_hat, 1)
             correct_pred += (predicted_labels == y_true).sum()
             n += y_true.size(0)
     return float(correct_pred) / n
@@ -52,11 +52,3 @@ def get_all_weights(model: nn.Module):
     params = torch.cat(params)
     return params
 
-
-def print_model_with_params(model: nn.Module):
-    for idx, layer in enumerate(model.children()):
-        print(f"({idx}): {layer}")
-        if hasattr(layer, "weight"):
-            print(f"\tweight:\t{layer.weight.data}")
-        if hasattr(layer, "bias"):
-            print(f"\tbias:\t{layer.bias.data}")

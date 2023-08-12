@@ -85,6 +85,18 @@ def nn_2_bool_formula(model: nn.Module) -> Optional[Tree]:
     pass
 
 
+def print_model_with_params(model: nn.Module):
+    # the model.children()
+    assert len(list(model.children())) == 1
+    
+    for idx, layer in enumerate(model.children()):
+        print(f"({idx}): {layer}")
+        if hasattr(layer, "weight"):
+            print(f"\tweight:\t{layer.weight.data}")
+        if hasattr(layer, "bias"):
+            print(f"\tbias:\t{layer.bias.data}")
+
+
 if __name__ == "__main__":
     path = Path("runs/logical_AND/best/config01_epoch001.pth")
     model = torch.load(path)
