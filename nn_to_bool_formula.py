@@ -42,9 +42,7 @@ class Neuron:
             name = input_neurons[i][0].name
             weight = input_neurons[i][1]
             # set to False
-            term1 = Func(
-                Op.AND, [to_bool_rec(input_neurons, bias, i + 1), Literal(name, False)]
-            )
+            term1 = to_bool_rec(input_neurons, bias, i + 1)
             term2 = Func(
                 Op.AND,
                 [to_bool_rec(input_neurons, bias - weight, i + 1), Literal(name, True)],
@@ -54,7 +52,6 @@ class Neuron:
             return Func(Op.OR, [term1, term2])
 
         def simplified(b: Boolean, layer=0) -> Boolean:
-            print(new_var)
             if isinstance(b, Func):
                 for i, child in enumerate(b.children):
                     b.children[i] = simplified(child, layer + 1)
@@ -100,11 +97,10 @@ class Neuron:
 
 
 if __name__ == "__main__":
-    path = Path("runs/logical_AND/best/config01_epoch001.pth")
-    model = torch.load(path)
-    # formula = nn_2_bool_formula(model)
-    # print(f"The converted model is {formula}")
-    weights = np.array([2.4, 2.1, 1.8, 1.3, 1.1, 0.8])
-    terms = sum_2_dnf(weights, -3.5)
-    terms.sort(axis=1)
-    print(terms_2_dnf(terms, names=[f"x{i}" for i in range(1, len(weights) + 1)]))
+    x1 = Neuron("x1")
+    x2 = Neuron("x2")
+    x3 = Neuron("x3")
+    x4 = Neuron("x4")
+    b = Neuron("b", [(x1, 1.2), (x2, 3.0), (x3, 1.6), (x4, 0.3)], 2.2)
+    print(b.to_bool())
+    

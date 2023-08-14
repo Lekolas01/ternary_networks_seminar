@@ -1,6 +1,9 @@
 from __future__ import annotations
 from enum import Enum
-from typing import Any
+from typing import Any, Dict
+
+
+Interpretation = Dict[str, bool]
 
 
 class Op(Enum):
@@ -12,8 +15,11 @@ class Boolean:
     def __init__(self) -> None:
         pass
 
-    def __call__(self, var: dict[str, bool]) -> bool:
+    def __call__(self, interpretation: Interpretation) -> bool:
         return False
+    
+    def all_literals(self) -> set[str]:
+        return set()
 
 
 class Constant(Boolean):
@@ -23,8 +29,11 @@ class Constant(Boolean):
     def __str__(self) -> str:
         return "T" if self.val else "F"
 
-    def __call__(self, var: dict[str, bool]) -> Any:
+    def __call__(self, interpretation: Interpretation) -> bool:
         return self.val
+    
+    def all_literals(self) -> set[str]:
+        return set()
 
     def __eq__(self, __value: object) -> bool:
         return isinstance(__value, Constant) and __value.val == self.val
@@ -39,11 +48,14 @@ class Literal(Boolean):
     def __str__(self) -> str:
         return f"{'!' if not self.positive else ''}{str(self.name)}"
 
-    def __call__(self, vars: dict[str, bool]) -> Any:
-        ans = vars[self.name]
+    def __call__(self, interpretation: Interpretation) -> bool:
+        ans = interpretation[self.name]
         if not self.positive:
             ans = not ans
         return ans
+    
+    def all_literals(self) -> set[str]:
+        return {self.name}
 
 
 class Func(Boolean):
@@ -55,21 +67,23 @@ class Func(Boolean):
         op = str(self.bin_op.value)
         return f"({f' {op} '.join([str(c) for c in self.children])})"
 
-    def eval(self, vals: dict[str, bool]) -> Any:
-        temp = [c(vals) for c in self.children]
+    def __call__(self, interpretation: Interpretation) -> Any:
+        temp = [f(interpretation) for f in self.children]
         if self.bin_op == Op.AND:
             return all(temp)
         return any(temp)
+    
+    def all_literals(self) -> set[str]:
+        return set().union(*(f.all_literals() for f in self.children))
 
 
 if __name__ == "__main__":
-    # tree1 = Tree("(a & b) | c")
-    instantiations = {"a": True, "b": False, "c": False}
+    interpretation = {"a": True, "b": False, "c": False}
 
     a = Literal("a")
     b = Literal("b")
     c = Literal("c")
     func = Func(Op.OR, [Func(Op.AND, [a, b]), c])
     fn1 = Func(Op.AND, [a, b])
-    print(func(instantiations))
+    print(func(interpretation))
     print(func)
