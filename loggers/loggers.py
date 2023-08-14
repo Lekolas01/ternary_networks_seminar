@@ -78,10 +78,10 @@ class LogMetrics(Logger):
     def epoch_end(self):
         self.m_format = {
             "timestamp": f"{datetime.now().time().replace(microsecond=0)} ----",
-            "epoch": f"Epoch: {eval('self.t.' + 'epoch')}",
-            "train_loss": f"Loss: {eval('self.t.' + 'mean_train_losses[-1]'):.5f}",
-            "train_acc": f"Train: {eval('self.t.' + 'train_acc'):.1f}%",
-            "valid_acc": f"Valid: {eval('self.t.' + 'valid_acc'):.1f}%",
+            "epoch": f"Epoch: {self.t.epoch}",
+            "train_loss": f"Loss: {self.t.mean_train_losses[-1]:.4f}",
+            "train_acc": f"Train: {(self.t.train_acc * 100):.2f}%",
+            "valid_acc": f"Valid: {(self.t.valid_acc * 100):.2f}%",
         }
 
         for metric in self.metrics:
@@ -146,11 +146,14 @@ class LogModel(Logger):
         pass
 
     def epoch_start(self, **kwargs):
-        print(f"Epoch: {self.t.epoch}")
-        print(f"Model :\t{self.t.model}")
+        pass
+
+    def epoch_end(self, **kwargs):
+        print(self.t.model)
 
     def batch_start(self):
-        print(f"Model :\t{self.t.model}")
+        pass
+        # print(f"Model :\t{self.t.model}")
 
 
 class Tracker:

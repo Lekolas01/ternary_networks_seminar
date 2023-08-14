@@ -1,11 +1,10 @@
 import numpy as np
 from pathlib import Path
-import random
 import os
 
 
 def main(path, n_rows, n_vars, sep=","):
-    # assert os.access(path, os.W_OK), f"path {path} must be writable."
+    assert os.access(path, os.W_OK), f"path {path} must be writable."
     assert (
         isinstance(n_rows, int) and n_rows >= 1
     ), f"n_rows must be int type and greater than 0."

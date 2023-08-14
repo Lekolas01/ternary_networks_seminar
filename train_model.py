@@ -29,8 +29,6 @@ def train(
         optim.zero_grad()
         y_hat = model(X)
         loss = loss_fn(y_hat, y)
-        print(f"X: {X} | y: {y.item()} | y_hat{y_hat.item()} | l:{loss.item()}")
-        # losses.append(loss.item() * X.size(0))
         losses.append(loss.item())
         loss.backward()
         optim.step()
@@ -76,6 +74,7 @@ def training_loop(
         tracker.epoch_start()
         # training
         train_loss = train(train_loader, model, criterion, optimizer, device, tracker)
+        print()
 
         # validation
         with torch.no_grad():

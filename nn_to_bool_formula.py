@@ -1,100 +1,102 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
-from argparse import ArgumentParser
-from enum import Enum
-import numpy.typing as npt
+from collections import OrderedDict
+from bool_formula import *
+import numpy as np
 
 
-class Literal:
-    def __init__(self, value: object, positive: bool) -> None:
-        assert value is not None
-        self.value = value
-        self.positive = positive
-
-    def __str__(self) -> str:
-        return f"{'!' if not self.positive else ''}{str(self.value)}"
-
-
-class BinaryOp(Enum):
-    AND = "&"
-    OR = "|"
-
-
-class Tree:
-    def __init__(self, val: Literal | BinaryOp, children: list = []) -> None:
-        self.val = val
-        self.children = children
+class Neuron:
+    def __init__(
+        self,
+        name="",
+        neurons_in: list[tuple[Neuron, float]] = [],
+        bias: float = 0.0,
+    ) -> None:
+        self.neurons_in = neurons_in
+        self.bias = bias
+        self.name = name
 
     def __str__(self) -> str:
-        if isinstance(self.val, Literal):
-            return str(self.val)
-        elif isinstance(self.val, Tree):
-            op = str(self.val.value)
-            return f"({f' {op} '.join([str(c) for c in self.children])})"
-        else:
-            raise ValueError(
-                f"Error for argument val: Expected Literal | BinaryOp, but got {type(self.val)}."
+        left_term = self.name
+        rounded_weights = [round(n[1], 2) for n in self.neurons_in]
+        right_term = zip(rounded_weights, [t[0].name for t in self.neurons_in])
+        right_term = " ".join(f"{t[0]}*{t[1]} " for t in right_term)
+        if self.bias:
+            right_term += str(round(self.bias, 2))
+        return f"{left_term} := {right_term}"
+
+    def to_bool(self) -> Boolean:
+        def to_bool_rec(
+            input_neurons: list[tuple[Neuron, float]],
+            bias: float,
+            i: int = 0,
+        ) -> Boolean:
+            if bias <= 0:
+                return Constant(True)
+            if i == len(input_neurons):
+                return Constant(False)
+
+            name = input_neurons[i][0].name
+            weight = input_neurons[i][1]
+            # set to False
+            term1 = Func(
+                Op.AND, [to_bool_rec(input_neurons, bias, i + 1), Literal(name, False)]
             )
+            term2 = Func(
+                Op.AND,
+                [to_bool_rec(input_neurons, bias - weight, i + 1), Literal(name, True)],
+            )
+            if any(term == Constant(True) for term in [term1, term2]):
+                return Constant(True)
+            return Func(Op.OR, [term1, term2])
 
+        def simplified(b: Boolean, layer=0) -> Boolean:
+            print(new_var)
+            if isinstance(b, Func):
+                for i, child in enumerate(b.children):
+                    b.children[i] = simplified(child, layer + 1)
+                if b.bin_op == Op.AND:
+                    # if one term is False, the whole conjunction is False
+                    if any(child == Constant(False) for child in b.children):
+                        return Constant(False)
 
-def sum_2_dnf(weights: np.ndarray, bias: float):
-    """
-    Create a formula in DNF that is logically equivalent to the sign activation function applied to the linear combination with some weights.
-    For example: [2.5*x1 + 3.0*x2 >= 4.0] -> [x1 AND x2]
-    """
-    ans = []
-    assert len(weights) >= 1
-    n = len(weights)
-    # order = weights.argsort()
-    # weights = weights[order]
-    vals = np.zeros(n)
-    n_iter = 2**n
-    for _ in range(n_iter):
-        sum = np.sum(weights * vals)
-        if sum + bias >= 0:
-            ans.append(vals.copy())
-        idx = n - 1
-        while vals[idx] == 1:
-            vals[idx] = 0
-            idx -= 1
-        vals[idx] = 1
-    return np.array(ans)
+                    # True constants can be removed
+                    b.children = list(filter(lambda c: c != Constant(True), b.children))
+                    # if now the list is empty, we can return True
+                    if len(b.children) == 0:
+                        return Constant(True)
+                    # otherwise return b
+                if b.bin_op == Op.OR:
+                    # if one term is True, the whole conjunction is True
+                    if any(child == Constant(True) for child in b.children):
+                        return Constant(True)
 
+                    # False constants can be removed
+                    b.children = list(
+                        filter(lambda c: c != Constant(False), b.children)
+                    )
+                    # if now the list is empty, we can return False
+                    if len(b.children) == 0:
+                        return Constant(False)
+                    # otherwise return b
+                if len(b.children) == 1:
+                    return b.children[0]
+            return b
 
-def terms_2_dnf(terms: np.ndarray, names: list[str]) -> list[str]:
-    def val_2_str(term: np.ndarray, names: list[str]) -> str:
-        return "".join([names[i] if term[i] == 1 else "" for i in range(len(term))])
+        # sort neurons by their weight
+        neurons_in = sorted(self.neurons_in, key=lambda x: x[1], reverse=True)
+        # TODO: also allow negative weights
+        assert all(
+            t[1] >= 0 for t in neurons_in
+        ), "Not yet implemented for negative numbers."
+        new_var = to_bool_rec(neurons_in, self.bias)
 
-    return [val_2_str(terms[i], names) for i in range(terms.shape[0])]
-
-
-def nn_2_bool_formula(model: nn.Module) -> Optional[Tree]:
-    """ """
-    for name, module in model.named_children():
-        print(f"{name} = {module}")
-        if isinstance(module, nn.Sequential):
-            for layer_name, layer in module.named_children():
-                if isinstance(layer, nn.Linear):
-                    sum_2_dnf(layer.weight[0, :], layer.bias[0])
-    # get the weights to the first node in the second layer
-    # weights =
-    pass
-
-
-def print_model_with_params(model: nn.Module):
-    # the model.children()
-    assert len(list(model.children())) == 1
-    
-    for idx, layer in enumerate(model.children()):
-        print(f"({idx}): {layer}")
-        if hasattr(layer, "weight"):
-            print(f"\tweight:\t{layer.weight.data}")
-        if hasattr(layer, "bias"):
-            print(f"\tbias:\t{layer.bias.data}")
+        print(new_var)
+        ans = simplified(new_var)
+        return ans
 
 
 if __name__ == "__main__":

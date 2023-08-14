@@ -23,7 +23,7 @@ loss_fn = nn.BCELoss()
 optim = torch.optim.SGD(model.parameters(), 1)
 t = Tracker()
 t.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc", "valid_acc"]))
-#t.add_logger(LogModel())
+t.add_logger(LogModel())
 losses = training_loop(model, loss_fn, optim, dataloader, dataloader, 50, "cpu", t)
 
 print(len(dataset))
