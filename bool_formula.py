@@ -67,7 +67,7 @@ class Quantifier(Boolean):
         return set().union(*(f.all_literals() for f in self.children))
 
 
-class All(Quantifier):
+class AND(Quantifier):
     def __init__(self, children: list[Boolean]) -> None:
         super().__init__(children, "&")
 
@@ -75,7 +75,8 @@ class All(Quantifier):
         temp = [c(interpretation) for c in self.children]
         return all(temp)
 
-class Any(Quantifier):
+
+class OR(Quantifier):
     def __init__(self, children: list[Boolean]) -> None:
         super().__init__(children, "|")
 
@@ -88,7 +89,7 @@ def simplified(b: Boolean) -> Boolean:
     if isinstance(b, Quantifier):
         for i, child in enumerate(b.children):
             b.children[i] = simplified(child)
-        if isinstance(b, All):
+        if isinstance(b, AND):
             # if one term is False, the whole conjunction is False
             if any(child == Constant(False) for child in b.children):
                 return Constant(False)
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     a = Literal("a")
     b = Literal("b")
     c = Literal("c")
-    func = Any([All([a, b]), c])
-    fn1 = All([a, b])
+    func = OR([AND([a, b]), c])
+    fn1 = AND([a, b])
     print(func(interpretation))
     print(func)

@@ -40,10 +40,10 @@ class Neuron:
 
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
-            term2 = All(
+            term2 = AND(
                 [to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1), Literal(name, positive)]
             )
-            return Any([term1, term2])
+            return OR([term1, term2])
         
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
@@ -66,7 +66,6 @@ if __name__ == "__main__":
     x2 = Neuron("x2")
     x3 = Neuron("x3")
     x4 = Neuron("x4")
-    #b = Neuron("b", [(x1, 1.2), (x2, 3.0), (x3, 1.6), (x4, 0.3)], 2.2)
     b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], 1.0)
     print(b.to_bool())
     

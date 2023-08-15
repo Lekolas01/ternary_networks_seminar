@@ -44,23 +44,30 @@ class TestToBool(unittest.TestCase):
         b4 = Neuron("b5", [(x1, 1), (x2, -1)], 0.5)     # x1 OR !x2
         b5 = Neuron("b3", [(x1, -1), (x2, -1)], 0.5)    # !x1 AND !x2
         b6 = Neuron("b6", [(x1, -1), (x2, -1)], 1.5)    # !x1 OR !x2
-        assert self.equivalent(b1.to_bool(), All([Literal(x1.name), Literal(x2.name)]))
-        assert self.equivalent(b2.to_bool(), Any([Literal(x1.name), Literal(x2.name)]))
-        assert self.equivalent(b3.to_bool(), All([Literal(x1.name), Literal(x2.name, False)]))
-        assert self.equivalent(b4.to_bool(), Any([Literal(x1.name), Literal(x2.name, False)]))
-        assert self.equivalent(b5.to_bool(), All([Literal(x1.name, False), Literal(x2.name, False)]))
-        assert self.equivalent(b6.to_bool(), Any([Literal(x1.name, False), Literal(x2.name, False)]))
+        assert self.equivalent(b1.to_bool(), AND([Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b2.to_bool(), OR([Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b3.to_bool(), AND([Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b4.to_bool(), OR([Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b5.to_bool(), AND([Literal(x1.name, False), Literal(x2.name, False)]))
+        assert self.equivalent(b6.to_bool(), OR([Literal(x1.name, False), Literal(x2.name, False)]))
     
 
-    def test_ComplexNeurons(self):
+    def test_ComplexNeuron(self):
         x1 = Neuron("x1")
         x2 = Neuron("x2")
         x3 = Neuron("x3")
         x4 = Neuron("x4")
         b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], -1.0)
-        #true_bool = Func(Op.OR())
-        #assert self.equivalent(b.to_bool(),)
-        #temp = 0
+        true_bool = OR([
+            AND([Literal(x1.name), Literal(x2.name, False)]),
+            AND([Literal(x3.name), OR([Literal(x1.name), Literal(x2.name, False)])])
+        ])
+        assert self.equivalent(b.to_bool(), true_bool)
+
+    
+    def test_TanhActivation(self):
+        pass
+
 
     def test_XOR(self):
         x1 = Neuron("x1")
@@ -68,9 +75,9 @@ class TestToBool(unittest.TestCase):
         x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], 1.0)
         x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], 1.0)
         b = Neuron("b", [(x3, 1.5), (x4, 1.2)], 1.0)
-        xor_1 = All([Literal(x1.name), Literal(x2.name, False)])
-        xor_2 = All([Literal(x1.name, False), Literal(x2.name)])
-        xor = Any([xor_1, xor_2])
+        xor_1 = AND([Literal(x1.name), Literal(x2.name, False)])
+        xor_2 = AND([Literal(x1.name, False), Literal(x2.name)])
+        xor = OR([xor_1, xor_2])
         assert self.equivalent(b.to_bool(), xor)
 
     
