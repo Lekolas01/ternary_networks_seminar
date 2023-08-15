@@ -1,6 +1,11 @@
 import numpy as np
 from pathlib import Path
 import os
+from bool_formula import Boolean
+import pandas as pd
+
+def generate_data(n_samples: int, func: Boolean) -> pd.DataFrame:
+    return pd.DataFrame()
 
 
 def main(path, n_rows, n_vars, sep=","):
