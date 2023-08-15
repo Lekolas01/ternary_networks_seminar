@@ -11,27 +11,56 @@ class TestToBool(unittest.TestCase):
             interpretation = dict(
                 [(l, ((i >> idx) % 2 == 1)) for idx, l in enumerate(literals)]
             )
-            if n1(interpretation) != n2(interpretation): return False
+            if n1(interpretation) != n2(interpretation): 
+                return False
         return True
     
-    def test_AND(self):
+    def test_True(self):
         x1 = Neuron("x1")
         x2 = Neuron("x2")
         b = Neuron("b", [(x1, 1.5), (x2, 1.4)], 2.2)
-        assert self.equivalent(b.to_bool(), Func(Op.AND, [Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b.to_bool(), Constant(True))
 
-    def test_OR(self):
+    def test_False(self):
         x1 = Neuron("x1")
         x2 = Neuron("x2")
-        b = Neuron("b", [(x1, 1.5), (x2, 1.4)], 1.0)
-        assert self.equivalent(b.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name)]))
+        b = Neuron("b", [(x1, 1.5), (x2, 1.4)], -5.0)
+        assert self.equivalent(b.to_bool(), Constant(False))
 
-    def test_IMPL(self):
-        # a => b is the same as !a OR b
+    def test_NegativeWeights(self):
+        x1 = Neuron("x1")
+        b = Neuron("b", [(x1, -1)], -0.5)
+        b2 = Neuron("b2", [(x1, -1)], 0.5)
+        assert self.equivalent(b.to_bool(), Constant(False))
+        assert self.equivalent(b2.to_bool(), Literal(x1.name, False))
+
+
+    def test_all_binary_Funcs(self):
         x1 = Neuron("x1")
         x2 = Neuron("x2")
-        b = Neuron("b", [(x1, 1.5), (x2, -1.4)], 1.0)
-        assert self.equivalent(b.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name, False)]))
+        b1 = Neuron("b1", [(x1, 1), (x2, 1)], -1.5)     # x1 AND x2
+        b2 = Neuron("b4", [(x1, 1), (x2, 1)], -0.5)     # x1 OR x2
+        b3 = Neuron("b2", [(x1, 1), (x2, -1)], -0.5)    # x1 AND !x2
+        b4 = Neuron("b5", [(x1, 1), (x2, -1)], 0.5)     # x1 OR !x2
+        b5 = Neuron("b3", [(x1, -1), (x2, -1)], 0.5)    # !x1 AND !x2
+        b6 = Neuron("b6", [(x1, -1), (x2, -1)], 1.5)    # !x1 OR !x2
+        assert self.equivalent(b1.to_bool(), Func(Op.AND, [Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b2.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b3.to_bool(), Func(Op.AND, [Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b4.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b5.to_bool(), Func(Op.AND, [Literal(x1.name, False), Literal(x2.name, False)]))
+        assert self.equivalent(b6.to_bool(), Func(Op.OR, [Literal(x1.name, False), Literal(x2.name, False)]))
+    
+
+    def test_ComplexNeurons(self):
+        x1 = Neuron("x1")
+        x2 = Neuron("x2")
+        x3 = Neuron("x3")
+        x4 = Neuron("x4")
+        b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], -1.0)
+        #true_bool = Func(Op.OR())
+        #assert self.equivalent(b.to_bool(),)
+        #temp = 0
 
     def test_XOR(self):
         x1 = Neuron("x1")
@@ -43,3 +72,5 @@ class TestToBool(unittest.TestCase):
         xor_2 = Func(Op.AND, [Literal(x1.name, False), Literal(x2.name)])
         xor = Func(Op.OR, [xor_1, xor_2])
         assert self.equivalent(b.to_bool(), xor)
+
+    

@@ -30,69 +30,41 @@ class Neuron:
 
     def to_bool(self) -> Boolean:
         def to_bool_rec(
-            input_neurons: list[tuple[Neuron, float]],
-            bias: float,
+            neurons_in: list[tuple[Neuron, float]],
+            neuron_signs: list[bool],
+            threshold: float,
             i: int = 0,
         ) -> Boolean:
-            if bias <= 0:
-                return Constant(True)
-            if i == len(input_neurons):
+            if threshold < 0:
+                return Constant(True)  
+            if i == len(neurons_in):
                 return Constant(False)
 
-            name = input_neurons[i][0].name
-            weight = input_neurons[i][1]
+            name = neurons_in[i][0].name
+            positive = not neuron_signs[i]
+            weight = neurons_in[i][1]
+
             # set to False
-            term1 = to_bool_rec(input_neurons, bias, i + 1)
+            term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
             term2 = Func(
                 Op.AND,
-                [to_bool_rec(input_neurons, bias - weight, i + 1), Literal(name, True)],
+                [to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1), Literal(name, positive)],
             )
-            if any(term == Constant(True) for term in [term1, term2]):
-                return Constant(True)
             return Func(Op.OR, [term1, term2])
-
-        def simplified(b: Boolean, layer=0) -> Boolean:
-            if isinstance(b, Func):
-                for i, child in enumerate(b.children):
-                    b.children[i] = simplified(child, layer + 1)
-                if b.bin_op == Op.AND:
-                    # if one term is False, the whole conjunction is False
-                    if any(child == Constant(False) for child in b.children):
-                        return Constant(False)
-
-                    # True constants can be removed
-                    b.children = list(filter(lambda c: c != Constant(True), b.children))
-                    # if now the list is empty, we can return True
-                    if len(b.children) == 0:
-                        return Constant(True)
-                    # otherwise return b
-                if b.bin_op == Op.OR:
-                    # if one term is True, the whole conjunction is True
-                    if any(child == Constant(True) for child in b.children):
-                        return Constant(True)
-
-                    # False constants can be removed
-                    b.children = list(
-                        filter(lambda c: c != Constant(False), b.children)
-                    )
-                    # if now the list is empty, we can return False
-                    if len(b.children) == 0:
-                        return Constant(False)
-                    # otherwise return b
-                if len(b.children) == 1:
-                    return b.children[0]
-            return b
-
+        
         # sort neurons by their weight
-        neurons_in = sorted(self.neurons_in, key=lambda x: x[1], reverse=True)
-        # TODO: also allow negative weights
-        assert all(
-            t[1] >= 0 for t in neurons_in
-        ), "Not yet implemented for negative numbers."
-        new_var = to_bool_rec(neurons_in, self.bias)
+        neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
 
-        print(new_var)
-        ans = simplified(new_var)
+        # remember which weights are negative and then invert all of them (needed for negative numbers)
+        negative = [tup[1] < 0 for tup in neurons_in]
+        neurons_in = [(tup[0], abs(tup[1])) for tup in neurons_in]
+
+        positive_weights = zip(negative, [tup[1] for tup in neurons_in])
+        filtered_weights = filter(lambda tup: tup[0], positive_weights)
+        bias_diff = sum(tup[1] for tup in filtered_weights)
+        long_ans = to_bool_rec(neurons_in, negative, -self.bias + bias_diff)
+
+        ans = simplified(long_ans)
         return ans
 
 
@@ -101,6 +73,7 @@ if __name__ == "__main__":
     x2 = Neuron("x2")
     x3 = Neuron("x3")
     x4 = Neuron("x4")
-    b = Neuron("b", [(x1, 1.2), (x2, 3.0), (x3, 1.6), (x4, 0.3)], 2.2)
+    #b = Neuron("b", [(x1, 1.2), (x2, 3.0), (x3, 1.6), (x4, 0.3)], 2.2)
+    b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], 1.0)
     print(b.to_bool())
     

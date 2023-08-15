@@ -58,6 +58,8 @@ class Literal(Boolean):
         return {self.name}
 
 
+
+
 class Func(Boolean):
     def __init__(self, bin_op: Op, children: list[Boolean]) -> None:
         self.bin_op = bin_op
@@ -68,13 +70,46 @@ class Func(Boolean):
         return f"({f' {op} '.join([str(c) for c in self.children])})"
 
     def __call__(self, interpretation: Interpretation) -> Any:
-        temp = [f(interpretation) for f in self.children]
+        temp = [c(interpretation) for c in self.children]
         if self.bin_op == Op.AND:
             return all(temp)
         return any(temp)
     
     def all_literals(self) -> set[str]:
         return set().union(*(f.all_literals() for f in self.children))
+
+
+def simplified(b: Boolean) -> Boolean:
+    if isinstance(b, Func):
+        for i, child in enumerate(b.children):
+            b.children[i] = simplified(child)
+        if b.bin_op == Op.AND:
+            # if one term is False, the whole conjunction is False
+            if any(child == Constant(False) for child in b.children):
+                return Constant(False)
+
+            # True constants can be removed
+            b.children = list(filter(lambda c: c != Constant(True), b.children))
+            # if now the list is empty, we can return True
+            if len(b.children) == 0:
+                return Constant(True)
+            # otherwise return b
+        if b.bin_op == Op.OR:
+            # if one term is True, the whole conjunction is True
+            if any(child == Constant(True) for child in b.children):
+                return Constant(True)
+
+            # False constants can be removed
+            b.children = list(
+                filter(lambda c: c != Constant(False), b.children)
+            )
+            # if now the list is empty, we can return False
+            if len(b.children) == 0:
+                return Constant(False)
+            # otherwise return b
+        if len(b.children) == 1:
+            return b.children[0]
+    return b
 
 
 if __name__ == "__main__":
