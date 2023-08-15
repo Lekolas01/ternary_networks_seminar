@@ -44,12 +44,12 @@ class TestToBool(unittest.TestCase):
         b4 = Neuron("b5", [(x1, 1), (x2, -1)], 0.5)     # x1 OR !x2
         b5 = Neuron("b3", [(x1, -1), (x2, -1)], 0.5)    # !x1 AND !x2
         b6 = Neuron("b6", [(x1, -1), (x2, -1)], 1.5)    # !x1 OR !x2
-        assert self.equivalent(b1.to_bool(), Func(Op.AND, [Literal(x1.name), Literal(x2.name)]))
-        assert self.equivalent(b2.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name)]))
-        assert self.equivalent(b3.to_bool(), Func(Op.AND, [Literal(x1.name), Literal(x2.name, False)]))
-        assert self.equivalent(b4.to_bool(), Func(Op.OR, [Literal(x1.name), Literal(x2.name, False)]))
-        assert self.equivalent(b5.to_bool(), Func(Op.AND, [Literal(x1.name, False), Literal(x2.name, False)]))
-        assert self.equivalent(b6.to_bool(), Func(Op.OR, [Literal(x1.name, False), Literal(x2.name, False)]))
+        assert self.equivalent(b1.to_bool(), All([Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b2.to_bool(), Any([Literal(x1.name), Literal(x2.name)]))
+        assert self.equivalent(b3.to_bool(), All([Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b4.to_bool(), Any([Literal(x1.name), Literal(x2.name, False)]))
+        assert self.equivalent(b5.to_bool(), All([Literal(x1.name, False), Literal(x2.name, False)]))
+        assert self.equivalent(b6.to_bool(), Any([Literal(x1.name, False), Literal(x2.name, False)]))
     
 
     def test_ComplexNeurons(self):
@@ -68,9 +68,9 @@ class TestToBool(unittest.TestCase):
         x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], 1.0)
         x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], 1.0)
         b = Neuron("b", [(x3, 1.5), (x4, 1.2)], 1.0)
-        xor_1 = Func(Op.AND, [Literal(x1.name), Literal(x2.name, False)])
-        xor_2 = Func(Op.AND, [Literal(x1.name, False), Literal(x2.name)])
-        xor = Func(Op.OR, [xor_1, xor_2])
+        xor_1 = All([Literal(x1.name), Literal(x2.name, False)])
+        xor_2 = All([Literal(x1.name, False), Literal(x2.name)])
+        xor = Any([xor_1, xor_2])
         assert self.equivalent(b.to_bool(), xor)
 
     

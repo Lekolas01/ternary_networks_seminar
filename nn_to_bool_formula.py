@@ -1,11 +1,5 @@
 from __future__ import annotations
-from pathlib import Path
-import numpy as np
-import torch
-import torch.nn as nn
-from collections import OrderedDict
 from bool_formula import *
-import numpy as np
 
 
 class Neuron:
@@ -46,11 +40,10 @@ class Neuron:
 
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
-            term2 = Func(
-                Op.AND,
-                [to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1), Literal(name, positive)],
+            term2 = All(
+                [to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1), Literal(name, positive)]
             )
-            return Func(Op.OR, [term1, term2])
+            return Any([term1, term2])
         
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)

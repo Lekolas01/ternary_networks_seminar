@@ -1,14 +1,8 @@
 from __future__ import annotations
-from enum import Enum
 from typing import Any, Dict
 
 
 Interpretation = Dict[str, bool]
-
-
-class Op(Enum):
-    AND = "&"
-    OR = "|"
 
 
 class Boolean:
@@ -57,33 +51,44 @@ class Literal(Boolean):
     def all_literals(self) -> set[str]:
         return {self.name}
 
-
-
-
-class Func(Boolean):
-    def __init__(self, bin_op: Op, children: list[Boolean]) -> None:
-        self.bin_op = bin_op
+class Quantifier(Boolean):
+    def __init__(self, children: list[Boolean], op_str: str) -> None:
+        super().__init__()
         self.children = children
+        self.op_str = op_str
 
     def __str__(self) -> str:
-        op = str(self.bin_op.value)
-        return f"({f' {op} '.join([str(c) for c in self.children])})"
-
-    def __call__(self, interpretation: Interpretation) -> Any:
-        temp = [c(interpretation) for c in self.children]
-        if self.bin_op == Op.AND:
-            return all(temp)
-        return any(temp)
+        return f"({f' {self.op_str} '.join([str(c) for c in self.children])})"
+    
+    def __call__(self, interpretation: Interpretation) -> bool:
+        return super().__call__(interpretation)
     
     def all_literals(self) -> set[str]:
         return set().union(*(f.all_literals() for f in self.children))
 
 
+class All(Quantifier):
+    def __init__(self, children: list[Boolean]) -> None:
+        super().__init__(children, "&")
+
+    def __call__(self, interpretation: Interpretation) -> bool:
+        temp = [c(interpretation) for c in self.children]
+        return all(temp)
+
+class Any(Quantifier):
+    def __init__(self, children: list[Boolean]) -> None:
+        super().__init__(children, "|")
+
+    def __call__(self, interpretation: Interpretation) -> bool:
+        temp = [c(interpretation) for c in self.children]
+        return any(temp)
+
+
 def simplified(b: Boolean) -> Boolean:
-    if isinstance(b, Func):
+    if isinstance(b, Quantifier):
         for i, child in enumerate(b.children):
             b.children[i] = simplified(child)
-        if b.bin_op == Op.AND:
+        if isinstance(b, All):
             # if one term is False, the whole conjunction is False
             if any(child == Constant(False) for child in b.children):
                 return Constant(False)
@@ -94,7 +99,7 @@ def simplified(b: Boolean) -> Boolean:
             if len(b.children) == 0:
                 return Constant(True)
             # otherwise return b
-        if b.bin_op == Op.OR:
+        if isinstance(b, Any):
             # if one term is True, the whole conjunction is True
             if any(child == Constant(True) for child in b.children):
                 return Constant(True)
@@ -118,7 +123,7 @@ if __name__ == "__main__":
     a = Literal("a")
     b = Literal("b")
     c = Literal("c")
-    func = Func(Op.OR, [Func(Op.AND, [a, b]), c])
-    fn1 = Func(Op.AND, [a, b])
+    func = Any([All([a, b]), c])
+    fn1 = All([a, b])
     print(func(interpretation))
     print(func)
