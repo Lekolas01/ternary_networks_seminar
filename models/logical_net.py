@@ -1,6 +1,5 @@
 import torch.nn as nn
 from enum import Enum
-from typing import Optional
 
 
 class Activation(Enum):
@@ -9,9 +8,8 @@ class Activation(Enum):
 
 
 class LogicalNet(nn.Module):
-    def __init__(self, var_names: Optional[list[str]] = None, *args, **kwargs) -> None:
+    def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.var_names = var_names
         self.classifier = nn.Sequential()
 
     def forward(self, x):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Any, Dict
+import random
 
 
 Interpretation = Dict[str, bool]
@@ -11,7 +12,19 @@ class Boolean:
 
     def __call__(self, interpretation: Interpretation) -> bool:
         return False
-    
+
+    def __eq__(self, other: Boolean) -> bool:
+        literals = list(self.all_literals().union(other.all_literals()))
+        n_literals = len(literals)
+
+        for i in range(2**n_literals):
+            interpretation = dict(
+                [(l, ((i >> idx) % 2 == 1)) for idx, l in enumerate(literals)]
+            )
+            if self(interpretation) != other(interpretation):
+                return False
+        return True
+
     def all_literals(self) -> set[str]:
         return set()
 
@@ -25,7 +38,7 @@ class Constant(Boolean):
 
     def __call__(self, interpretation: Interpretation) -> bool:
         return self.val
-    
+
     def all_literals(self) -> set[str]:
         return set()
 
@@ -47,9 +60,10 @@ class Literal(Boolean):
         if not self.positive:
             ans = not ans
         return ans
-    
+
     def all_literals(self) -> set[str]:
         return {self.name}
+
 
 class Quantifier(Boolean):
     def __init__(self, children: list[Boolean], op_str: str) -> None:
@@ -59,10 +73,10 @@ class Quantifier(Boolean):
 
     def __str__(self) -> str:
         return f"({f' {self.op_str} '.join([str(c) for c in self.children])})"
-    
+
     def __call__(self, interpretation: Interpretation) -> bool:
         return super().__call__(interpretation)
-    
+
     def all_literals(self) -> set[str]:
         return set().union(*(f.all_literals() for f in self.children))
 
@@ -100,15 +114,13 @@ def simplified(b: Boolean) -> Boolean:
             if len(b.children) == 0:
                 return Constant(True)
             # otherwise return b
-        if isinstance(b, Any):
+        if isinstance(b, OR):
             # if one term is True, the whole conjunction is True
             if any(child == Constant(True) for child in b.children):
                 return Constant(True)
 
             # False constants can be removed
-            b.children = list(
-                filter(lambda c: c != Constant(False), b.children)
-            )
+            b.children = list(filter(lambda c: c != Constant(False), b.children))
             # if now the list is empty, we can return False
             if len(b.children) == 0:
                 return Constant(False)
@@ -116,6 +128,10 @@ def simplified(b: Boolean) -> Boolean:
         if len(b.children) == 1:
             return b.children[0]
     return b
+
+
+def random_interpretation(literals: set[str]) -> Interpretation:
+    return {l: random.random() >= 0.5 for l in literals}
 
 
 if __name__ == "__main__":

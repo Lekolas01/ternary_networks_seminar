@@ -4,6 +4,7 @@
 # My files not to be tracked
 data/
 runs/
+unittests/can_delete
 testing.py
 *.ipynb
 

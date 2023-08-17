@@ -1,5 +1,13 @@
 from __future__ import annotations
 from bool_formula import *
+import torch.nn as nn
+from typing import Optional
+from enum import Enum
+
+
+class Act(Enum):
+    SIGMOID = 1
+    TANH = 2
 
 
 class Neuron:
@@ -8,10 +16,12 @@ class Neuron:
         name="",
         neurons_in: list[tuple[Neuron, float]] = [],
         bias: float = 0.0,
+        activation_in: Act = Act.SIGMOID,
     ) -> None:
+        self.name = name
         self.neurons_in = neurons_in
         self.bias = bias
-        self.name = name
+        self.activation_in = activation_in
 
     def __str__(self) -> str:
         left_term = self.name
@@ -30,7 +40,7 @@ class Neuron:
             i: int = 0,
         ) -> Boolean:
             if threshold < 0:
-                return Constant(True)  
+                return Constant(True)
             if i == len(neurons_in):
                 return Constant(False)
 
@@ -41,10 +51,13 @@ class Neuron:
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
             term2 = AND(
-                [to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1), Literal(name, positive)]
+                [
+                    to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1),
+                    Literal(name, positive),
+                ]
             )
             return OR([term1, term2])
-        
+
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
 
@@ -61,6 +74,59 @@ class Neuron:
         return ans
 
 
+class NeuronNetwork:
+    def __init__(self, net: nn.Module, varnames: Optional[list[str]] = None):
+        self.neurons = set()
+        self.leaf = None
+
+        if isinstance(net, nn.Sequential):
+            first_layer = net[0]
+            if not isinstance(first_layer, nn.Linear):
+                raise ValueError("First layer must always be a linear layer.")
+            shape_out, shape_in = first_layer.weight.shape
+            if not varnames:
+                varnames = [next(self.neuron_names()) for i in range(shape_in)]
+            # create a neuron vor the the input nodes in the input layer
+            last_layer = []
+            for idx, name in enumerate(varnames):
+                neuron = Neuron(name)
+                self.neurons.add(neuron)
+                last_layer.append(neuron)
+
+            current_activation = None
+            for layer in net:
+                if isinstance(layer, nn.Sigmoid):
+                    current_activation = Act.SIGMOID
+                elif isinstance(layer, nn.Linear):
+                    shape_out, shape_in = layer.weight.shape
+                    weight = layer.weight.tolist()
+                    bias = layer.bias.tolist()
+                    new_layer = []
+                    for idx in range(shape_out):
+                        neurons_in = list(zip(last_layer, weight[idx]))
+                        neuron = Neuron(
+                            name=next(self.neuron_names()),
+                            neurons_in=neurons_in,
+                            bias=bias[idx],
+                        )
+                        self.neurons.add(neuron)
+                        new_layer.append(neuron)
+                    last_layer = new_layer
+            if len(last_layer) == 1:
+                self.leaf = last_layer[0]
+        else:
+            raise ValueError("Only allows Sequential for now.")
+
+    def neuron_names(self):
+        next_neuron_idx = 0
+        while True:
+            next_neuron_idx += 1
+            yield f"x_{next_neuron_idx}"
+
+    def get_leaf_neuron(self) -> Neuron:
+        return self.leaf
+
+
 if __name__ == "__main__":
     x1 = Neuron("x1")
     x2 = Neuron("x2")
@@ -68,4 +134,3 @@ if __name__ == "__main__":
     x4 = Neuron("x4")
     b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], 1.0)
     print(b.to_bool())
-    

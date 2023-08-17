@@ -1,11 +1,26 @@
 import numpy as np
 from pathlib import Path
 import os
-from bool_formula import Boolean
+from bool_formula import *
 import pandas as pd
 
+
 def generate_data(n_samples: int, func: Boolean) -> pd.DataFrame:
-    return pd.DataFrame()
+    assert (
+        isinstance(n_samples, int) and n_samples >= 1
+    ), f"n_rows must be int type and greater than 0."
+    dependent_vars = func.all_literals()
+    columns = sorted(list(dependent_vars))
+    target_col = "target"
+    columns.append(target_col)
+    df = pd.DataFrame(columns=columns)
+    # for every sample, pick a random interpretation,
+    # calculate the value and add that row to the DataFrame
+    for _ in range(n_samples):
+        interpretation = random_interpretation(dependent_vars)
+        interpretation[target_col] = func(interpretation)
+        df.loc[len(df)] = interpretation  # type: ignore
+    return df
 
 
 def main(path, n_rows, n_vars, sep=","):
@@ -54,4 +69,4 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = os.path.join(dir_path, "data.csv")
     n_rows, n_vars = 100, 2
-    main(file_path, n_rows, n_vars)
+    data = generate_data(100, AND([Literal("x1"), Literal("x2", False)]))
