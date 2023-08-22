@@ -31,6 +31,9 @@ class Neuron:
         if self.bias:
             right_term += str(round(self.bias, 2))
         return f"{left_term} := {right_term}"
+    
+    def __repr__(self) -> str:
+        return f"Neuron(\"{self.name}\")"
 
     def to_bool(self) -> Boolean:
         def to_bool_rec(
@@ -86,6 +89,8 @@ class NeuronNetwork:
             shape_out, shape_in = first_layer.weight.shape
             if not varnames:
                 varnames = [next(self.neuron_names()) for i in range(shape_in)]
+            if len(varnames) != shape_in:
+                raise ValueError("varnames need same shape as input of first layer")
             # create a neuron vor the the input nodes in the input layer
             last_layer = []
             for idx, name in enumerate(varnames):
