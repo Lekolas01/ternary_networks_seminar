@@ -9,13 +9,22 @@ from nn_to_bool_formula import *
 
 
 class TestFullCircle(unittest.TestCase):
-    def full_circle(self, func: Boolean):
-        # generate data for function x1 & x2
-        dead_vars = 4
-        vars = sorted(list(func.all_literals()))
+    def full_circle(self, target_func: Boolean, model: nn.Sequential):
+        layer_1 = model[0]
+        assert isinstance(layer_1, nn.Linear)
+        shape_out, shape_in = layer_1.weight.shape
+
+        # generate data for function
+        vars = sorted(list(target_func.all_literals()))
+        if shape_in < len(vars):
+            raise ValueError(
+                f"The input shape of the model is to small, it needs at least {len(vars)}, but got {shape_in}"
+            )
+        dead_vars = shape_in - len(vars)
+
         for i in range(dead_vars):
             vars.append(f"dead_{i}")
-        data = generate_data(640, func, vars = vars).astype(int)
+        data = generate_data(640, target_func, vars=vars).astype(int)
 
         # save it in a throwaway folder
         folder_path = Path("unittests/can_delete")
@@ -23,11 +32,9 @@ class TestFullCircle(unittest.TestCase):
         data.to_csv(data_path, index=False, sep=",")
 
         # train a neural network on the dataset
-        model = nn.Sequential(
-            nn.Linear(len(vars), 1), nn.Sigmoid(), nn.Flatten(0)
-        )
+
         dataset = FileDataset(data_path)
-        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
         loss_fn = nn.BCELoss()
         optim = torch.optim.SGD(model.parameters(), 0.1)
         losses = training_loop(model, loss_fn, optim, dataloader, dataloader, epochs=5)
@@ -41,10 +48,57 @@ class TestFullCircle(unittest.TestCase):
         # return the found boolean function
         return found_func
 
-    def test_AND(self):
-        target_func = AND([Literal("x1"), Literal("x2")])
-        # assert that this boolean function is indeed (x1 & x2)
-        found_func = self.full_circle(target_func)
-        assert (
-            target_func == found_func
-        ), f"Did not produce an equivalent function: target: {str(target_func)}, found: {str(found_func)}"
+    def test_binaryFunctions(self):
+        target_funcs = [
+            Constant(False),
+            Constant(True),
+            Literal("x1", False),
+            Literal("x1", True),
+            AND([Literal("x1", False), Literal("x2", False)]),
+            AND([Literal("x1", False), Literal("x2", True)]),
+            AND([Literal("x1", True), Literal("x2", False)]),
+            AND([Literal("x1", True), Literal("x2", True)]),
+            OR([Literal("x1", False), Literal("x2", False)]),
+            OR([Literal("x1", False), Literal("x2", True)]),
+            OR([Literal("x1", True), Literal("x2", False)]),
+            OR([Literal("x1", True), Literal("x2", True)]),
+        ]
+        for target_func in target_funcs:
+            model = nn.Sequential(
+                nn.Linear(12, 1),
+                nn.Sigmoid(),
+                nn.Flatten(0),
+            )
+            found_func = self.full_circle(target_func, model)
+            assert (
+                target_func == found_func
+            ), f"Did not produce an equivalent function: target: {str(target_func)}, found: {str(found_func)}"
+
+    def test_XOR(self):
+        # assert that this boolean function is indeed
+        target_funcs = [
+            OR(
+                [
+                    AND([Literal("x1", False), Literal("x2", True)]),
+                    AND([Literal("x1", True), Literal("x2", False)]),
+                ]
+            ),
+            OR(
+                [
+                    AND([Literal("x1", False), Literal("x2", False)]),
+                    AND([Literal("x1", True), Literal("x2", True)]),
+                ]
+            ),
+        ]
+        for target_func in target_funcs:
+            model = nn.Sequential(
+                nn.Linear(2, 2),
+                nn.Sigmoid(),
+                nn.Linear(2, 1),
+                nn.Sigmoid(),
+                nn.Flatten(0),
+            )
+            found_func = self.full_circle(target_func, model)
+            assert (
+                target_func == found_func
+            ), f"Did not produce an equivalent function: target: {str(target_func)}, found: {str(found_func)}"

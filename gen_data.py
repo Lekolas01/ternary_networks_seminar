@@ -6,21 +6,24 @@ import pandas as pd
 from typing import Optional
 
 
-def generate_data(n_samples: int, func: Boolean, vars: Optional[list[str]] = None) -> pd.DataFrame:
+def generate_data(
+    n_samples: int, func: Boolean, vars: Optional[list[str]] = None
+) -> pd.DataFrame:
     assert (
         isinstance(n_samples, int) and n_samples >= 1
     ), f"n_rows must be int type and greater than 0."
-    if not vars: 
+    if not vars:
         vars = list(func.all_literals())
-    
-    columns = sorted(list(vars))
+
+    columns = vars.copy()
+
     target_col = "target"
     columns.append(target_col)
     df = pd.DataFrame(columns=columns)
     # for every sample, pick a random interpretation,
     # calculate the value and add that row to the DataFrame
     for _ in range(n_samples):
-        interpretation = random_interpretation(vars)
+        interpretation = random_interpretation(set(vars))
         interpretation[target_col] = func(interpretation)
         df.loc[len(df)] = interpretation  # type: ignore
     return df
