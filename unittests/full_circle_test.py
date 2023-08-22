@@ -20,10 +20,12 @@ class TestFullCircle(unittest.TestCase):
             raise ValueError(
                 f"The input shape of the model is to small, it needs at least {len(vars)}, but got {shape_in}"
             )
-        dead_vars = shape_in - len(vars)
+        n_dead_vars = shape_in - len(vars)
 
-        for i in range(dead_vars):
-            vars.append(f"dead_{i}")
+        for i in range(n_dead_vars):
+            dead_var_name = f"dead{i}"
+            assert dead_var_name not in vars
+            vars.append(dead_var_name)
         data = generate_data(640, target_func, vars=vars).astype(int)
 
         # save it in a throwaway folder
@@ -32,12 +34,11 @@ class TestFullCircle(unittest.TestCase):
         data.to_csv(data_path, index=False, sep=",")
 
         # train a neural network on the dataset
-
         dataset = FileDataset(data_path)
-        dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+        dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
         loss_fn = nn.BCELoss()
-        optim = torch.optim.SGD(model.parameters(), 0.1)
-        losses = training_loop(model, loss_fn, optim, dataloader, dataloader, epochs=5)
+        optim = torch.optim.Adam(model.parameters(), 0.01)
+        losses = training_loop(model, loss_fn, optim, dataloader, dataloader, epochs=2)
 
         # convert the trained neural network to a set of perceptrons
         neurons = NeuronNetwork(model, varnames=vars)
@@ -69,13 +70,13 @@ class TestFullCircle(unittest.TestCase):
                 nn.Sigmoid(),
                 nn.Flatten(0),
             )
-            found_func = self.full_circle(target_func, model)
+            found = self.full_circle(target_func, model)
             assert (
-                target_func == found_func
-            ), f"Did not produce an equivalent function: target: {str(target_func)}, found: {str(found_func)}"
+                target_func == found
+            ), f"Did not produce an equivalent function: {target_func = }; {found = }"
 
     def test_XOR(self):
-        # assert that this boolean function is indeed
+        torch.manual_seed(0)
         target_funcs = [
             OR(
                 [
@@ -101,4 +102,4 @@ class TestFullCircle(unittest.TestCase):
             found_func = self.full_circle(target_func, model)
             assert (
                 target_func == found_func
-            ), f"Did not produce an equivalent function: target: {str(target_func)}, found: {str(found_func)}"
+            ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"

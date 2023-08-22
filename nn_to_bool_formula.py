@@ -3,6 +3,7 @@ from bool_formula import *
 import torch.nn as nn
 from typing import Optional
 from enum import Enum
+from collections import OrderedDict
 
 
 class Act(Enum):
@@ -13,31 +14,28 @@ class Act(Enum):
 class Neuron:
     def __init__(
         self,
-        name="",
         neurons_in: list[tuple[Neuron, float]] = [],
         bias: float = 0.0,
         activation_in: Act = Act.SIGMOID,
     ) -> None:
-        self.name = name
         self.neurons_in = neurons_in
         self.bias = bias
         self.activation_in = activation_in
 
     def __str__(self) -> str:
-        left_term = self.name
-        rounded_weights = [round(n[1], 2) for n in self.neurons_in]
-        right_term = zip(rounded_weights, [t[0].name for t in self.neurons_in])
-        right_term = " ".join(f"{t[0]}*{t[1]} " for t in right_term)
+        rounded_weights = [round(t[1], 2) for t in self.neurons_in]
+        ans = zip(rounded_weights, [t[0] for t in self.neurons_in])
+        ans = " ".join(f"{t[0]}*{t[1]} " for t in ans)
         if self.bias:
-            right_term += str(round(self.bias, 2))
-        return f"{left_term} := {right_term}"
-    
+            ans += str(round(self.bias, 2))
+        return ans
+
     def __repr__(self) -> str:
-        return f"Neuron(\"{self.name}\")"
+        return str(self)
 
     def to_bool(self) -> Boolean:
         def to_bool_rec(
-            neurons_in: list[tuple[Neuron, float]],
+            neurons_in: list[tuple[str, float]],
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
@@ -47,9 +45,9 @@ class Neuron:
             if i == len(neurons_in):
                 return Constant(False)
 
-            name = neurons_in[i][0].name
-            positive = not neuron_signs[i]
+            name = neurons_in[i][0]
             weight = neurons_in[i][1]
+            positive = not neuron_signs[i]
 
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
@@ -79,8 +77,10 @@ class Neuron:
 
 class NeuronNetwork:
     def __init__(self, net: nn.Module, varnames: Optional[list[str]] = None):
-        self.neurons = set()
+        self.neurons = OrderedDict()
         self.leaf = None
+        self.varnames = varnames
+        self.next_neuron_idx = 0
 
         if isinstance(net, nn.Sequential):
             first_layer = net[0]
@@ -88,54 +88,60 @@ class NeuronNetwork:
                 raise ValueError("First layer must always be a linear layer.")
             shape_out, shape_in = first_layer.weight.shape
             if not varnames:
-                varnames = [next(self.neuron_names()) for i in range(shape_in)]
+                varnames = [next(self.neuron_names()) for _ in range(shape_in)]
             if len(varnames) != shape_in:
                 raise ValueError("varnames need same shape as input of first layer")
-            # create a neuron vor the the input nodes in the input layer
-            last_layer = []
+            # create a neuron for each of the input nodes in the first layer
+            prev_layer = []
             for idx, name in enumerate(varnames):
-                neuron = Neuron(name)
-                self.neurons.add(neuron)
-                last_layer.append(neuron)
+                neuron = Neuron(neurons_in=[])
+                self.neurons[name] = neuron
+                prev_layer.append(neuron)
 
-            current_activation = None
             for layer in net:
-                if isinstance(layer, nn.Sigmoid):
-                    current_activation = Act.SIGMOID
-                elif isinstance(layer, nn.Linear):
+                if isinstance(layer, nn.Linear):
                     shape_out, shape_in = layer.weight.shape
                     weight = layer.weight.tolist()
                     bias = layer.bias.tolist()
                     new_layer = []
                     for idx in range(shape_out):
-                        neurons_in = list(zip(last_layer, weight[idx]))
+                        neurons_in = list(zip(prev_layer, weight[idx]))
                         neuron = Neuron(
-                            name=next(self.neuron_names()),
                             neurons_in=neurons_in,
                             bias=bias[idx],
                         )
-                        self.neurons.add(neuron)
+                        name = next(self.neuron_names())
+                        self.neurons[name] = neuron
                         new_layer.append(neuron)
-                    last_layer = new_layer
-            if len(last_layer) == 1:
-                self.leaf = last_layer[0]
+                    prev_layer = new_layer
+            if len(prev_layer) == 1:
+                self.leaf = prev_layer[0]
+
         else:
             raise ValueError("Only allows Sequential for now.")
 
+    def __len__(self):
+        return len(self.neurons)
+
+    def __str__(self) -> str:
+        return "\n".join(str(neuron) for neuron in self.neurons)
+
+    def __getitem__(self, key: str):
+        return self.neurons[key]
+
     def neuron_names(self):
-        next_neuron_idx = 0
         while True:
-            next_neuron_idx += 1
-            yield f"x_{next_neuron_idx}"
+            self.next_neuron_idx += 1
+            yield f"x_{self.next_neuron_idx}"
 
     def get_leaf_neuron(self) -> Neuron:
         return self.leaf
 
 
 if __name__ == "__main__":
-    x1 = Neuron("x1")
-    x2 = Neuron("x2")
-    x3 = Neuron("x3")
-    x4 = Neuron("x4")
+    x1 = Neuron()
+    x2 = Neuron()
+    x3 = Neuron()
+    x4 = Neuron()
     b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], 1.0)
     print(b.to_bool())

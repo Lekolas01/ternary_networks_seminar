@@ -25,6 +25,9 @@ class Boolean:
                 return False
         return True
 
+    def __repr__(self) -> str:
+        return str(self)
+
     def all_literals(self) -> set[str]:
         return set()
 
@@ -39,11 +42,11 @@ class Constant(Boolean):
     def __call__(self, interpretation: Interpretation) -> bool:
         return self.val
 
-    def all_literals(self) -> set[str]:
-        return set()
-
     def __eq__(self, __value: object) -> bool:
         return isinstance(__value, Constant) and __value.val == self.val
+
+    def all_literals(self) -> set[str]:
+        return set()
 
 
 class Literal(Boolean):
