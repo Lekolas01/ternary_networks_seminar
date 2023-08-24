@@ -26,7 +26,7 @@ def generate_data(
         interpretation = random_interpretation(set(vars))
         interpretation[target_col] = func(interpretation)
         df.loc[len(df)] = interpretation  # type: ignore
-    return df
+    return df.astype(int)
 
 
 def main(path, n_rows, n_vars, sep=","):
