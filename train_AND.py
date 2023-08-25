@@ -7,7 +7,7 @@ import torch.nn as nn
 from train_model import training_loop
 from loggers.loggers import *
 import torch.utils.data.sampler
-from nn_to_bool_formula import NeuronNetwork
+from nn_to_bool_formula import NeuronGraph
 
 torch.random.manual_seed(1)
 model = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Flatten(0))
@@ -28,4 +28,4 @@ t.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc", "valid
 # losses = training_loop(model, loss_fn, optim, dataloader, dataloader, 5, "cpu", t)
 
 model.eval()
-neurons = NeuronNetwork(model)
+neurons = NeuronGraph(model)

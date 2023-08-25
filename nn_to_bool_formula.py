@@ -7,6 +7,7 @@ from gen_data import *
 from dataloading import *
 from train_model import *
 from torch.utils.data import DataLoader
+from loggers.loggers import *
 
 
 class Act(Enum):
@@ -21,6 +22,7 @@ class Neuron:
         neurons_in: list[tuple[Neuron, float]] = [],
         bias: float = 0.0,
         activation_in: Act = Act.SIGMOID,
+        is_input: bool = False,
     ) -> None:
         self.name = name
         self.neurons_in = neurons_in
@@ -70,6 +72,7 @@ class Neuron:
                     Literal(name, positive),
                 ]
             )
+
             return OR([term1, term2])
 
         # sort neurons by their weight
@@ -83,17 +86,27 @@ class Neuron:
         filtered_weights = filter(lambda tup: tup[0], positive_weights)
         bias_diff = sum(tup[1] for tup in filtered_weights)
         long_ans = to_bool_rec(neurons_in, negative, -self.bias + bias_diff)
-
         ans = simplified(long_ans)
         return ans
 
 
-class NeuronNetwork:
+class InputNeuron(Neuron):
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def to_bool(self) -> Boolean:
+        return Literal(self.name)
+
+    def __repr__(self) -> str:
+        return f"{self.name} := {self.name}"
+
+
+class NeuronGraph:
     def __init__(self, net: nn.Module, input_vars: list[str] = []):
-        self.new_neuron_idx = 1  # for naming new neurons
-        self.neurons = []  # collection of all neurons added to Network
         self.input_vars = input_vars  # the names of the input variables
-        self.neuron_names = set()  # keeps track of the names of all neurons
+        self.new_neuron_idx = 1  # for naming new neurons
+        self.neurons: list[Neuron] = []  # collection of all neurons added to Network
+        self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
 
         if isinstance(net, nn.Sequential):
             first_layer = net[0]
@@ -107,7 +120,7 @@ class NeuronNetwork:
 
             # create a neuron for each of the input nodes in the first layer
             for idx, name in enumerate(input_vars):
-                self.add_neuron(Neuron(name, neurons_in=[]))
+                self.add_neuron(InputNeuron(name))
 
             ll_start, ll_end = 0, len(self.neurons)
             for layer in net:
@@ -160,6 +173,30 @@ class NeuronNetwork:
         return self.neurons[-1]
 
 
+class BooleanGraph(Boolean):
+    def __init__(self, neurons: NeuronGraph) -> None:
+        super().__init__()
+        self.neurons = neurons
+        self.n_bools = {n.name: n.to_bool() for n in self.neurons.neurons}
+        temp = 0
+
+    def __call__(self, interpretation: Interpretation) -> bool:
+        for key in self.n_bools:
+            n_bool = self.n_bools[key]
+            val = n_bool(interpretation)
+            interpretation[key] = val
+
+        target_name = self.neurons.target_neuron().name
+        return interpretation[target_name]
+
+    def __str__(self) -> str:
+        ans = ""
+        for key in self.n_bools:
+            n_bool = self.n_bools[key]
+            ans += f"{key} := {str(n_bool)}\n"
+        return ans
+
+
 def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
@@ -189,14 +226,19 @@ def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(model.parameters(), 0.01)
-    losses = training_loop(model, loss_fn, optim, dataloader, dataloader, epochs=epochs)
+    tracker = Tracker()
+    tracker.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"]))
+    losses = training_loop(
+        model, loss_fn, optim, dataloader, dataloader, epochs=epochs, tracker=tracker
+    )
 
     # convert the trained neural network to a set of perceptrons
-    neurons = NeuronNetwork(model, input_vars=vars)
+    neurons = NeuronGraph(model, input_vars=vars)
 
     # transform the output perceptron to a boolean function
-    found_func = neurons.target_neuron().to_bool()
+    found_func = BooleanGraph(neurons)
     print(neurons)
+    print(found_func)
     # return the found boolean function
     return found_func
 
@@ -224,7 +266,7 @@ if __name__ == "__main__":
             nn.Sigmoid(),
             nn.Flatten(0),
         )
-        found_func = full_circle(target_func, model)
+        found_func = full_circle(target_func, model, epochs=30)
         assert (
             target_func == found_func
         ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
