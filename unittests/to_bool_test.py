@@ -61,10 +61,10 @@ class TestToBool(unittest.TestCase):
     def test_XOR(self):
         x1 = Neuron("x1")
         x2 = Neuron("x2")
-        x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], 1.0)
-        x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], 1.0)
-        b = Neuron("b", [(x3, 1.5), (x4, 1.2)], 1.0)
+        x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], -1.0)
+        x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], -1.0)
+        b = Neuron("b", [(x3, 1.5), (x4, 1.2)], -1.0)
         xor_1 = AND([Literal(x1.name), Literal(x2.name, False)])
         xor_2 = AND([Literal(x1.name, False), Literal(x2.name)])
         xor = OR([xor_1, xor_2])
-        assert self.equivalent(b.to_bool(), xor)
+        assert b.to_bool() == xor

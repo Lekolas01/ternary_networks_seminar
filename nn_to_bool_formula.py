@@ -21,8 +21,7 @@ class Neuron:
         name: str,
         neurons_in: list[tuple[Neuron, float]] = [],
         bias: float = 0.0,
-        activation_in: Act = Act.SIGMOID,
-        is_input: bool = False,
+        activation_in: Act = Act.SIGMOID
     ) -> None:
         self.name = name
         self.neurons_in = neurons_in
