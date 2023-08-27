@@ -97,7 +97,7 @@ class InputNeuron(Neuron):
     def to_bool(self) -> Boolean:
         return Literal(self.name)
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f"{self.name} := {self.name}"
 
 
@@ -225,7 +225,7 @@ def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
     dataset = FileDataset(data_path)
     dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     loss_fn = nn.BCELoss()
-    optim = torch.optim.Adam(model.parameters(), 0.01)
+    optim = torch.optim.Adam(model.parameters(), lr=0.01)
     tracker = Tracker()
     tracker.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"]))
     losses = training_loop(
@@ -266,7 +266,7 @@ if __name__ == "__main__":
             nn.Sigmoid(),
             nn.Flatten(0),
         )
-        found_func = full_circle(target_func, model, epochs=30)
+        found_func = full_circle(target_func, model, epochs=50)
         assert (
             target_func == found_func
         ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
