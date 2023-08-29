@@ -21,7 +21,7 @@ class Neuron:
         name: str,
         neurons_in: list[tuple[Neuron, float]] = [],
         bias: float = 0.0,
-        activation_in: Act = Act.SIGMOID
+        activation_in: Act = Act.SIGMOID,
     ) -> None:
         self.name = name
         self.neurons_in = neurons_in
@@ -101,25 +101,32 @@ class InputNeuron(Neuron):
 
 
 class NeuronGraph:
-    def __init__(self, net: nn.Module, input_vars: list[str] = []):
-        self.input_vars = input_vars  # the names of the input variables
+    def __init__(self):
         self.new_neuron_idx = 1  # for naming new neurons
         self.neurons: list[Neuron] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
 
+    def __len__(self):
+        return len(self.neurons)
+
+    def __str__(self) -> str:
+        return "\n".join(str(neuron) for neuron in self.neurons)
+
+    def add_module(self, net: nn.Module, input_vars: list[str] = []):
+        self.input_vars = input_vars  # the names of the input variables
         if isinstance(net, nn.Sequential):
             first_layer = net[0]
             if not isinstance(first_layer, nn.Linear):
                 raise ValueError("First layer must always be a linear layer.")
             shape_out, shape_in = first_layer.weight.shape
-            if len(input_vars) == 0:
-                input_vars = [self._new_name() for _ in range(shape_in)]
-            if len(input_vars) != shape_in:
+            if len(self.input_vars) == 0:
+                self.input_vars = [self._new_name() for _ in range(shape_in)]
+            if len(self.input_vars) != shape_in:
                 raise ValueError("varnames need same shape as input of first layer")
 
             # create a neuron for each of the input nodes in the first layer
-            for idx, name in enumerate(input_vars):
-                self.add_neuron(InputNeuron(name))
+            for idx, name in enumerate(self.input_vars):
+                self.add(InputNeuron(name))
 
             ll_start, ll_end = 0, len(self.neurons)
             for layer in net:
@@ -138,27 +145,21 @@ class NeuronGraph:
                             neurons_in=neurons_in,
                             bias=bias[idx],
                         )
-                        self.add_neuron(neuron)
+                        self.add(neuron)
                     ll_start, ll_end = ll_end, len(self.neurons)
 
             # rename the last variable, so it is distinguishable from the rest
-            self.rename_neuron(self.target_neuron(), "target")
+            self.rename(self.target(), "target")
 
         else:
             raise ValueError("Only allows Sequential for now.")
 
-    def __len__(self):
-        return len(self.neurons)
-
-    def __str__(self) -> str:
-        return "\n".join(str(neuron) for neuron in self.neurons)
-
-    def add_neuron(self, neuron: Neuron):
+    def add(self, neuron: Neuron):
         assert neuron.name not in self.neuron_names
         self.neurons.append(neuron)
         self.neuron_names.add(neuron.name)
 
-    def rename_neuron(self, neuron: Neuron, new_name: str):
+    def rename(self, neuron: Neuron, new_name: str):
         assert neuron in self.neurons
         assert new_name not in self.neuron_names
         neuron.name = new_name
@@ -168,7 +169,7 @@ class NeuronGraph:
             self.new_neuron_idx += 1
         return f"x{self.new_neuron_idx}"
 
-    def target_neuron(self) -> Neuron:
+    def target(self) -> Neuron:
         return self.neurons[-1]
 
 
@@ -185,7 +186,7 @@ class BooleanGraph(Boolean):
             val = n_bool(interpretation)
             interpretation[key] = val
 
-        target_name = self.neurons.target_neuron().name
+        target_name = self.neurons.target().name
         return interpretation[target_name]
 
     def __str__(self) -> str:
@@ -232,12 +233,12 @@ def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
     )
 
     # convert the trained neural network to a set of perceptrons
-    neurons = NeuronGraph(model, input_vars=vars)
+    neurons = NeuronGraph()
+neurons.add_module(model, vars)
 
     # transform the output perceptron to a boolean function
     found_func = BooleanGraph(neurons)
-    print(neurons)
-    print(found_func)
+
     # return the found boolean function
     return found_func
 
