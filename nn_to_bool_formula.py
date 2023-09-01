@@ -234,7 +234,7 @@ def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
 
     # convert the trained neural network to a set of perceptrons
     neurons = NeuronGraph()
-neurons.add_module(model, vars)
+    neurons.add_module(model, vars)
 
     # transform the output perceptron to a boolean function
     found_func = BooleanGraph(neurons)
