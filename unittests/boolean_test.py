@@ -21,7 +21,7 @@ class TestToBool(unittest.TestCase):
         b = Neuron("b", [(x1, -1)], -0.5)
         b2 = Neuron("b2", [(x1, -1)], 0.5)
         assert b.to_bool() == Constant(False)
-        assert b2.to_bool() == Literal(x1.name, False)
+        assert b2.to_bool() == NOT(Literal(x1.name))
 
     def test_all_binary_Funcs(self):
         x1 = Neuron("x1")
@@ -32,12 +32,12 @@ class TestToBool(unittest.TestCase):
         b4 = Neuron("b5", [(x1, 1), (x2, -1)], 0.5)  # x1 OR !x2
         b5 = Neuron("b3", [(x1, -1), (x2, -1)], 0.5)  # !x1 AND !x2
         b6 = Neuron("b6", [(x1, -1), (x2, -1)], 1.5)  # !x1 OR !x2
-        assert b1.to_bool() == AND([Literal(x1.name), Literal(x2.name)])
-        assert b2.to_bool() == OR([Literal(x1.name), Literal(x2.name)])
-        assert b3.to_bool() == AND([Literal(x1.name), Literal(x2.name, False)])
-        assert b4.to_bool() == OR([Literal(x1.name), Literal(x2.name, False)])
-        assert b5.to_bool() == AND([Literal(x1.name, False), Literal(x2.name, False)])
-        assert b6.to_bool() == OR([Literal(x1.name, False), Literal(x2.name, False)])
+        assert b1.to_bool() == AND(Literal(x1.name), Literal(x2.name))
+        assert b2.to_bool() == OR(Literal(x1.name), Literal(x2.name))
+        assert b3.to_bool() == AND(Literal(x1.name), NOT(Literal(x2.name)))
+        assert b4.to_bool() == OR(Literal(x1.name), NOT(Literal(x2.name)))
+        assert b5.to_bool() == AND(NOT(Literal(x1.name)), NOT(Literal(x2.name)))
+        assert b6.to_bool() == OR(NOT(Literal(x1.name)), NOT(Literal(x2.name)))
 
     def test_ComplexNeuron(self):
         x1 = Neuron("x1")
@@ -46,12 +46,8 @@ class TestToBool(unittest.TestCase):
         x4 = Neuron("x4")
         b = Neuron("b", [(x1, 1.5), (x2, -1.4), (x3, 2.1), (x4, -0.3)], -1.0)
         true_bool = OR(
-            [
-                AND([Literal(x1.name), Literal(x2.name, False)]),
-                AND(
-                    [Literal(x3.name), OR([Literal(x1.name), Literal(x2.name, False)])]
-                ),
-            ]
+            AND(Literal(x1.name), NOT(Literal(x2.name))),
+            AND(Literal(x3.name), OR(Literal(x1.name), NOT(Literal(x2.name)))),
         )
         assert b.to_bool() == true_bool
 
@@ -68,9 +64,9 @@ class TestToBool(unittest.TestCase):
         b_graph = NeuronGraph()
         for neuron in [x1, x2, x3, x4, b]:
             b_graph.add(neuron)
-        xor_1 = AND([Literal(x1.name), Literal(x2.name, False)])
-        xor_2 = AND([Literal(x1.name, False), Literal(x2.name)])
-        xor = OR([xor_1, xor_2])
+        xor_1 = AND(Literal(x1.name), NOT(Literal(x2.name)))
+        xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
+        xor = OR(xor_1, xor_2)
 
         assert BooleanGraph(b_graph) == xor
 
@@ -85,8 +81,7 @@ class TestToBool(unittest.TestCase):
         target = Neuron("target", [(x3, 2.8), (x4, 3.7), (x5, 0.3), (x6, 3.0)], -5.2)
         for n in [x1, x2, x3, x4, x5, x6, target]:
             neurons.add(n)
-        xor_1 = AND([Literal(x1.name), Literal(x2.name, False)])
-        xor_2 = AND([Literal(x1.name, False), Literal(x2.name)])
-        xor = OR([xor_1, xor_2])
+        xor_1 = AND(Literal(x1.name), NOT(Literal(x2.name)))
+        xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
+        xor = OR(xor_1, xor_2)
         assert BooleanGraph(neurons) == xor
-

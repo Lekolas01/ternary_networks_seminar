@@ -6,8 +6,12 @@ import pandas as pd
 from typing import Optional
 
 
+def random_interpretation(literals: set[str]) -> Interpretation:
+    return {l: random.random() >= 0.5 for l in literals}
+
+
 def generate_data(
-    n_samples: int, func: Boolean, vars: Optional[list[str]] = None
+    n_samples: int, func: Bool, vars: Optional[list[str]] = None
 ) -> pd.DataFrame:
     assert (
         isinstance(n_samples, int) and n_samples >= 1

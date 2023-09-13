@@ -45,15 +45,15 @@ class Neuron:
         return f"{self.name:>8}  :=  {right_term}"
 
     def __repr__(self) -> str:
-        return f'Neuron("{self.name}")'
+        return f'Neuron("{str(self)}")'
 
-    def to_bool(self) -> Boolean:
+    def to_bool(self) -> Bool:
         def to_bool_rec(
             neurons_in: list[tuple[Neuron, float]],
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
-        ) -> Boolean:
+        ) -> Bool:
             if threshold < 0:
                 return Constant(True)
             if i == len(neurons_in):
@@ -66,13 +66,11 @@ class Neuron:
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
             term2 = AND(
-                [
-                    to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1),
-                    Literal(name, positive),
-                ]
+                to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1),
+                Literal(name) if positive else NOT(Literal(name)),
             )
 
-            return OR([term1, term2])
+            return OR(term1, term2)
 
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
@@ -84,20 +82,18 @@ class Neuron:
         positive_weights = zip(negative, [tup[1] for tup in neurons_in])
         filtered_weights = filter(lambda tup: tup[0], positive_weights)
         bias_diff = sum(tup[1] for tup in filtered_weights)
-        long_ans = to_bool_rec(neurons_in, negative, -self.bias + bias_diff)
-        ans = simplified(long_ans)
-        return ans
+        return to_bool_rec(neurons_in, negative, -self.bias + bias_diff).simplify()
 
 
 class InputNeuron(Neuron):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def to_bool(self) -> Boolean:
+    def to_bool(self) -> Bool:
         return Literal(self.name)
 
     def __str__(self) -> str:
-        return f"{self.name} := {self.name}"
+        return f'InputNeuron("{self.name}")'
 
 
 class NeuronGraph:
@@ -114,45 +110,41 @@ class NeuronGraph:
 
     def add_module(self, net: nn.Module, input_vars: list[str] = []):
         self.input_vars = input_vars  # the names of the input variables
-        if isinstance(net, nn.Sequential):
-            first_layer = net[0]
-            if not isinstance(first_layer, nn.Linear):
-                raise ValueError("First layer must always be a linear layer.")
-            shape_out, shape_in = first_layer.weight.shape
-            if len(self.input_vars) == 0:
-                self.input_vars = [self._new_name() for _ in range(shape_in)]
-            if len(self.input_vars) != shape_in:
-                raise ValueError("varnames need same shape as input of first layer")
-
-            # create a neuron for each of the input nodes in the first layer
-            for idx, name in enumerate(self.input_vars):
-                self.add(InputNeuron(name))
-
-            ll_start, ll_end = 0, len(self.neurons)
-            for layer in net:
-                if isinstance(layer, nn.Linear):
-                    shape_out, shape_in = layer.weight.shape
-                    weight = layer.weight.tolist()
-                    bias = layer.bias.tolist()
-
-                    for idx in range(shape_out):
-                        neurons_in = list(
-                            zip(self.neurons[ll_start:ll_end], weight[idx])
-                        )
-                        name = self._new_name()
-                        neuron = Neuron(
-                            name,
-                            neurons_in=neurons_in,
-                            bias=bias[idx],
-                        )
-                        self.add(neuron)
-                    ll_start, ll_end = ll_end, len(self.neurons)
-
-            # rename the last variable, so it is distinguishable from the rest
-            self.rename(self.target(), "target")
-
-        else:
+        if not isinstance(net, nn.Sequential):
             raise ValueError("Only allows Sequential for now.")
+        first_layer = net[0]
+        if not isinstance(first_layer, nn.Linear):
+            raise ValueError("First layer must always be a linear layer.")
+        shape_out, shape_in = first_layer.weight.shape
+        if len(self.input_vars) == 0:
+            self.input_vars = [self._new_name() for _ in range(shape_in)]
+        if len(self.input_vars) != shape_in:
+            raise ValueError("varnames need same shape as input of first layer")
+
+        # create a neuron for each of the input nodes in the first layer
+        for idx, name in enumerate(self.input_vars):
+            self.add(InputNeuron(name))
+
+        ll_start, ll_end = 0, len(self.neurons)
+        for layer in net:
+            if isinstance(layer, nn.Linear):
+                shape_out, shape_in = layer.weight.shape
+                weight = layer.weight.tolist()
+                bias = layer.bias.tolist()
+
+                for idx in range(shape_out):
+                    neurons_in = list(zip(self.neurons[ll_start:ll_end], weight[idx]))
+                    name = self._new_name()
+                    neuron = Neuron(
+                        name,
+                        neurons_in=neurons_in,
+                        bias=bias[idx],
+                    )
+                    self.add(neuron)
+                ll_start, ll_end = ll_end, len(self.neurons)
+
+        # rename the last variable, so it is distinguishable from the rest
+        self.rename(self.target(), "target")
 
     def add(self, neuron: Neuron):
         assert neuron.name not in self.neuron_names
@@ -173,12 +165,11 @@ class NeuronGraph:
         return self.neurons[-1]
 
 
-class BooleanGraph(Boolean):
-    def __init__(self, neurons: NeuronGraph) -> None:
-        super().__init__()
+class BooleanGraph(Bool):
+    def __init__(self, neurons: NeuronGraph, positive=True) -> None:
+        super().__init__(positive)
         self.neurons = neurons
         self.n_bools = {n.name: n.to_bool() for n in self.neurons.neurons}
-        temp = 0
 
     def __call__(self, interpretation: Interpretation) -> bool:
         for key in self.n_bools:
@@ -189,15 +180,25 @@ class BooleanGraph(Boolean):
         target_name = self.neurons.target().name
         return interpretation[target_name]
 
+    def __repr__(self) -> str:
+        return self.__str__()
+
     def __str__(self) -> str:
-        ans = ""
+        ans = "BooleanGraph[\n"
         for key in self.n_bools:
             n_bool = self.n_bools[key]
-            ans += f"{key} := {str(n_bool)}\n"
+            ans += f"\t{key} := {str(n_bool)}\n"
+        ans += "]\n"
+        return ans
+
+    def all_literals(self) -> set[str]:
+        ans = set()
+        for key in self.n_bools:
+            ans = ans.union(self.n_bools[key].all_literals())
         return ans
 
 
-def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
+def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
     shape_out, shape_in = layer_1.weight.shape
@@ -210,8 +211,8 @@ def full_circle(target_func: Boolean, model: nn.Sequential, epochs=5):
         )
     n_dead_vars = shape_in - len(vars)
 
-    for i in range(n_dead_vars):
-        dead_var_name = f"dead{i}"
+    for i in range(len(vars) + 1, n_dead_vars + len(vars) + 1):
+        dead_var_name = f"x{i}"
         assert dead_var_name not in vars
         vars.append(dead_var_name)
     data = generate_data(640, target_func, vars=vars)
@@ -260,13 +261,18 @@ if __name__ == "__main__":
     ]
     for target_func in target_funcs:
         model = nn.Sequential(
-            nn.Linear(2, 2),
+            nn.Linear(6, 2),
             nn.Sigmoid(),
             nn.Linear(2, 1),
             nn.Sigmoid(),
             nn.Flatten(0),
         )
-        found_func = full_circle(target_func, model, epochs=50)
+        found_func = full_circle(target_func, model, epochs=20)
+        print(f"{target_func = }")
+        print(f"{model = }")
+        print(f"{found_func = }")
+
         assert (
             target_func == found_func
         ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
+        break
