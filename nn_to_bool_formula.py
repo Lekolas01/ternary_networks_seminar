@@ -82,7 +82,7 @@ class Neuron:
         positive_weights = zip(negative, [tup[1] for tup in neurons_in])
         filtered_weights = filter(lambda tup: tup[0], positive_weights)
         bias_diff = sum(tup[1] for tup in filtered_weights)
-        return to_bool_rec(neurons_in, negative, -self.bias + bias_diff).simplify()
+        return to_bool_rec(neurons_in, negative, -self.bias + bias_diff).simplified()
 
 
 class InputNeuron(Neuron):

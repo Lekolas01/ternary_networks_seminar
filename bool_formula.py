@@ -30,11 +30,11 @@ class Bool(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def negate(self) -> None:
-        raise NotImplementedError
+    def negated(self) -> Bool:
+        return NOT(copy.copy(self))
 
-    def simplify(self) -> None:
-        pass
+    def simplified(self) -> Bool:
+        return self
 
     def __eq__(self, other: Bool) -> bool:
         if isinstance(other, Bool):
@@ -64,8 +64,8 @@ class Constant(Bool):
     def all_literals(self) -> set[str]:
         return set()
 
-    def negate(self) -> None:
-        self.val = not self.val
+    def negated(self) -> Bool:
+        return Constant(not self.val)
 
 
 class Literal(Bool):
@@ -84,8 +84,8 @@ class Literal(Bool):
     def all_literals(self) -> set[str]:
         return {self.name}
 
-    def negate(self) -> None:
-        self.value = not self.value
+    def negated(self) -> Bool:
+        return Literal(self.name, not self.value)
 
 
 class NOT(Bool):
@@ -101,12 +101,13 @@ class NOT(Bool):
     def all_literals(self) -> set[str]:
         return self.child.all_literals()
 
-    def negate(self) -> None:
-        self = self.child
+    def negated(self) -> Bool:
+        # if you negate a NOT(...), you can just cancel the NOT() and return the child
+        return copy.copy(self.child)
 
-    def simplify(self) -> None:
-        self.child.negate()
-        self = self.child
+    def simplified(self) -> Bool:
+        # move the NOT() inside
+        return self.child.negated().simplified()
 
 
 class Quantifier(Bool):
@@ -139,36 +140,30 @@ class AND(Quantifier):
     def __init__(self, *children: Bool) -> None:
         super().__init__(list(children), True)
 
-    def simplify(self) -> None:
+    def simplified(self) -> Bool:
         # TODO: simplify children first
         # if one term is False, the whole conjunction is False
         if any(child == False for child in self.children):
-            self = Constant(False)
-            return
+            return Constant(False)
         # True constants can be removed
         children = list(filter(lambda c: c != True, self.children))
         # if now the list is empty, we can return True
         if len(children) == 0:
-            self = Constant(True)
-            return
+            return Constant(True)
         if len(children) == 1:
-            self = children[0]
-            return
+            return children[0]
         # otherwise return the rest of the relevant children
-        self = AND(*children)
-        return
+        return AND(*children)
 
-    def negate(self) -> None:
-        for c in self.children:
-            c.negate()
-        self = OR(*self.children)
+    def negated(self) -> Bool:
+        return OR(*(c.negated() for c in self.children))
 
 
 class OR(Quantifier):
     def __init__(self, *children: Bool) -> None:
         super().__init__(list(children), False)
 
-    def simplify(self) -> Bool:
+    def simplified(self) -> Bool:
         # if one term is True, the whole disjuction is True
         if any(child == True for child in self.children):
             return Constant(True)
@@ -182,21 +177,32 @@ class OR(Quantifier):
         # otherwise return the rest of the relevant children
         return OR(*children)
 
-    def negate(self) -> None:
-        for c in self.children:
-            c.negate()
-        self = OR(*self.children)
+    def negated(self) -> Bool:
+        return AND(*(c.negated() for c in self.children))
 
 
 if __name__ == "__main__":
-    interpretation = {"a": True, "b": False, "c": False}
-    z = Constant(True)
-    a = Literal("a")
-    b = Literal("b")
-    c = Literal("c")
-    d = OR(a, b)
-    func = OR(OR(a, b), c)
-    fn1 = AND(a, b)
-    print(func(interpretation))
-    print(func)
-    print(func.simplify())
+    formulae: Dict[str, Bool] = {
+        "a0": AND(),
+        "a1": AND(Constant(True)),
+        "a2": AND(Constant(False)),
+        "a": AND(Constant(True), Constant(True)),
+        "b": AND(Constant(True), Constant(False)),
+        "c": AND(Constant(False), Constant(False)),
+        "d": AND(Constant(True), Constant(True), Literal("x1")),
+        "e": AND(Constant(True), Constant(False), Literal("x1")),
+        "f": AND(Constant(False), Constant(False), Literal("x1")),
+        "n1": NOT(Constant(True)),
+        "n2": NOT(NOT(Constant(True))),
+        "n3": NOT(Constant(False)),
+        "n4": NOT(NOT(Constant(False))),
+        "n5": NOT(Literal("x1")),
+        "n6": NOT(NOT(Literal("x1"))),
+        "or0": OR(),
+        "and1": NOT(AND()),
+        "and2": NOT(AND(Literal("x1"))),
+        "and3": NOT(AND(Literal("x1"), Literal("x2"))),
+    }
+    for key in formulae:
+        b = formulae[key]
+        print(f"{key:>6} | {b.__str__():>15} -> {b.simplified().__str__():>5}")
