@@ -85,3 +85,33 @@ class TestToBool(unittest.TestCase):
         xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
         xor = OR(xor_1, xor_2)
         assert BooleanGraph(neurons) == xor
+
+    def test_simplified(self):
+        formulae: list[tuple[Bool, str]] = [
+            (AND(), "T"),
+            (AND(Constant(True)), "T"),
+            (AND(Constant(False)), "F"),
+            (AND(Constant(True), Constant(True)), "T"),
+            (AND(Constant(True), Constant(False)), "F"),
+            (AND(Constant(False), Constant(False)), "F"),
+            (AND(Constant(True), Constant(True), Literal("x1")), "x1"),
+            (AND(Constant(True), Constant(False), Literal("x1")), "F"),
+            (AND(Constant(False), Constant(False), Literal("x1")), "F"),
+            (NOT(Constant(True)), "F"),
+            (NOT(NOT(Constant(True))), "T"),
+            (NOT(Constant(False)), "T"),
+            (NOT(NOT(Constant(False))), "F"),
+            (NOT(Literal("x1")), "!x1"),
+            (NOT(NOT(Literal("x1"))), "x1"),
+            (OR(), "F"),
+            (NOT(AND()), "F"),
+            (NOT(AND(Literal("x1"))), "!x1"),
+            (NOT(AND(Literal("x1"), Literal("x2"))), "(!x1 | !x2)"),
+            (AND(AND(Constant(True), Literal("x1")), Constant(True)), "x1"),
+            (AND(AND(Constant(True), NOT(Literal("x1"))), Constant(True)), "!x1"),
+            (NOT(AND(AND(Constant(True), NOT(Literal("x1"))), Constant(True))), "x1"),
+        ]
+
+        for formula, ans in formulae:
+            if formula.simplified().__str__() != ans:
+                assert False

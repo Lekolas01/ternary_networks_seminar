@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import Dict
-import random
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 import copy
@@ -69,23 +68,22 @@ class Constant(Bool):
 
 
 class Literal(Bool):
-    def __init__(self, name: str, is_true: bool = True) -> None:
+    def __init__(self, name: str) -> None:
         assert name is not None
         self.name = name
-        self.value = is_true
 
     def __call__(self, interpretation: Interpretation) -> bool:
         ans = interpretation[self.name]
-        return ans if self.value else not ans
+        return ans
 
     def __str__(self) -> str:
-        return f"{'!' if not self.value else ''}{self.name}"
+        return self.name
 
     def all_literals(self) -> set[str]:
         return {self.name}
 
     def negated(self) -> Bool:
-        return Literal(self.name, not self.value)
+        return NOT(copy.copy(self))
 
 
 class NOT(Bool):
@@ -96,7 +94,7 @@ class NOT(Bool):
         return not self.child(interpretation)
 
     def __str__(self) -> str:
-        return f"NOT({self.child.__str__()})"
+        return f"!{self.child.__str__()}"
 
     def all_literals(self) -> set[str]:
         return self.child.all_literals()
@@ -107,78 +105,60 @@ class NOT(Bool):
 
     def simplified(self) -> Bool:
         # move the NOT() inside
+        if isinstance(self.child, Literal):
+            return copy.copy(self)
         return self.child.negated().simplified()
 
 
 class Quantifier(Bool):
     def __init__(self, children: list[Bool], is_all: bool) -> None:
         self.children = children
-        self.set_is_all(is_all)
+        self.is_all = is_all
+        self.op = all if self.is_all else any
+        self.opstr = " & " if is_all else " | "
 
     def __call__(self, interpretation: Interpretation) -> bool:
-        return self._op(c(interpretation) for c in self.children)
+        return self.op(c(interpretation) for c in self.children)
 
     def __str__(self) -> str:
-        return f"{self._oprepr}({', '.join([c.__str__() for c in self.children])})"
+        if len(self.children) == 0:
+            return "(T)" if self.is_all else "(F)"
+        else:
+            return f"({self.opstr.join([c.__str__() for c in self.children])})"
 
     def all_literals(self) -> set[str]:
         return set().union(*(f.all_literals() for f in self.children))
 
-    def get_is_all(self) -> bool:
-        return self._is_all
+    def negated(self) -> Bool:
+        return Quantifier(
+            [c.negated().simplified() for c in self.children], not self.is_all
+        )
 
-    def set_is_all(self, is_all: bool) -> None:
-        if hasattr(self, "is_all") and self._is_all == is_all:
-            return
-        self._is_all = is_all
-        self._opstr = " & " if is_all else " | "
-        self._oprepr = "AND" if is_all else "OR"
-        self._op = all if self._is_all else any
+    def simplified(self) -> Bool:
+        # simplify children first
+        children = [c.simplified() for c in self.children]
+        # if one term is False, the whole conjunction is False
+        if any(child == (not self.is_all) for child in children):
+            return Constant(not self.is_all)
+        # True constants can be removed
+        children = list(filter(lambda c: c != self.is_all, children))
+        # if now the list is empty, we can return True
+        if len(children) == 0:
+            return Constant(self.is_all)
+        if len(children) == 1:
+            return children[0]
+        # otherwise return the rest of the relevant children
+        return Quantifier(children, self.is_all)
 
 
 class AND(Quantifier):
     def __init__(self, *children: Bool) -> None:
         super().__init__(list(children), True)
 
-    def simplified(self) -> Bool:
-        # TODO: simplify children first
-        # if one term is False, the whole conjunction is False
-        if any(child == False for child in self.children):
-            return Constant(False)
-        # True constants can be removed
-        children = list(filter(lambda c: c != True, self.children))
-        # if now the list is empty, we can return True
-        if len(children) == 0:
-            return Constant(True)
-        if len(children) == 1:
-            return children[0]
-        # otherwise return the rest of the relevant children
-        return AND(*children)
-
-    def negated(self) -> Bool:
-        return OR(*(c.negated() for c in self.children))
-
 
 class OR(Quantifier):
     def __init__(self, *children: Bool) -> None:
         super().__init__(list(children), False)
-
-    def simplified(self) -> Bool:
-        # if one term is True, the whole disjuction is True
-        if any(child == True for child in self.children):
-            return Constant(True)
-        # False constants can be removed
-        children = list(filter(lambda c: c != False, self.children))
-        # if now the list is empty, we can return False
-        if len(self.children) == 0:
-            return Constant(False)
-        if len(children) == 1:
-            return children[0]
-        # otherwise return the rest of the relevant children
-        return OR(*children)
-
-    def negated(self) -> Bool:
-        return AND(*(c.negated() for c in self.children))
 
 
 if __name__ == "__main__":
@@ -202,7 +182,9 @@ if __name__ == "__main__":
         "and1": NOT(AND()),
         "and2": NOT(AND(Literal("x1"))),
         "and3": NOT(AND(Literal("x1"), Literal("x2"))),
+        "and4": AND(AND(Constant(True), Literal("x1")), Constant(True)),
     }
     for key in formulae:
         b = formulae[key]
-        print(f"{key:>6} | {b.__str__():>15} -> {b.simplified().__str__():>5}")
+        ans = b.simplified()
+        print(f"{key:>6} | {b.__str__():>15} -> {ans.__str__():>5}")
