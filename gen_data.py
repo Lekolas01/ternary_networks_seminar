@@ -4,6 +4,7 @@ import os
 from bool_formula import *
 import pandas as pd
 from typing import Optional
+import random
 
 
 def random_interpretation(literals: set[str]) -> Interpretation:

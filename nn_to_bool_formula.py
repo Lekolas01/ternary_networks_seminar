@@ -2,7 +2,7 @@ from __future__ import annotations
 from bool_formula import *
 import torch.nn as nn
 from enum import Enum
-from bool_formula import Interpretation
+from bool_formula import Bool, Interpretation
 from gen_data import *
 from dataloading import *
 from train_model import *
@@ -166,8 +166,8 @@ class NeuronGraph:
 
 
 class BooleanGraph(Bool):
-    def __init__(self, neurons: NeuronGraph, positive=True) -> None:
-        super().__init__(positive)
+    def __init__(self, neurons: NeuronGraph) -> None:
+        super().__init__()
         self.neurons = neurons
         self.n_bools = {n.name: n.to_bool() for n in self.neurons.neurons}
 
@@ -196,6 +196,9 @@ class BooleanGraph(Bool):
         for key in self.n_bools:
             ans = ans.union(self.n_bools[key].all_literals())
         return ans
+
+    def negated(self) -> Bool:
+        raise NotImplementedError
 
 
 def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
@@ -247,16 +250,12 @@ def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
 if __name__ == "__main__":
     target_funcs = [
         OR(
-            [
-                AND([Literal("x1", False), Literal("x2", True)]),
-                AND([Literal("x1", True), Literal("x2", False)]),
-            ]
+            AND(NOT(Literal("x1")), Literal("x2")),
+            AND(Literal("x1"), NOT(Literal("x2"))),
         ),
         OR(
-            [
-                AND([Literal("x1", False), Literal("x2", False)]),
-                AND([Literal("x1", True), Literal("x2", True)]),
-            ]
+            AND(NOT(Literal("x1")), NOT(Literal("x2"))),
+            AND(Literal("x1"), Literal("x2")),
         ),
     ]
     for target_func in target_funcs:
