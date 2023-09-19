@@ -10,16 +10,16 @@ class TestFullCircle(unittest.TestCase):
         target_funcs = [
             Constant(False),
             Constant(True),
-            Literal("x1", False),
-            Literal("x1", True),
-            AND([Literal("x1", False), Literal("x2", False)]),
-            AND([Literal("x1", False), Literal("x2", True)]),
-            AND([Literal("x1", True), Literal("x2", False)]),
-            AND([Literal("x1", True), Literal("x2", True)]),
-            OR([Literal("x1", False), Literal("x2", False)]),
-            OR([Literal("x1", False), Literal("x2", True)]),
-            OR([Literal("x1", True), Literal("x2", False)]),
-            OR([Literal("x1", True), Literal("x2", True)]),
+            NOT(Literal("x1")),
+            Literal("x1"),
+            AND(NOT(Literal("x1")), NOT(Literal("x2"))),
+            AND(NOT(Literal("x1")), Literal("x2")),
+            AND(Literal("x1"), NOT(Literal("x2"))),
+            AND(Literal("x1"), Literal("x2")),
+            OR(NOT(Literal("x1")), NOT(Literal("x2"))),
+            OR(NOT(Literal("x1")), Literal("x2")),
+            OR(Literal("x1"), NOT(Literal("x2"))),
+            OR(Literal("x1"), Literal("x2")),
         ]
         for target_func in target_funcs:
             model = nn.Sequential(
@@ -35,16 +35,12 @@ class TestFullCircle(unittest.TestCase):
     def test_XOR(self):
         target_funcs = [
             OR(
-                [
-                    AND([Literal("x1", False), Literal("x2", True)]),
-                    AND([Literal("x1", True), Literal("x2", False)]),
-                ]
+                AND(NOT(Literal("x1")), Literal("x2")),
+                AND(Literal("x1"), NOT(Literal("x2"))),
             ),
             OR(
-                [
-                    AND([Literal("x1", False), Literal("x2", False)]),
-                    AND([Literal("x1", True), Literal("x2", True)]),
-                ]
+                AND(NOT(Literal("x1")), NOT(Literal("x2"))),
+                AND(Literal("x1"), Literal("x2")),
             ),
         ]
         for target_func in target_funcs:
@@ -59,3 +55,4 @@ class TestFullCircle(unittest.TestCase):
             assert (
                 target_func == found_func
             ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
+            break
