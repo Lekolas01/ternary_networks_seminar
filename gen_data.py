@@ -7,28 +7,29 @@ from typing import Optional
 import random
 
 
-def random_interpretation(literals: set[str]) -> Interpretation:
+def random_interpretation(literals: Collection[str]) -> Interpretation:
+    literals = list(literals)
     return {l: random.random() >= 0.5 for l in literals}
 
 
 def generate_data(
-    n_samples: int, func: Bool, vars: Optional[list[str]] = None
+    n_samples: int, func: Bool, vars: Optional[list[str]] = None, seed=None
 ) -> pd.DataFrame:
     assert (
         isinstance(n_samples, int) and n_samples >= 1
     ), f"n_rows must be int type and greater than 0."
+    if seed is not None:
+        random.seed(seed)
     if not vars:
         vars = list(func.all_literals())
-
     columns = vars.copy()
-
     target_col = "target"
     columns.append(target_col)
     df = pd.DataFrame(columns=columns)
     # for every sample, pick a random interpretation,
     # calculate the value and add that row to the DataFrame
     for _ in range(n_samples):
-        interpretation = random_interpretation(set(vars))
+        interpretation = random_interpretation(vars)
         interpretation[target_col] = func(interpretation)
         df.loc[len(df)] = interpretation  # type: ignore
     return df.astype(int)
@@ -80,4 +81,4 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = os.path.join(dir_path, "data.csv")
     n_rows, n_vars = 100, 2
-    data = generate_data(100, AND([Literal("x1"), Literal("x2", False)]))
+    data = generate_data(100, AND("x1", NOT(Literal("x2"))))

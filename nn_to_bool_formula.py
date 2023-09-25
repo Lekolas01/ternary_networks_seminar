@@ -8,6 +8,7 @@ from dataloading import *
 from train_model import *
 from torch.utils.data import DataLoader
 from loggers.loggers import *
+import sys
 
 
 class Act(Enum):
@@ -169,39 +170,44 @@ class BooleanGraph(Bool):
     def __init__(self, neurons: NeuronGraph) -> None:
         super().__init__()
         self.neurons = neurons
-        self.n_bools = {n.name: n.to_bool() for n in self.neurons.neurons}
+        self.bools = {n.name: n.to_bool() for n in self.neurons.neurons}
 
     def __call__(self, interpretation: Interpretation) -> bool:
-        for key in self.n_bools:
-            n_bool = self.n_bools[key]
-            val = n_bool(interpretation)
-            interpretation[key] = val
+        int_copy = copy.copy(interpretation)
+        for key in self.bools:
+            n_bool = self.bools[key]
+            val = n_bool(int_copy)
+
+            int_copy[key] = val
 
         target_name = self.neurons.target().name
-        return interpretation[target_name]
+        return int_copy[target_name]
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def __str__(self) -> str:
         ans = "BooleanGraph[\n"
-        for key in self.n_bools:
-            n_bool = self.n_bools[key]
+        for key in self.bools:
+            n_bool = self.bools[key]
             ans += f"\t{key} := {str(n_bool)}\n"
         ans += "]\n"
         return ans
 
     def all_literals(self) -> set[str]:
         ans = set()
-        for key in self.n_bools:
-            ans = ans.union(self.n_bools[key].all_literals())
+        for key in self.bools:
+            if isinstance(self.bools[key], InputNeuron):
+                ans = ans.union(self.bools[key].all_literals())
         return ans
 
     def negated(self) -> Bool:
         raise NotImplementedError
 
 
-def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
+def full_circle(
+    target_func: Bool, model: nn.Sequential, epochs=5, verbose=False, seed=None
+):
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
     shape_out, shape_in = layer_1.weight.shape
@@ -218,7 +224,7 @@ def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
         dead_var_name = f"x{i}"
         assert dead_var_name not in vars
         vars.append(dead_var_name)
-    data = generate_data(640, target_func, vars=vars)
+    data = generate_data(640, target_func, vars=vars, seed=seed)
 
     # save it in a throwaway folder
     folder_path = Path("unittests/can_delete")
@@ -239,7 +245,8 @@ def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
     # convert the trained neural network to a set of perceptrons
     neurons = NeuronGraph()
     neurons.add_module(model, vars)
-
+    if verbose:
+        print(neurons)
     # transform the output perceptron to a boolean function
     found_func = BooleanGraph(neurons)
 
@@ -248,30 +255,25 @@ def full_circle(target_func: Bool, model: nn.Sequential, epochs=5):
 
 
 if __name__ == "__main__":
-    target_funcs = [
-        OR(
-            AND(NOT(Literal("x1")), Literal("x2")),
-            AND(Literal("x1"), NOT(Literal("x2"))),
-        ),
-        OR(
-            AND(NOT(Literal("x1")), NOT(Literal("x2"))),
-            AND(Literal("x1"), Literal("x2")),
-        ),
-    ]
-    for target_func in target_funcs:
-        model = nn.Sequential(
-            nn.Linear(6, 2),
-            nn.Sigmoid(),
-            nn.Linear(2, 1),
-            nn.Sigmoid(),
-            nn.Flatten(0),
-        )
-        found_func = full_circle(target_func, model, epochs=20)
-        print(f"{target_func = }")
-        print(f"{model = }")
-        print(f"{found_func = }")
+    args = sys.argv[1:]
+    seed = None
+    if len(args) > 0:
+        seed = int(args[0])
+        print(f"{seed = }")
+        torch.manual_seed(seed)
+        random.seed(seed)
 
-        assert (
-            target_func == found_func
-        ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
-        break
+    parity = PARITY(("x1", "x2", "x3"))
+    n = len(parity.all_literals())
+    model = nn.Sequential(
+        nn.Linear(n, n),
+        nn.Sigmoid(),
+        # nn.Linear(n, n),
+        # nn.Sigmoid(),
+        nn.Linear(n, 1),
+        nn.Sigmoid(),
+        nn.Flatten(0),
+    )
+    found = full_circle(parity, model, epochs=45, seed=seed)
+    print(found)
+    print(f"{fidelity(found, parity, True) = }")

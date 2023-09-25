@@ -56,8 +56,8 @@ class TestToBool(unittest.TestCase):
 
     def test_XOR(self):
         n = NeuronGraph()
-        x1 = Neuron("x1")
-        x2 = Neuron("x2")
+        x1 = InputNeuron("x1")
+        x2 = InputNeuron("x2")
         x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], -1.0)
         x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], -1.0)
         b = Neuron("b", [(x3, 1.5), (x4, 1.2)], -1.0)

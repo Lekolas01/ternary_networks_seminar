@@ -56,3 +56,17 @@ class TestFullCircle(unittest.TestCase):
                 target_func == found_func
             ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
             break
+
+    def test_parity(self):
+        parity = PARITY(("x1", "x2", "x3", "x4"))
+        model = nn.Sequential(
+            nn.Linear(6, 6),
+            nn.Sigmoid(),
+            nn.Linear(6, 3),
+            nn.Sigmoid(),
+            nn.Linear(3, 1),
+            nn.Sigmoid(),
+            nn.Flatten(0),
+        )
+        found = full_circle(parity, model, epochs=1, verbose=True)
+        temp = 0

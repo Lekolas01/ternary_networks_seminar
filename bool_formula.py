@@ -15,6 +15,20 @@ def all_interpretations(names: Collection[str]) -> list[Interpretation]:
     return ans
 
 
+def fidelity(left: Bool, right: Bool, verbose=False) -> float:
+    names = list(left.all_literals().union(right.all_literals()))
+    interpretations = all_interpretations(names)
+    if verbose:
+        print(f"{names = }")
+        print(f"{len(interpretations) = }")
+
+    ans = 0
+    for inter in interpretations:
+        if left(inter) == right(inter):
+            ans += 1
+    return ans / len(interpretations)
+
+
 class Bool(ABC):
     @abstractmethod
     def __call__(self, interpretation: Interpretation) -> bool:
@@ -35,19 +49,10 @@ class Bool(ABC):
     def simplified(self) -> Bool:
         return self
 
-    def __eq__(self, other: Bool) -> bool:
-        if isinstance(other, Bool):
-            names = list(self.all_literals().union(other.all_literals()))
-            for interpretation in all_interpretations(names):
-                if self(interpretation) != other(interpretation):
-                    return False
-            return True
-        elif isinstance(other, bool):
-            names = list(self.all_literals())
-            for interpretation in all_interpretations(names):
-                if self(interpretation) != other:
-                    return False
-            return True
+    def __eq__(self, other: Bool | bool) -> bool:
+        if isinstance(other, bool):
+            return fidelity(self, Constant(other)) == 1
+        return fidelity(self, other) == 1
 
 
 class Constant(Bool):
@@ -111,8 +116,8 @@ class NOT(Bool):
 
 
 class Quantifier(Bool):
-    def __init__(self, children: list[Bool], is_all: bool) -> None:
-        self.children = children
+    def __init__(self, children: Collection[Bool | str], is_all: bool) -> None:
+        self.children = [c if isinstance(c, Bool) else Literal(c) for c in children]
         self.is_all = is_all
         self.op = all if self.is_all else any
         self.opstr = " & " if is_all else " | "
@@ -147,18 +152,48 @@ class Quantifier(Bool):
             return Constant(self.is_all)
         if len(children) == 1:
             return children[0]
+
+        new_children = []
+        for child in children:
+            # if a child is the same quantifier type, you can combine it with the parent
+            # for example: AND(AND(a, b), c) -> AND(a, b, c)
+            if isinstance(child, Quantifier) and child.is_all == self.is_all:
+                for c in child.children:
+                    new_children.append(c)
+            else:
+                new_children.append(child)
+
         # otherwise return the rest of the relevant children
-        return Quantifier(children, self.is_all)
+        return Quantifier(new_children, self.is_all)
 
 
 class AND(Quantifier):
-    def __init__(self, *children: Bool) -> None:
+    def __init__(self, *children: Bool | str) -> None:
         super().__init__(list(children), True)
 
 
 class OR(Quantifier):
-    def __init__(self, *children: Bool) -> None:
+    def __init__(self, *children: Bool | str) -> None:
         super().__init__(list(children), False)
+
+
+class PARITY(Bool):
+    def __init__(self, literals: Collection[str]) -> None:
+        super().__init__()
+        self.literals = set(literals)
+
+    def __call__(self, interpretation: Interpretation) -> bool:
+        assert all(literal in interpretation for literal in self.literals)
+        return sum(1 for key in interpretation if interpretation[key]) % 2 == 1
+
+    def __str__(self) -> str:
+        return f"PARITY({','.join([c.__str__() for c in self.literals])})"
+
+    def all_literals(self) -> set[str]:
+        return self.literals
+
+    def negated(self) -> Bool:
+        return super().negated()
 
 
 if __name__ == "__main__":
@@ -183,6 +218,7 @@ if __name__ == "__main__":
         "and2": NOT(AND(Literal("x1"))),
         "and3": NOT(AND(Literal("x1"), Literal("x2"))),
         "and4": AND(AND(Constant(True), Literal("x1")), Constant(True)),
+        "and5": AND("x1", "x2", AND("x3", "x4", AND("x5"))),
     }
     for key in formulae:
         b = formulae[key]
