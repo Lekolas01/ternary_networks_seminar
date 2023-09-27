@@ -166,6 +166,11 @@ class Quantifier(Bool):
         # otherwise return the rest of the relevant children
         return Quantifier(new_children, self.is_all)
 
+    def skolemized(self) -> Bool:
+        ans = self.simplified()
+
+        return ans
+
 
 class AND(Quantifier):
     def __init__(self, *children: Bool | str) -> None:

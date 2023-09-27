@@ -224,7 +224,7 @@ def full_circle(
         dead_var_name = f"x{i}"
         assert dead_var_name not in vars
         vars.append(dead_var_name)
-    data = generate_data(640, target_func, vars=vars, seed=seed)
+    data = generate_data(4000, target_func, vars=vars, seed=seed)
 
     # save it in a throwaway folder
     folder_path = Path("unittests/can_delete")
@@ -233,7 +233,7 @@ def full_circle(
 
     # train a neural network on the dataset
     dataset = FileDataset(data_path)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(model.parameters(), lr=0.01)
     tracker = Tracker()
@@ -263,7 +263,8 @@ if __name__ == "__main__":
         torch.manual_seed(seed)
         random.seed(seed)
 
-    parity = PARITY(("x1", "x2", "x3"))
+    vars = [f"x{i + 1}" for i in range(8)]
+    parity = PARITY(vars)
     n = len(parity.all_literals())
     model = nn.Sequential(
         nn.Linear(n, n),
@@ -274,6 +275,6 @@ if __name__ == "__main__":
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    found = full_circle(parity, model, epochs=45, seed=seed)
+    found = full_circle(parity, model, epochs=70, seed=seed)
     print(found)
     print(f"{fidelity(found, parity, True) = }")
