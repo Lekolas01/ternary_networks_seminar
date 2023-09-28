@@ -1,0 +1,6 @@
+1. fix metrics in nn_to_bool_formula:
+    - accuracy NN: accuracy of the trained NN on the train dataset
+    - accuracy NeuronGraph: should be the same as accuracy NN
+    - accuracy BooleanGraph: accuracy of inference rules model on train dataset
+    - fidelity NN <-> BooleanGraph: overlap of predictions between NN and BooleanGraph on train dataset
+2. expand NOT intialization to str parameter instead of only Literal

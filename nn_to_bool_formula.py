@@ -9,7 +9,7 @@ from train_model import *
 from torch.utils.data import DataLoader
 from loggers.loggers import *
 import sys
-
+from typing import Any
 
 class Act(Enum):
     SIGMOID = 1
@@ -109,7 +109,7 @@ class NeuronGraph:
     def __str__(self) -> str:
         return "\n".join(str(neuron) for neuron in self.neurons)
 
-    def add_module(self, net: nn.Module, input_vars: list[str] = []):
+    def add_module(self, net: nn.Module, input_vars: list[str]):
         self.input_vars = input_vars  # the names of the input variables
         if not isinstance(net, nn.Sequential):
             raise ValueError("Only allows Sequential for now.")
@@ -117,8 +117,6 @@ class NeuronGraph:
         if not isinstance(first_layer, nn.Linear):
             raise ValueError("First layer must always be a linear layer.")
         shape_out, shape_in = first_layer.weight.shape
-        if len(self.input_vars) == 0:
-            self.input_vars = [self._new_name() for _ in range(shape_in)]
         if len(self.input_vars) != shape_in:
             raise ValueError("varnames need same shape as input of first layer")
 
@@ -158,9 +156,9 @@ class NeuronGraph:
         neuron.name = new_name
 
     def _new_name(self):
-        while f"x{self.new_neuron_idx}" in self.neuron_names:
+        while f"h{self.new_neuron_idx}" in self.neuron_names:
             self.new_neuron_idx += 1
-        return f"x{self.new_neuron_idx}"
+        return f"h{self.new_neuron_idx}"
 
     def target(self) -> Neuron:
         return self.neurons[-1]
@@ -206,8 +204,8 @@ class BooleanGraph(Bool):
 
 
 def full_circle(
-    target_func: Bool, model: nn.Sequential, epochs=5, verbose=False, seed=None
-):
+    target_func: Bool, model: nn.Sequential, epochs=5, seed=None
+) -> Dict[str, Any]:
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
     shape_out, shape_in = layer_1.weight.shape
@@ -221,7 +219,7 @@ def full_circle(
     n_dead_vars = shape_in - len(vars)
 
     for i in range(len(vars) + 1, n_dead_vars + len(vars) + 1):
-        dead_var_name = f"x{i}"
+        dead_var_name = f"dead{i}"
         assert dead_var_name not in vars
         vars.append(dead_var_name)
     data = generate_data(4000, target_func, vars=vars, seed=seed)
@@ -243,27 +241,33 @@ def full_circle(
     )
 
     # convert the trained neural network to a set of perceptrons
-    neurons = NeuronGraph()
-    neurons.add_module(model, vars)
-    if verbose:
-        print(neurons)
+    neuron_graph = NeuronGraph()
+    neuron_graph.add_module(model, vars)
     # transform the output perceptron to a boolean function
-    found_func = BooleanGraph(neurons)
+    bool_graph = BooleanGraph(neuron_graph)
 
     # return the found boolean function
-    return found_func
+    return {
+        "neural_network": model,
+        "losses": losses,
+        "dataloader": dataloader,
+        "neuron_graph": neuron_graph,
+        "bool_graph": bool_graph,
+    }
 
 
 if __name__ == "__main__":
-    args = sys.argv[1:]
-    seed = None
-    if len(args) > 0:
-        seed = int(args[0])
-        print(f"{seed = }")
-        torch.manual_seed(seed)
-        random.seed(seed)
+    # set seed to some integer if you want determinism during training
+    seed: Optional[int] = 442962147146800
 
-    vars = [f"x{i + 1}" for i in range(8)]
+    if seed is None:
+        seed = torch.random.initial_seed()
+    else:
+        torch.manual_seed(seed)
+    random.seed(seed)
+    print(f"{seed = }")
+
+    vars = [f"x{i + 1}" for i in range(3)]
     parity = PARITY(vars)
     n = len(parity.all_literals())
     model = nn.Sequential(
@@ -275,6 +279,6 @@ if __name__ == "__main__":
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    found = full_circle(parity, model, epochs=70, seed=seed)
+    found = full_circle(parity, model, epochs=20, seed=seed, verbose=True)
     print(found)
     print(f"{fidelity(found, parity, True) = }")
