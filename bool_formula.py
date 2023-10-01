@@ -8,23 +8,21 @@ Interpretation = Dict[str, bool]
 
 
 def all_interpretations(names: Collection[str]) -> list[Interpretation]:
-    ans = []
-    for i in range(2 ** len(names)):
-        interpretation = {name: ((i >> idx) % 2 == 1) for idx, name in enumerate(names)}
-        ans.append(interpretation)
-    return ans
+    n_interpretations = 2 ** len(names)
+    return [
+        {name: ((i >> idx) % 2 == 1) for idx, name in enumerate(names)}
+        for i in range(n_interpretations)
+    ]
 
 
-def fidelity(left: Bool, right: Bool, verbose=False) -> float:
-    names = list(left.all_literals().union(right.all_literals()))
-    interpretations = all_interpretations(names)
-    if verbose:
-        print(f"{names = }")
-        print(f"{len(interpretations) = }")
+def fidelity(left: Bool, right: Bool, interpretations=None) -> float:
+    if interpretations is None:
+        names = list(left.all_literals().union(right.all_literals()))
+        interpretations = all_interpretations(names)
 
     ans = 0
-    for inter in interpretations:
-        if left(inter) == right(inter):
+    for interpretation in interpretations:
+        if left(interpretation) == right(interpretation):
             ans += 1
     return ans / len(interpretations)
 
@@ -92,7 +90,9 @@ class Literal(Bool):
 
 
 class NOT(Bool):
-    def __init__(self, child: Bool) -> None:
+    def __init__(self, child: Bool | str) -> None:
+        if isinstance(child, str):
+            child = Literal(child)
         self.child = child
 
     def __call__(self, interpretation: Interpretation) -> bool:

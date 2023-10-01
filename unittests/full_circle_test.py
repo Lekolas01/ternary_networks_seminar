@@ -9,21 +9,22 @@ class TestFullCircle(unittest.TestCase):
     def test_binaryFunctions(self):
         target_funcs = [
             Constant(False),
-            # Constant(True),
-            # NOT(Literal("x1")),
-            # Literal("x1"),
-            # AND(NOT(Literal("x1")), NOT(Literal("x2"))),
-            # AND(NOT(Literal("x1")), Literal("x2")),
-            #AND(Literal("x1"), NOT(Literal("x2"))),
-            #AND(Literal("x1"), Literal("x2")),
-            #OR(NOT(Literal("x1")), NOT(Literal("x2"))),
-            #OR(NOT(Literal("x1")), Literal("x2")),
-            #OR(Literal("x1"), NOT(Literal("x2"))),
-            #OR(Literal("x1"), Literal("x2")),
+            Constant(True),
+            NOT(Literal("x1")),
+            Literal("x1"),
+            AND(NOT(Literal("x1")), NOT(Literal("x2"))),
+            AND(NOT(Literal("x1")), Literal("x2")),
+            AND(Literal("x1"), NOT(Literal("x2"))),
+            AND(Literal("x1"), Literal("x2")),
+            OR(NOT(Literal("x1")), NOT(Literal("x2"))),
+            OR(NOT(Literal("x1")), Literal("x2")),
+            OR(Literal("x1"), NOT(Literal("x2"))),
+            OR(Literal("x1"), Literal("x2")),
         ]
         for target_func in target_funcs:
+            n_vars = len(target_func.all_literals())
             model = nn.Sequential(
-                nn.Linear(4, 1),
+                nn.Linear(n_vars, 1),
                 nn.Sigmoid(),
                 nn.Flatten(0),
             )
@@ -35,7 +36,7 @@ class TestFullCircle(unittest.TestCase):
     def test_XOR(self):
         target_funcs = [
             OR(
-                AND(NOT(Literal("x1")), Literal("x2")),
+                AND(NOT("x1"), "x2"),
                 AND(Literal("x1"), NOT(Literal("x2"))),
             ),
             OR(
@@ -51,9 +52,8 @@ class TestFullCircle(unittest.TestCase):
                 nn.Sigmoid(),
                 nn.Flatten(0),
             )
-            found_func = full_circle(target_func, model, epochs=30)["bool_graph"]
+            found_func = full_circle(target_func, model, epochs=100)["bool_graph"]
             assert (
                 target_func == found_func
             ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
             break
-

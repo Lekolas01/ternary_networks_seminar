@@ -11,6 +11,7 @@ from loggers.loggers import *
 import sys
 from typing import Any
 
+
 class Act(Enum):
     SIGMOID = 1
     TANH = 2
@@ -98,10 +99,11 @@ class InputNeuron(Neuron):
 
 
 class NeuronGraph:
-    def __init__(self):
+    def __init__(self, net: nn.Module, vars: list[str]):
         self.new_neuron_idx = 1  # for naming new neurons
         self.neurons: list[Neuron] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
+        self._add_module(net, vars)
 
     def __len__(self):
         return len(self.neurons)
@@ -109,7 +111,7 @@ class NeuronGraph:
     def __str__(self) -> str:
         return "\n".join(str(neuron) for neuron in self.neurons)
 
-    def add_module(self, net: nn.Module, input_vars: list[str]):
+    def _add_module(self, net: nn.Module, input_vars: list[str]):
         self.input_vars = input_vars  # the names of the input variables
         if not isinstance(net, nn.Sequential):
             raise ValueError("Only allows Sequential for now.")
@@ -204,7 +206,11 @@ class BooleanGraph(Bool):
 
 
 def full_circle(
-    target_func: Bool, model: nn.Sequential, epochs=5, seed=None
+    target_func: Bool,
+    model: nn.Sequential,
+    n_datapoints=4000,
+    epochs=5,
+    seed=None,
 ) -> Dict[str, Any]:
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
@@ -212,17 +218,12 @@ def full_circle(
 
     # generate data for function
     vars = sorted(list(target_func.all_literals()))
-    if shape_in < len(vars):
+    if shape_in != len(vars):
         raise ValueError(
-            f"The input shape of the model is to small, it needs at least {len(vars)}, but got {shape_in}"
+            f"The model's input shape must be same as the number of variables in target_func, but got: {len(vars) = },  {shape_in = }"
         )
-    n_dead_vars = shape_in - len(vars)
 
-    for i in range(len(vars) + 1, n_dead_vars + len(vars) + 1):
-        dead_var_name = f"dead{i}"
-        assert dead_var_name not in vars
-        vars.append(dead_var_name)
-    data = generate_data(4000, target_func, vars=vars, seed=seed)
+    data = generate_data(n_datapoints, target_func, vars=vars, seed=seed)
 
     # save it in a throwaway folder
     folder_path = Path("unittests/can_delete")
@@ -231,7 +232,7 @@ def full_circle(
 
     # train a neural network on the dataset
     dataset = FileDataset(data_path)
-    dataloader = DataLoader(dataset, batch_size=4, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(model.parameters(), lr=0.01)
     tracker = Tracker()
@@ -240,14 +241,14 @@ def full_circle(
         model, loss_fn, optim, dataloader, dataloader, epochs=epochs, tracker=tracker
     )
 
-    # convert the trained neural network to a set of perceptrons
-    neuron_graph = NeuronGraph()
-    neuron_graph.add_module(model, vars)
+    # transform the trained neural network to a directed graph of perceptrons
+    neuron_graph = NeuronGraph(model, vars)
     # transform the output perceptron to a boolean function
     bool_graph = BooleanGraph(neuron_graph)
 
     # return the found boolean function
     return {
+        "vars": vars,
         "neural_network": model,
         "losses": losses,
         "dataloader": dataloader,
@@ -279,6 +280,11 @@ if __name__ == "__main__":
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    found = full_circle(parity, model, epochs=20, seed=seed, verbose=True)
-    print(found)
-    print(f"{fidelity(found, parity, True) = }")
+    ans = full_circle(parity, model, epochs=20, seed=seed)
+    found = ans["bool_graph"]
+    print(ans)
+    # print(f"{fidelity(found, model, True) = }")
+    # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
+    # Accuracy: the percentage of test examples that are correctly classified by the rules
+    # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
+    # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
