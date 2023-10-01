@@ -55,20 +55,19 @@ class TestToBool(unittest.TestCase):
         pass
 
     def test_XOR(self):
-        n = NeuronGraph()
         x1 = InputNeuron("x1")
         x2 = InputNeuron("x2")
         x3 = Neuron("x3", [(x1, 1.5), (x2, -1.2)], -1.0)
         x4 = Neuron("x4", [(x1, -1.5), (x2, +1.2)], -1.0)
         b = Neuron("b", [(x3, 1.5), (x4, 1.2)], -1.0)
-        b_graph = NeuronGraph()
+        n_graph = NeuronGraph()
         for neuron in [x1, x2, x3, x4, b]:
-            b_graph.add(neuron)
+            n_graph.add(neuron)
         xor_1 = AND(Literal(x1.name), NOT(Literal(x2.name)))
         xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
         xor = OR(xor_1, xor_2)
 
-        assert BooleanGraph(b_graph) == xor
+        assert BooleanGraph(n_graph) == xor
 
     def test_XOR_2(self):
         neurons = NeuronGraph()

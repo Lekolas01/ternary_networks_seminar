@@ -3,6 +3,7 @@ from typing import Dict
 from abc import ABC, abstractmethod
 from collections.abc import Collection
 import copy
+from typing import Callable
 
 Interpretation = Dict[str, bool]
 
@@ -15,16 +16,12 @@ def all_interpretations(names: Collection[str]) -> list[Interpretation]:
     ]
 
 
-def fidelity(left: Bool, right: Bool, interpretations=None) -> float:
-    if interpretations is None:
-        names = list(left.all_literals().union(right.all_literals()))
-        interpretations = all_interpretations(names)
-
+def fidelity(left: Callable, right: Callable, data: Collection) -> float:
     ans = 0
-    for interpretation in interpretations:
-        if left(interpretation) == right(interpretation):
+    for datapoint in data:
+        if left(datapoint) == right(datapoint):
             ans += 1
-    return ans / len(interpretations)
+    return ans / len(data)
 
 
 class Bool(ABC):
@@ -48,9 +45,13 @@ class Bool(ABC):
         return self
 
     def __eq__(self, other: Bool | bool) -> bool:
-        if isinstance(other, bool):
-            return fidelity(self, Constant(other)) == 1
-        return fidelity(self, other) == 1
+        names = self.all_literals()
+        if isinstance(other, Bool):
+            names = names.union(other.all_literals())
+        else:
+            other = Constant(other)
+        data = all_interpretations(names)
+        return fidelity(self, other, data) == 1
 
 
 class Constant(Bool):
@@ -68,6 +69,13 @@ class Constant(Bool):
 
     def negated(self) -> Bool:
         return Constant(not self.val)
+    
+    def __eq__(self, other: Bool | bool) -> bool:
+        if isinstance(other, bool):
+            return self.val == other
+        if isinstance(other, Constant):
+            return self.val == other.val
+        return super().__eq__(other)
 
 
 class Literal(Bool):

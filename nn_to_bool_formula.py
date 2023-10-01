@@ -9,7 +9,7 @@ from train_model import *
 from torch.utils.data import DataLoader
 from loggers.loggers import *
 import sys
-from typing import Any
+from typing import Any, Iterable
 
 
 class Act(Enum):
@@ -99,19 +99,33 @@ class InputNeuron(Neuron):
 
 
 class NeuronGraph:
-    def __init__(self, net: nn.Module, vars: list[str]):
+    def __init__(self, vars: Optional[list[str]]=None, net: Optional[nn.Module]=None):
         self.new_neuron_idx = 1  # for naming new neurons
         self.neurons: list[Neuron] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
-        self._add_module(net, vars)
+        if net:
+            assert vars is not None
+            self.add_module(net, vars)
+
 
     def __len__(self):
         return len(self.neurons)
 
     def __str__(self) -> str:
         return "\n".join(str(neuron) for neuron in self.neurons)
+    
+    def __call__(self, interpretation: list[int]) -> bool:
+        int_copy = copy.copy(interpretation)
+            
+        for neuron in self.neurons:
+            val = n_bool(int_copy)
+            int_copy[key] = val
 
-    def _add_module(self, net: nn.Module, input_vars: list[str]):
+        target_name = self.neurons.target().name
+        return int_copy[target_name]
+            
+
+    def add_module(self, net: nn.Module, input_vars: list[str]):
         self.input_vars = input_vars  # the names of the input variables
         if not isinstance(net, nn.Sequential):
             raise ValueError("Only allows Sequential for now.")
@@ -242,7 +256,7 @@ def full_circle(
     )
 
     # transform the trained neural network to a directed graph of perceptrons
-    neuron_graph = NeuronGraph(model, vars)
+    neuron_graph = NeuronGraph(vars, model)
     # transform the output perceptron to a boolean function
     bool_graph = BooleanGraph(neuron_graph)
 
@@ -280,10 +294,19 @@ if __name__ == "__main__":
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    ans = full_circle(parity, model, epochs=20, seed=seed)
+    ans = full_circle(parity, model, epochs=30, seed=seed)
     found = ans["bool_graph"]
-    print(ans)
-    # print(f"{fidelity(found, model, True) = }")
+    dl = ans["dataloader"]
+    vars = ans["vars"]
+
+    data = []
+    for x, y in dl:
+        n_rows, n_cols = x.shape
+        for i in range(n_rows):
+            row = x[i]
+            data.append({vars[j]: bool(row[j]) for j in range(n_cols)})
+    
+    print(f"{fidelity(found, model, data) = }")
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
