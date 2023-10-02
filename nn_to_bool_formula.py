@@ -75,6 +75,15 @@ class Neuron:
 
             return OR(term1, term2)
 
+        for idx, (neuron_in, weight) in enumerate(self.neurons_in):
+            if (
+                not isinstance(neuron_in, InputNeuron)
+                and neuron_in.activation_in == Act.TANH
+            ):
+                # a = -1, k = 2
+                self.bias -= 1
+                a = self.neurons_in[idx][1]
+
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
 
@@ -132,8 +141,15 @@ class NeuronGraph:
             self.add(InputNeuron(name))
 
         ll_start, ll_end = 0, len(self.neurons)
-        for layer in net:
+        curr_act = Act.SIGMOID
+        for idx, layer in enumerate(net):
             if isinstance(layer, nn.Linear):
+                next_layer = net[idx + 1]
+                if isinstance(next_layer, nn.Sigmoid):
+                    curr_act = Act.SIGMOID
+                elif isinstance(next_layer, nn.Tanh):
+                    curr_act = Act.TANH
+
                 shape_out, shape_in = layer.weight.shape
                 weight = layer.weight.tolist()
                 bias = layer.bias.tolist()
@@ -145,6 +161,7 @@ class NeuronGraph:
                         name,
                         neurons_in=neurons_in,
                         bias=bias[idx],
+                        activation_in=curr_act,
                     )
                     self.add(neuron)
                 ll_start, ll_end = ll_end, len(self.neurons)
@@ -208,6 +225,14 @@ class BooleanGraph(Bool):
 
     def negated(self) -> Bool:
         raise NotImplementedError
+
+
+class Multiply(nn.Module):
+    def __init__(self):
+        super(Multiply, self).__init__()
+
+    def forward(self, x):
+        return x * 4
 
 
 def full_circle(
@@ -290,7 +315,8 @@ def fidelity(vars, model, bg, dl):
 
 if __name__ == "__main__":
     # set seed to some integer if you want determinism during training
-    seed: Optional[int] = None
+    seed: Optional[int] = 32697229636701
+    # 32697229636700
 
     if seed is None:
         seed = torch.random.initial_seed()
@@ -299,20 +325,20 @@ if __name__ == "__main__":
     random.seed(seed)
     print(f"{seed = }")
 
-    vars = [f"x{i + 1}" for i in range(6)]
+    vars = [f"x{i + 1}" for i in range(3)]
     parity = PARITY(vars)
     n = len(parity.all_literals())
     model = nn.Sequential(
         nn.Linear(n, n),
-        nn.Sigmoid(),
-        # nn.Linear(n, n),
-        # nn.Sigmoid(),
+        nn.Tanh(),
+        nn.Linear(n, n),
+        nn.Tanh(),
         nn.Linear(n, 1),
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    ans = full_circle(parity, model, epochs=300, seed=seed)
-
+    ans = full_circle(parity, model, epochs=120, seed=seed)
+    print(model)
     bg = ans["bool_graph"]
     ng = ans["neuron_graph"]
     dl = ans["dataloader"]
