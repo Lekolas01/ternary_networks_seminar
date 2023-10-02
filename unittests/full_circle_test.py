@@ -53,10 +53,10 @@ class TestFullCircle(unittest.TestCase):
                 nn.Flatten(0),
             )
             ans = full_circle(target_func, model, epochs=80)
-            found_func = ans['bool_graph']
+            found_func = ans["bool_graph"]
             names = target_func.all_literals().union(found_func.all_literals())
             data = all_interpretations(names)
             assert (
-                fidelity(target_func, found_func, data) >= 0.8
+                overlap(target_func, found_func, data) >= 0.8
             ), f"Did not produce an equivalent function: {target_func = }; {found_func = }"
             break

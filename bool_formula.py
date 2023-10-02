@@ -16,7 +16,7 @@ def all_interpretations(names: Collection[str]) -> list[Interpretation]:
     ]
 
 
-def fidelity(left: Callable, right: Callable, data: Collection) -> float:
+def overlap(left: Callable, right: Callable, data: Collection) -> float:
     ans = 0
     for datapoint in data:
         if left(datapoint) == right(datapoint):
@@ -51,7 +51,7 @@ class Bool(ABC):
         else:
             other = Constant(other)
         data = all_interpretations(names)
-        return fidelity(self, other, data) == 1
+        return overlap(self, other, data) == 1
 
 
 class Constant(Bool):
@@ -69,7 +69,7 @@ class Constant(Bool):
 
     def negated(self) -> Bool:
         return Constant(not self.val)
-    
+
     def __eq__(self, other: Bool | bool) -> bool:
         if isinstance(other, bool):
             return self.val == other

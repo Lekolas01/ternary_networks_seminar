@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from loggers.loggers import *
 import sys
 from typing import Any, Iterable
+from utils import accuracy
 
 
 class Act(Enum):
@@ -99,7 +100,9 @@ class InputNeuron(Neuron):
 
 
 class NeuronGraph:
-    def __init__(self, vars: Optional[list[str]]=None, net: Optional[nn.Module]=None):
+    def __init__(
+        self, vars: Optional[list[str]] = None, net: Optional[nn.Module] = None
+    ):
         self.new_neuron_idx = 1  # for naming new neurons
         self.neurons: list[Neuron] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
@@ -107,23 +110,11 @@ class NeuronGraph:
             assert vars is not None
             self.add_module(net, vars)
 
-
     def __len__(self):
         return len(self.neurons)
 
     def __str__(self) -> str:
         return "\n".join(str(neuron) for neuron in self.neurons)
-    
-    def __call__(self, interpretation: list[int]) -> bool:
-        int_copy = copy.copy(interpretation)
-            
-        for neuron in self.neurons:
-            val = n_bool(int_copy)
-            int_copy[key] = val
-
-        target_name = self.neurons.target().name
-        return int_copy[target_name]
-            
 
     def add_module(self, net: nn.Module, input_vars: list[str]):
         self.input_vars = input_vars  # the names of the input variables
@@ -254,6 +245,7 @@ def full_circle(
     losses = training_loop(
         model, loss_fn, optim, dataloader, dataloader, epochs=epochs, tracker=tracker
     )
+    model.train(False)
 
     # transform the trained neural network to a directed graph of perceptrons
     neuron_graph = NeuronGraph(vars, model)
@@ -271,9 +263,34 @@ def full_circle(
     }
 
 
+def fidelity(vars, model, bg, dl):
+    fid = 0
+    n_vals = 0
+    bg_accuracy = 0
+    for X, y in dl:
+        nn_pred = model(X)
+        nn_pred = [bool(val.round()) for val in nn_pred]
+
+        data = []
+        n_rows, n_cols = X.shape
+        for i in range(n_rows):
+            row = X[i]
+            new_var = {vars[j]: bool(row[j]) for j in range(n_cols)}
+            data.append(new_var)
+        bg_pred = [bg(datapoint) for datapoint in data]
+        bg_correct = [bg_pred[i] == y[i] for i in range(n_rows)]
+        n_correct = len(list(filter(lambda x: x, bg_correct)))
+        bg_accuracy += n_correct
+        bg_same = [bg_pred[i] == nn_pred[i] for i in range(n_rows)]
+        n_same = len(list(filter(lambda x: x, bg_same)))
+        fid += n_same
+        n_vals += n_rows
+    return fid / n_vals, bg_accuracy / n_vals
+
+
 if __name__ == "__main__":
     # set seed to some integer if you want determinism during training
-    seed: Optional[int] = 442962147146800
+    seed: Optional[int] = None
 
     if seed is None:
         seed = torch.random.initial_seed()
@@ -282,7 +299,7 @@ if __name__ == "__main__":
     random.seed(seed)
     print(f"{seed = }")
 
-    vars = [f"x{i + 1}" for i in range(3)]
+    vars = [f"x{i + 1}" for i in range(6)]
     parity = PARITY(vars)
     n = len(parity.all_literals())
     model = nn.Sequential(
@@ -294,19 +311,22 @@ if __name__ == "__main__":
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    ans = full_circle(parity, model, epochs=30, seed=seed)
-    found = ans["bool_graph"]
+    ans = full_circle(parity, model, epochs=300, seed=seed)
+
+    bg = ans["bool_graph"]
+    ng = ans["neuron_graph"]
     dl = ans["dataloader"]
     vars = ans["vars"]
+    print(f"{accuracy(model, dl, torch.device('cpu')) =}")
 
-    data = []
-    for x, y in dl:
-        n_rows, n_cols = x.shape
-        for i in range(n_rows):
-            row = x[i]
-            data.append({vars[j]: bool(row[j]) for j in range(n_cols)})
-    
-    print(f"{fidelity(found, model, data) = }")
+    print(ng)
+    print(bg)
+
+    fid, bg_acc = fidelity(vars, model, bg, dl)
+
+    print(f"nn model accuracy: {accuracy(model, dl, torch.device('cpu'))}")
+    print(f"bg model accuracy: {bg_acc}")
+    print(f"fidelity: {fid}")
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
