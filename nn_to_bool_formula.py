@@ -11,6 +11,7 @@ from loggers.loggers import *
 import sys
 from typing import Any, Iterable
 from utils import accuracy
+import matplotlib.pyplot as plt
 
 
 class Act(Enum):
@@ -33,6 +34,8 @@ class Neuron:
 
     def __str__(self) -> str:
         right_term = ""
+        act_str = "sig" if self.activation_in == Act.SIGMOID else "tanh"
+
         if len(self.neurons_in) >= 1:
             neuron, weight = self.neurons_in[0]
             right_term += f"{round(weight, 2):>5}*{neuron.name:<5}"
@@ -45,7 +48,7 @@ class Neuron:
             right_term += f"{weight_sign}{round(abs(self.bias), 2)}"
         if not right_term:
             right_term = self.name
-        return f"{self.name:>8}  :=  {right_term}"
+        return f"{self.name:>8}  :=  {act_str}({right_term})"
 
     def __repr__(self) -> str:
         return f'Neuron("{str(self)}")'
@@ -80,9 +83,14 @@ class Neuron:
                 not isinstance(neuron_in, InputNeuron)
                 and neuron_in.activation_in == Act.TANH
             ):
-                # a = -1, k = 2
+                # a = -1
                 self.bias -= 1
-                a = self.neurons_in[idx][1]
+
+                # k = 2
+                a = self.neurons_in[idx]
+                a = list(a)
+                a[1] *= 2
+                self.neurons_in[idx] = tuple(a)
 
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
@@ -91,8 +99,8 @@ class Neuron:
         negative = [tup[1] < 0 for tup in neurons_in]
         neurons_in = [(tup[0], abs(tup[1])) for tup in neurons_in]
 
-        positive_weights = zip(negative, [tup[1] for tup in neurons_in])
-        filtered_weights = filter(lambda tup: tup[0], positive_weights)
+        positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
+        filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
         return to_bool_rec(neurons_in, negative, -self.bias + bias_diff).simplified()
 
@@ -241,6 +249,7 @@ def full_circle(
     n_datapoints=4000,
     epochs=5,
     seed=None,
+    verbose=False,
 ) -> Dict[str, Any]:
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
@@ -266,7 +275,10 @@ def full_circle(
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(model.parameters(), lr=0.01)
     tracker = Tracker()
-    tracker.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"]))
+    if verbose:
+        tracker.add_logger(
+            LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"])
+        )
     losses = training_loop(
         model, loss_fn, optim, dataloader, dataloader, epochs=epochs, tracker=tracker
     )
@@ -313,9 +325,20 @@ def fidelity(vars, model, bg, dl):
     return fid / n_vals, bg_accuracy / n_vals
 
 
+def test_model(seed, target_func, model):
+    ans = full_circle(target_func, model, epochs=200, seed=seed, verbose=False)
+    bg = ans["bool_graph"]
+    dl = ans["dataloader"]
+    vars = ans["vars"]
+
+    fid, bg_acc = fidelity(vars, model, bg, dl)
+    nn_acc = accuracy(model, dl, torch.device("cpu"))
+    return fid, bg_acc, nn_acc
+
+
 if __name__ == "__main__":
     # set seed to some integer if you want determinism during training
-    seed: Optional[int] = 32697229636701
+    seed: Optional[int] = 86704648622300
     # 32697229636700
 
     if seed is None:
@@ -325,35 +348,67 @@ if __name__ == "__main__":
     random.seed(seed)
     print(f"{seed = }")
 
-    vars = [f"x{i + 1}" for i in range(3)]
+    vars = [f"x{i + 1}" for i in range(6)]
     parity = PARITY(vars)
     n = len(parity.all_literals())
-    model = nn.Sequential(
-        nn.Linear(n, n),
-        nn.Tanh(),
-        nn.Linear(n, n),
-        nn.Tanh(),
-        nn.Linear(n, 1),
-        nn.Sigmoid(),
-        nn.Flatten(0),
-    )
-    ans = full_circle(parity, model, epochs=120, seed=seed)
-    print(model)
-    bg = ans["bool_graph"]
-    ng = ans["neuron_graph"]
-    dl = ans["dataloader"]
-    vars = ans["vars"]
-    print(f"{accuracy(model, dl, torch.device('cpu')) =}")
 
-    print(ng)
-    print(bg)
+    activation_sig = []
+    activation_tanh = []
 
-    fid, bg_acc = fidelity(vars, model, bg, dl)
+    for i in range(12):
+        print(f"\t------ {i} ------")
+        for act in ["sigmoid"]:
+            print(f"-------------- {act} -----------")
+            if act == "sigmoid":
+                model = nn.Sequential(
+                    nn.Linear(n, n),
+                    nn.Sigmoid(),
+                    nn.Linear(n, n),
+                    nn.Sigmoid(),
+                    nn.Linear(n, 1),
+                    nn.Sigmoid(),
+                    nn.Flatten(0),
+                )
+            else:
+                model = nn.Sequential(
+                    nn.Linear(n, n),
+                    nn.Tanh(),
+                    nn.Linear(n, n),
+                    nn.Tanh(),
+                    nn.Linear(n, 1),
+                    nn.Sigmoid(),
+                    nn.Flatten(0),
+                )
 
-    print(f"nn model accuracy: {accuracy(model, dl, torch.device('cpu'))}")
-    print(f"bg model accuracy: {bg_acc}")
-    print(f"fidelity: {fid}")
-    # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
-    # Accuracy: the percentage of test examples that are correctly classified by the rules
-    # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
-    # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
+            fid, bg_acc, nn_acc = test_model(seed, parity, model)
+            # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
+            # Accuracy: the percentage of test examples that are correctly classified by the rules
+            # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
+            # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
+            if act == "sigmoid":
+                activation_sig.append((nn_acc, bg_acc, fid))
+            else:
+                activation_tanh.append((nn_acc, bg_acc, fid))
+
+    sig_nn_acc = [val[0] for val in activation_sig]
+    sig_bg_acc = [val[1] for val in activation_sig]
+    sig_fid = [val[2] for val in activation_sig]
+
+    tanh_nn_acc = [val[0] for val in activation_tanh]
+    tanh_bg_acc = [val[1] for val in activation_tanh]
+    tanh_fid = [val[2] for val in activation_tanh]
+    print(f"{sig_nn_acc = }")
+    print(f"{sig_bg_acc = }")
+    print(f"{sig_fid = }")
+    print(f"{tanh_nn_acc = }")
+    print(f"{tanh_bg_acc = }")
+    print(f"{tanh_fid = }")
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(sig_nn_acc, sig_nn_acc, sig_fid, c="r", label="Sigmoid")
+    ax.scatter(tanh_nn_acc, tanh_nn_acc, tanh_fid, c="g", label="Tanh")
+    ax.set_xlabel("NN Accuracy")
+    ax.set_ylabel("BG Accuracy")
+    ax.set_zlabel("Fidelity")
+    plt.legend()
+    plt.show()

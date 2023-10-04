@@ -74,7 +74,6 @@ def training_loop(
         tracker.epoch_start()
         # training
         train_loss = train(train_loader, model, criterion, optimizer, device, tracker)
-        print()
 
         # validation
         with torch.no_grad():
