@@ -60,7 +60,7 @@ class Neuron:
             threshold: float,
             i: int = 0,
         ) -> Bool:
-            if threshold < 0:
+            if threshold >= 0:
                 return Constant(True)
             if i == len(neurons_in):
                 return Constant(False)
@@ -72,7 +72,7 @@ class Neuron:
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
             term2 = AND(
-                to_bool_rec(neurons_in, neuron_signs, threshold - weight, i + 1),
+                to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1),
                 Literal(name) if positive else NOT(Literal(name)),
             )
 
@@ -102,7 +102,7 @@ class Neuron:
         positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
-        return to_bool_rec(neurons_in, negative, -self.bias + bias_diff).simplified()
+        return to_bool_rec(neurons_in, negative, self.bias - bias_diff).simplified()
 
 
 class InputNeuron(Neuron):
@@ -338,7 +338,7 @@ def test_model(seed, target_func, model):
 
 if __name__ == "__main__":
     # set seed to some integer if you want determinism during training
-    seed: Optional[int] = 86704648622300
+    seed: Optional[int] = None
     # 32697229636700
 
     if seed is None:
@@ -348,16 +348,16 @@ if __name__ == "__main__":
     random.seed(seed)
     print(f"{seed = }")
 
-    vars = [f"x{i + 1}" for i in range(6)]
+    vars = [f"x{i + 1}" for i in range(12)]
     parity = PARITY(vars)
     n = len(parity.all_literals())
 
     activation_sig = []
     activation_tanh = []
 
-    for i in range(12):
+    for i in range(20):
         print(f"\t------ {i} ------")
-        for act in ["sigmoid"]:
+        for act in ["tanh"]:
             print(f"-------------- {act} -----------")
             if act == "sigmoid":
                 model = nn.Sequential(
@@ -405,8 +405,8 @@ if __name__ == "__main__":
     print(f"{tanh_fid = }")
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(sig_nn_acc, sig_nn_acc, sig_fid, c="r", label="Sigmoid")
-    ax.scatter(tanh_nn_acc, tanh_nn_acc, tanh_fid, c="g", label="Tanh")
+    ax.scatter(sig_nn_acc, sig_bg_acc, sig_fid, c="r", label="Sigmoid")
+    ax.scatter(tanh_nn_acc, tanh_bg_acc, tanh_fid, c="g", label="Tanh")
     ax.set_xlabel("NN Accuracy")
     ax.set_ylabel("BG Accuracy")
     ax.set_zlabel("Fidelity")
