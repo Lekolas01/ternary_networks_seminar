@@ -62,7 +62,7 @@ class Neuron:
         ) -> Bool:
             if threshold >= 0:
                 return Constant(True)
-            if i == len(neurons_in):
+            if threshold < -sum(n[1] for n in neurons_in[i:]):
                 return Constant(False)
 
             name = neurons_in[i][0].name
@@ -72,10 +72,9 @@ class Neuron:
             # set to False
             term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
             term2 = AND(
-                to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1),
                 Literal(name) if positive else NOT(Literal(name)),
+                to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1),
             )
-
             return OR(term1, term2)
 
         for idx, (neuron_in, weight) in enumerate(self.neurons_in):
