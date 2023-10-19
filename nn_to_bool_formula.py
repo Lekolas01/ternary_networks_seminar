@@ -8,8 +8,7 @@ from dataloading import *
 from train_model import *
 from torch.utils.data import DataLoader
 from loggers.loggers import *
-import sys
-from typing import Any, Iterable
+from typing import Any
 from utils import accuracy
 import matplotlib.pyplot as plt
 
@@ -76,20 +75,21 @@ class Neuron:
                 to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1),
             )
             return OR(term1, term2)
-
+        
+        # step 1: adjust Neuron so that all activations from input are boolean, while preserving equality
         for idx, (neuron_in, weight) in enumerate(self.neurons_in):
             if (
                 not isinstance(neuron_in, InputNeuron)
                 and neuron_in.activation_in == Act.TANH
             ):
                 # a = -1
-                self.bias -= 1
+                self.bias -= weight
 
                 # k = 2
-                a = self.neurons_in[idx]
-                a = list(a)
-                a[1] *= 2
-                self.neurons_in[idx] = tuple(a)
+                temp = self.neurons_in[idx]
+                temp = list(temp)
+                temp[1] *= 2
+                self.neurons_in[idx] = tuple(temp)
 
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
