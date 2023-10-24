@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .ternary import TernaryLinear, TernaryConv2d
+from .ternary import TernaryLinear, TernaryConv2d, R
 
 
 class LeNet(nn.Module):
