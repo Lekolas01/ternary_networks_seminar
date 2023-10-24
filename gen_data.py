@@ -1,10 +1,11 @@
 import numpy as np
 from pathlib import Path
 import os
-from bool_formula import *
+from bool_formula import Bool, Interpretation, AND, NOT, Literal
 import pandas as pd
 from typing import Optional
 import random
+from collections.abc import Collection
 
 
 def random_interpretation(literals: Collection[str]) -> Interpretation:

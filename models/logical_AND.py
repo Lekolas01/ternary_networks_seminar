@@ -1,7 +1,6 @@
 import torch.nn as nn
 
 from .ternary import TernaryModule, TernaryLinear
-from .logical_net import *
 
 
 class ANDNet(nn.Module):

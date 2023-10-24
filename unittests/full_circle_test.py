@@ -1,6 +1,5 @@
 import unittest
-from gen_data import *
-from bool_formula import *
+from bool_formula import Constant, Literal, NOT, AND, OR, all_interpretations, overlap
 import torch.nn as nn
 from nn_to_bool_formula import full_circle
 
@@ -12,14 +11,14 @@ class TestFullCircle(unittest.TestCase):
             Constant(True),
             NOT(Literal("x1")),
             Literal("x1"),
-            AND(NOT(Literal("x1")), NOT(Literal("x2"))),
-            AND(NOT(Literal("x1")), Literal("x2")),
-            AND(Literal("x1"), NOT(Literal("x2"))),
-            AND(Literal("x1"), Literal("x2")),
-            OR(NOT(Literal("x1")), NOT(Literal("x2"))),
-            OR(NOT(Literal("x1")), Literal("x2")),
-            OR(Literal("x1"), NOT(Literal("x2"))),
-            OR(Literal("x1"), Literal("x2")),
+            AND(NOT("x1"), NOT("x2")),
+            AND(NOT("x1"), "x2"),
+            AND("x1", NOT("x2")),
+            AND("x1", "x2"),
+            OR(NOT("x1"), NOT("x2")),
+            OR(NOT("x1"), "x2"),
+            OR("x1", NOT("x2")),
+            OR("x1", "x2"),
         ]
         for target_func in target_funcs:
             n_vars = len(target_func.all_literals())
@@ -37,11 +36,11 @@ class TestFullCircle(unittest.TestCase):
         target_funcs = [
             OR(
                 AND(NOT("x1"), "x2"),
-                AND(Literal("x1"), NOT(Literal("x2"))),
+                AND("x1", NOT("x2")),
             ),
             OR(
-                AND(NOT(Literal("x1")), NOT(Literal("x2"))),
-                AND(Literal("x1"), Literal("x2")),
+                AND(NOT("x1"), NOT("x2")),
+                AND("x1", "x2"),
             ),
         ]
         for target_func in target_funcs:

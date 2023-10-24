@@ -4,11 +4,11 @@ import torch
 from dataloading import FileDataset
 from torch.utils.data import DataLoader
 import torch.nn as nn
-from my_logging.loggers import *
+from my_logging.loggers import Tracker, LogMetrics
 import torch.utils.data.sampler
 from nn_to_bool_formula import NeuronGraph
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     torch.random.manual_seed(1)
     model = nn.Sequential(nn.Linear(2, 3), nn.Sigmoid(), nn.Flatten(0))
     # model = ANDNet(2)
@@ -23,7 +23,9 @@ if __name__ == '__main__':
     loss_fn = nn.BCELoss()
     optim = torch.optim.SGD(model.parameters(), 0.1)
     t = Tracker()
-    t.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc", "valid_acc"]))
+    t.add_logger(
+        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc", "valid_acc"])
+    )
     # t.add_logger(LogModel())
     # losses = training_loop(model, loss_fn, optim, dataloader, dataloader, 5, "cpu", t)
 

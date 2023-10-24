@@ -8,11 +8,6 @@ from models.ternary import TernaryModule
 from statistics import mean
 
 
-class Temp:
-    def __init__(self) -> None:
-        print("Hello")
-
-
 class Logger:
     """Extracts and/or persists tracker information."""
 

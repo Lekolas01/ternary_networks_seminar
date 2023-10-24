@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
 from bool_formula import Bool, Interpretation, PARITY
 from typing import Any, Dict, Optional
 
@@ -9,9 +10,8 @@ from gen_data import generate_data
 
 from train_model import training_loop
 
-from my_logging.loggers import Temp, Tracker, LogMetrics
+from my_logging.loggers import Tracker, LogMetrics
 
-import matplotlib.pyplot as plt
 import copy
 from neuron import NeuronGraph, InputNeuron
 from utilities import acc
@@ -62,7 +62,7 @@ def full_circle(
 ) -> Dict[str, Any]:
     layer_1 = model[0]
     assert isinstance(layer_1, nn.Linear)
-    shape_out, shape_in = layer_1.weight.shape
+    _, shape_in = layer_1.weight.shape
 
     # generate data for function
     vars = sorted(list(target_func.all_literals()))
