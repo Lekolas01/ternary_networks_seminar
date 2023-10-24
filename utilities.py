@@ -4,7 +4,8 @@ import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 from torch.types import Device
 
-def accuracy(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
+
+def acc(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
     """
     Compute the accuracy of a model on the data held by a data loader.
     """
@@ -51,4 +52,3 @@ def get_all_weights(model: nn.Module):
     params = [param.view(-1) for param in model.parameters()]
     params = torch.cat(params)
     return params
-

@@ -9,7 +9,7 @@ from .ternary import TernaryLinear, TernaryConv2d
 class LeNet(nn.Module):
     def __init__(self, n_classes):
         super(LeNet, self).__init__()
-        
+
         self.feature_extractor = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1),
             nn.Tanh(),
@@ -18,7 +18,7 @@ class LeNet(nn.Module):
             nn.Tanh(),
             nn.AvgPool2d(kernel_size=2),
             nn.Conv2d(in_channels=16, out_channels=120, kernel_size=5, stride=1),
-            nn.Tanh()
+            nn.Tanh(),
         )
 
         self.classifier = nn.Sequential(
@@ -36,11 +36,11 @@ class LeNet(nn.Module):
 
 
 class TernaryLeNet(nn.Module):
-    def __init__(self, n_classes: int, a: float=0.0, b: float=0.0):
+    def __init__(self, n_classes: int, a: float = 0.0, b: float = 0.0):
         super(TernaryLeNet, self).__init__()
         self.a = a
         self.b = b
-        
+
         self.feature_extractor = nn.Sequential(
             TernaryConv2d(in_channels=1, out_channels=16, kernel_size=5, stride=1),
             nn.MaxPool2d(kernel_size=2),
@@ -55,7 +55,6 @@ class TernaryLeNet(nn.Module):
             TernaryLinear(in_features=84, out_features=n_classes),
         )
 
-
     def forward(self, x):
         x = self.feature_extractor(x)
         x = torch.flatten(x, 1)
@@ -63,10 +62,8 @@ class TernaryLeNet(nn.Module):
         probs = F.softmax(logits, dim=1)
         return logits, probs
 
-
     def regularization(self):
         reg = torch.zeros(1)
         for param in self.parameters():
             reg = reg + R(param, self.a)
         return self.b * reg
-

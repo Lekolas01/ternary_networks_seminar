@@ -109,7 +109,7 @@ class Configuration(Mapping):
         return self._config.__repr__()
 
     def __getattr__(self, k: str) -> object:
-        if k.startswith('_'):
+        if k.startswith("_"):
             raise AttributeError(f"no attribute '{k}'")
 
         try:
@@ -118,13 +118,13 @@ class Configuration(Mapping):
             raise AttributeError(f"no config entry with key '{k}'") from e
 
     def __setattr__(self, k: str, val: object):
-        if k.startswith('_'):
+        if k.startswith("_"):
             return super().__setattr__(k, val)
 
         return self.__setitem__(k, val)
 
     def __delattr__(self, k: str):
-        if k.startswith('_'):
+        if k.startswith("_"):
             return super().__delattr__(k)
 
         try:
@@ -162,9 +162,11 @@ class Configuration(Mapping):
 
     @property
     def dict(self) -> dict:
-        """ This configuration object as plain dictionary. """
-        return {k: v.dict if isinstance(v, Configuration) else v
-                for k, v in self._config.items()}
+        """This configuration object as plain dictionary."""
+        return {
+            k: v.dict if isinstance(v, Configuration) else v
+            for k, v in self._config.items()
+        }
 
 
 class Grid:
@@ -248,7 +250,7 @@ class Grid:
 
     def __iter__(self) -> iter:
         def _cart_prod(_dict):
-            """ Compute Cartesian product of options. """
+            """Compute Cartesian product of options."""
             if len(_dict) == 0:
                 yield {}
                 return
@@ -277,7 +279,7 @@ class Grid:
 
 
 def _config_path(path: str = None, ext: str = ".yml") -> Path:
-    """ Builds the default path to the config file if necessary. """
+    """Builds the default path to the config file if necessary."""
     file_path = Path() if path is None else Path(path)
     if file_path.is_dir():
         file_path = file_path / "config"
@@ -315,7 +317,7 @@ def read_config(path: str = None, yaml: bool = True) -> Configuration:
     else:
         raise ValueError(f"unknown config file extension: '{extension}'")
 
-    with open(file, 'r') as fp:
+    with open(file, "r") as fp:
         data = load(fp)
 
     return Configuration(**data)
@@ -346,24 +348,26 @@ def write_config(config: Configuration, path: Path = None, yaml: bool = True) ->
         from json import dump as _dump
 
         def dump(o, f):
-            return _dump(o, f, indent='\t')
+            return _dump(o, f, indent="\t")
+
     elif extension == ".yaml":
         from yaml import safe_dump as dump
     else:
         raise ValueError(f"unknown config file extension: '{extension}'")
 
-    with open(file, 'w') as fp:
+    with open(file, "w") as fp:
         dump(config.dict, fp)
 
     return file
 
 
-def read_grid(path: str = None, prop: str=None) -> Grid:
-    file = _config_path(path, '.json')
+def read_grid(path: str = None, prop: str = None) -> Grid:
+    file = _config_path(path, ".json")
     from json import load
-    with open(file, 'r') as fp:
+
+    with open(file, "r") as fp:
         data = load(fp)
-    if (prop is not None):
+    if prop is not None:
         data = data[prop]
     grid = Grid()
     for attr in data:
@@ -372,4 +376,3 @@ def read_grid(path: str = None, prop: str=None) -> Grid:
         else:
             grid.add_option(attr, data[attr])
     return grid
-

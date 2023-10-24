@@ -12,7 +12,7 @@ class MushroomNet(nn.Module):
         self.classifier = nn.Sequential(
             nn.Linear(in_features=in_features, out_features=80, bias=True),
             nn.Linear(in_features=80, out_features=1, bias=True),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
 
@@ -21,6 +21,6 @@ class TernaryMushroomNet(TernaryModule):
         classifier = nn.Sequential(
             TernaryLinear(in_features=in_features, out_features=10, bias=True),
             TernaryLinear(in_features=10, out_features=1, bias=True),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
         super().__init__(classifier, a, b, **kwargs)

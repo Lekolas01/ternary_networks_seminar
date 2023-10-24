@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from config import Configuration, Grid, read_grid
-from loggers.loggers import *
-from loggers.checkpoints import Checkpoints
+from my_logging.loggers import *
+from my_logging.checkpoints import Checkpoints
 
 from models.factory import ModelFactory
 from dataloading import DataloaderFactory
@@ -20,14 +20,14 @@ def run(
     # check device
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    model = ModelFactory(conf.data, conf.ternary, conf.a, conf.b).to(device)
+    model = ModelFactory(str(conf.data), bool(conf.ternary), float(str(conf.a)), float(str(conf.b))).to(device)
 
     train_loader, valid_loader = DataloaderFactory(
-        ds=conf.data, shuffle=True, batch_size=conf.batch_size
+        ds=str(conf.data), shuffle=True, batch_size=conf.batch_size
     )
 
-    criterion = nn.CrossEntropyLoss if conf.data == "mnist" else nn.BCELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=conf.lr)
+    criterion = nn.CrossEntropyLoss() if conf.data == "mnist" else nn.BCELoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=float(str(conf.lr)))
     scheduler = None
     if conf.schedule_lr:
         scheduler = torch.optim.lr_scheduler.MultiStepLR(
@@ -44,7 +44,6 @@ def run(
         device,
         tracker,
         scheduler,
-        conf=conf,
         **kwargs
     )
 

@@ -1,12 +1,16 @@
 from datetime import datetime
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 import torch.nn as nn
-import utils
+import utilities
 from torch.utils.data.dataloader import DataLoader
 from models.ternary import TernaryModule
 from statistics import mean
+
+
+class Temp:
+    def __init__(self) -> None:
+        print("Hello")
 
 
 class Logger:
@@ -214,13 +218,13 @@ class Tracker:
         # train- and test accuracy
         self.mean_train_losses.append(mean(train_losses))
         self.mean_valid_losses.append(mean(valid_losses))
-        self.train_acc = utils.accuracy(self.model, self.train_dl, self.device)
+        self.train_acc = utilities.acc(self.model, self.train_dl, self.device)
         self.valid_acc = self.train_acc
         # valid_acc = utils.accuracy(self.model, self.valid_loader, self.device)
 
         # mean distance from full-precision and sparsity
-        weights = np.tanh(utils.get_all_weights(self.model).detach().cpu().numpy())
-        distance, sparsity = utils.distance_from_int_precision(weights)
+        weights = np.tanh(utilities.get_all_weights(self.model).detach().cpu().numpy())
+        distance, sparsity = utilities.distance_from_int_precision(weights)
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
@@ -228,7 +232,7 @@ class Tracker:
             self.compl = quantized_model.complexity()
             simple_model = self.model.quantized(prune=True).to(self.device)
             simple_compl = simple_model.complexity()
-            self.q_train_acc = utils.accuracy(
+            self.q_train_acc = utilities.acc(
                 quantized_model, self.train_dl, self.device
             )
             self.q_valid_acc = self.q_train_acc

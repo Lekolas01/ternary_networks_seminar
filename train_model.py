@@ -1,11 +1,11 @@
-from typing import Optional
 import torch
 from torch.nn import Module
 from torch.utils.data.dataloader import DataLoader
+from torch.types import Device
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
-from loggers.loggers import Tracker
-from torch.types import Device
+from my_logging.loggers import Tracker
+from typing import Optional
 
 
 def train(

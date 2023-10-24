@@ -2,7 +2,7 @@ from pathlib import Path
 import os, glob
 import torch
 
-from .loggers import Logger
+from my_logging.loggers import Logger
 
 
 class Errors(Logger):

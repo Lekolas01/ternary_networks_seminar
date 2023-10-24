@@ -10,9 +10,9 @@ class AdultNet(nn.Module):
             nn.Linear(in_features=in_features, out_features=80),
             nn.ReLU(),
             nn.Linear(in_features=80, out_features=1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
-    
+
     def forward(self, x):
         ans = self.classifier(x).flatten()
         return ans, ans
@@ -24,7 +24,6 @@ class TernaryAdultNet(TernaryModule):
             TernaryLinear(in_features=in_features, out_features=80),
             nn.Sigmoid(),
             TernaryLinear(in_features=80, out_features=1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
         super().__init__(classifier, a, b, **kwargs)
-

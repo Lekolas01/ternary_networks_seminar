@@ -6,9 +6,7 @@ from models.mushroom import MushroomNet, TernaryMushroomNet
 from models.logical_AND import ANDNet, TernaryANDNet
 
 
-def ModelFactory(
-    data: str, ternary: bool, a: float = 0, b: float = 0
-) -> nn.Module:
+def ModelFactory(data: str, ternary: bool, a: float = 0, b: float = 0) -> nn.Module:
     if data == "mnist":
         n_classes = 10
         return LeNet(n_classes) if not ternary else TernaryLeNet(n_classes, a, b)
