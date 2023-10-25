@@ -1,22 +1,20 @@
+import copy
+import random
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-import matplotlib.pyplot as plt
-from bool_formula import Bool, Interpretation, PARITY
-from typing import Any, Dict, Optional
 
-from pathlib import Path
-from gen_data import generate_data
-
-from train_model import training_loop
-
-from my_logging.loggers import Tracker, LogMetrics
-
-import copy
-from neuron import NeuronGraph, InputNeuron
-from utilities import acc
-import random
+from bool_formula import PARITY, Bool, Interpretation
 from dataloading import FileDataset
+from gen_data import generate_data
+from my_logging.loggers import LogMetrics, Tracker
+from neuron import InputNeuron, NeuronGraph, Neuron
+from train_model import training_loop
+from utilities import acc
 
 
 class BooleanGraph(Bool):
@@ -144,9 +142,7 @@ def test_model(seed, target_func, model):
     return fid, bg_acc, nn_acc
 
 
-if __name__ == "__main__":
-    pass
-
+def plot_metrics():
     # set seed to some integer if you want determinism during training
     seed: Optional[int] = None
     # 32697229636700
@@ -222,3 +218,19 @@ if __name__ == "__main__":
     ax.set_zlabel("Fidelity")
     plt.legend()
     plt.show()
+
+
+if __name__ == "__main__":
+    y = Neuron(
+        "y",
+        [
+            (InputNeuron("x1"), 2.5),
+            (InputNeuron("x2"), 2.5),
+            (InputNeuron("x3"), 1.0),
+            (InputNeuron("x4"), 1.0),
+            (InputNeuron("x5"), 1.0),
+        ],
+        -4.0,
+    )
+    print(y.__str__())
+    print(y.to_bool())

@@ -1,7 +1,9 @@
 from enum import Enum
 from typing import Optional, Self
+
 import torch.nn as nn
-from bool_formula import Bool, Constant, AND, Literal, OR, NOT
+
+from bool_formula import AND, NOT, OR, Bool, Constant, Literal
 
 
 class Act(Enum):
@@ -79,8 +81,8 @@ class Neuron:
                 # k = 2
                 temp = self.neurons_in[idx]
                 temp = list(temp)
-                # temp[1] *= 2
-                # self.neurons_in[idx] = tuple(temp)
+                temp[1] *= 2  # type: ignore
+                self.neurons_in[idx] = tuple(temp)  # type: ignore
 
         # sort neurons by their weight
         neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
@@ -92,7 +94,8 @@ class Neuron:
         positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
-        return to_bool_rec(neurons_in, negative, self.bias - bias_diff).simplified()
+        ans = to_bool_rec(neurons_in, negative, self.bias - bias_diff)
+        return ans.simplified()
 
 
 class InputNeuron(Neuron):
