@@ -86,7 +86,10 @@ class FileDataset(Dataset):
         return self.x[idx], self.y[idx]
 
 
-def DataloaderFactory(ds: str, **dl_args):
+def DataloaderFactory(ds: str, **dl_args) -> tuple[DataLoader, DataLoader]:
+    """
+    Factory function for obtaining dataloader based on the dataset name.
+    """
     datasets = ["adult", "logical_AND"]
     assert (
         ds in datasets
@@ -104,16 +107,14 @@ def DataloaderFactory(ds: str, **dl_args):
         dataloaders.append(DataLoader(dataset, **dl_args))
 
     elif ds == "adult":
-        path = Path("data", ds, "adult.csv")
-        # for filename in ['adult.data', 'adult.names', 'adult.test', 'adult.csv']:
-        #    assert filename in os.listdir(path), f'File {filename} not found in {path}.'
+        path = Path("data/adult/adult.csv")
         split = 2 / 3
         dataloaders.append(
             DataLoader(dataset=FileDataset(path=str(path), range=(0, split)), **dl_args)
         )
         dataloaders.append(
             DataLoader(
-                dataset=FileDataset(path=path / "adult.csv", range=(split, 1)),
+                dataset=FileDataset(path=str(path), range=(split, 1)),
                 **dl_args,
             )
         )

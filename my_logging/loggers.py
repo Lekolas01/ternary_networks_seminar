@@ -1,11 +1,13 @@
 from datetime import datetime
+from statistics import mean
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch.nn as nn
-import utilities
 from torch.utils.data.dataloader import DataLoader
+
+import utilities
 from models.ternary import TernaryModule
-from statistics import mean
 
 
 class Logger:
@@ -206,16 +208,12 @@ class Tracker:
         for logger in self.loggers:
             logger.batch_end()
 
-    def epoch_end(self, train_losses, valid_losses):
-        self.epoch += 1
-
-        # calculate important metrics:
+    def _compute_metrics(self, train_losses, valid_losses):
         # train- and test accuracy
         self.mean_train_losses.append(mean(train_losses))
         self.mean_valid_losses.append(mean(valid_losses))
         self.train_acc = utilities.acc(self.model, self.train_dl, self.device)
-        self.valid_acc = self.train_acc
-        # valid_acc = utils.accuracy(self.model, self.valid_loader, self.device)
+        self.valid_acc = utilities.acc(self.model, self.valid_dl, self.device)
 
         # mean distance from full-precision and sparsity
         weights = np.tanh(utilities.get_all_weights(self.model).detach().cpu().numpy())
@@ -226,21 +224,23 @@ class Tracker:
             quantized_model = self.model.quantized(prune=False).to(self.device)
             self.compl = quantized_model.complexity()
             simple_model = self.model.quantized(prune=True).to(self.device)
-            simple_compl = simple_model.complexity()
+            self.simple_compl = simple_model.complexity()
             self.q_train_acc = utilities.acc(
                 quantized_model, self.train_dl, self.device
             )
             self.q_valid_acc = self.q_train_acc
-            # q_valid_acc = utils.accuracy(quantized_model, self.valid_loader, self.device).item()
-        else:
-            self.q_train_acc = self.q_valid_acc = self.compl = self.simple_compl = 0.0
+            self.q_valid_acc = utilities.acc(
+                quantized_model, self.valid_dl, self.device
+            )
+
+    def epoch_end(self, train_losses, valid_losses):
+        self.epoch += 1
+        self._compute_metrics(train_losses, valid_losses)
 
         for logger in self.loggers:
             if self.epoch % logger.log_every == 0:
                 # pass on the calculated metrics to all subclasses, so they can print it or whatever they want to do with it.
                 logger.epoch_end()
-
-        return self.simple_compl
 
     def training_end(self) -> tuple[list[float], list[float]]:
         for logger in self.loggers:
