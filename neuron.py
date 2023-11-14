@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import Optional, Self
+import copy
 
 import torch.nn as nn
 
@@ -51,23 +52,58 @@ class Neuron:
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
-        ) -> Bool:
+            dp: list[list[tuple[float, float, Bool]]] | None = None,
+        ) -> tuple[float, float, Bool]:
+            def find_in_ranges(
+                ranges: list[tuple[float, float, Bool]], val: float
+            ) -> tuple[int, bool]:
+                left, right = 0, len(ranges)
+                while left < right:
+                    mid = (left + right) // 2
+                    curr_range_left, curr_range_right, _ = ranges[mid]
+                    if curr_range_left <= val <= curr_range_right:
+                        return mid, True
+                    elif curr_range_right < val:
+                        left = mid + 1
+                    else:
+                        right = mid
+                return right, False
+
+            if dp is None:
+                dp = [[] for j in range(len(neurons_in))]
+
             if threshold >= 0:
-                return Constant(True)
+                return threshold, float("inf"), Constant(True)
             if threshold < -sum(n[1] for n in neurons_in[i:]):
-                return Constant(False)
+                return float("-inf"), -threshold, Constant(False)
+            idx, is_found = find_in_ranges(dp[i], threshold)
+            if is_found:
+                return dp[i][idx]
 
             name = neurons_in[i][0].name
             weight = neurons_in[i][1]
             positive = not neuron_signs[i]
 
             # set to False
-            term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
+            thr_l1, thr_r1, term1 = to_bool_rec(
+                neurons_in, neuron_signs, threshold, i + 1
+            )
+
+            thr_l2, thr_r2, term2 = to_bool_rec(
+                neurons_in, neuron_signs, threshold + weight, i + 1
+            )
             term2 = AND(
                 Literal(name) if positive else NOT(Literal(name)),
-                to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1),
+                term2,
             )
-            return OR(term1, term2)
+            dp[i].insert(
+                (
+                    max(thr_l1, thr_l2),
+                    min(thr_r1, thr_r2),
+                )
+            )
+            # TODO: add to dp
+            return OR(term1, term2).simplified()
 
         # step 1: adjust Neuron so that all activations from input are boolean, while preserving equality
         for idx, (neuron_in, weight) in enumerate(self.neurons_in):
@@ -94,8 +130,7 @@ class Neuron:
         positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
-        ans = to_bool_rec(neurons_in, negative, self.bias - bias_diff)
-        return ans.simplified()
+        return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
 
 
 class InputNeuron(Neuron):

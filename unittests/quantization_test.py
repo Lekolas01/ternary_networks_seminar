@@ -13,8 +13,9 @@ class TestSimplification(unittest.TestCase):
                 TernaryLinear(in_features=5, out_features=5, bias=bias),
             )
             super().__init__(classifier, 0, 0)
-            self.fill_weight(fill_value)
-            self.fill_bias(fill_value)
+            if fill_value:
+                self.fill_weight(fill_value)
+                self.fill_bias(fill_value)
 
         def fill_params(self, fill_value: float):
             if fill_value == None:

@@ -13,29 +13,19 @@ def R(weights: torch.Tensor, a: float):
     return torch.sum((a - s) * s)
 
 
-class TernaryLayer(nn.Module):
-    def __init__(self, module: nn.Module, functional: Callable):
+class TernaryLinear(nn.Module):
+    def __init__(self, in_features: int, out_features: int, bias: bool = True):
         super().__init__()
+        module = nn.Linear(in_features, out_features, bias)
         self.weight = module.weight
         self.bias = module.bias
-        self.f = functional
+        self.f = F.linear
 
     def forward(self, x: torch.Tensor):
         assert isinstance(self.weight, torch.Tensor)
-        assert isinstance(self.bias, torch.Tensor)
         weight = torch.tanh(self.weight)
         bias = torch.tanh(self.bias) if self.bias is not None else None
         return self.f(x, weight, bias)
-
-
-class TernaryLinear(TernaryLayer):
-    def __init__(self, **kwargs):
-        super().__init__(nn.Linear(**kwargs), F.linear)
-
-
-class TernaryConv2d(TernaryLayer):
-    def __init__(self, **kwargs):
-        super().__init__(nn.Conv2d(**kwargs), F.conv2d)
 
 
 class TernaryModule(nn.Module):
