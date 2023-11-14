@@ -28,7 +28,7 @@ def train(
         y = y.to(device)
         optim.zero_grad()
         y_hat = model(X)
-        loss = loss_fn(y_hat, y)
+        loss = loss_fn(y_hat, y.float())
         losses.append(loss.item())
         loss.backward()
         optim.step()
@@ -51,7 +51,8 @@ def validate(
         X = X.to(device)
         y_true = y_true.to(device)
         y_hat = model(X)
-        loss = loss_fn(y_hat, y_true)
+        loss = torch.Tensor()
+        loss = loss_fn(y_hat, y_true.float())
         losses.append(loss.item())
 
     return losses

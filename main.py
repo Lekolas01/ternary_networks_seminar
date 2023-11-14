@@ -8,7 +8,7 @@ from my_logging.loggers import Tracker, Plotter
 from my_logging.checkpoints import Checkpoints
 
 from models.factory import ModelFactory
-from dataloading import DataloaderFactory
+from dataloading import get_dataset
 from train_model import training_loop
 
 
@@ -24,7 +24,7 @@ def run(
         str(conf.data), bool(conf.ternary), float(str(conf.a)), float(str(conf.b))
     ).to(device)
 
-    train_loader, valid_loader = DataloaderFactory(
+    train_loader, valid_loader = get_dataset(
         ds=str(conf.data), shuffle=True, batch_size=conf.batch_size
     )
 

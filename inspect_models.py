@@ -6,7 +6,7 @@ import glob, os
 import torch
 import torch.nn as nn
 import utilities
-from dataloading import DataloaderFactory
+from datasets import get_datasets
 
 
 def get_indices_epochs(base_model_paths):
@@ -42,9 +42,10 @@ def inspect(dir_path):
     plt.ylabel("Accuracy")
     plt.title(os.path.basename(dir_path))
     plt.show()
-    valid_loader = DataloaderFactory(
-        ds="mushroom", train=False, shuffle=True, batch_size=128
+    valid_loader = get_datasets(
+        ds="mushroom"  # , train=False, shuffle=True, batch_size=128
     )
+    valid_loader = torch.Dat
     names = valid_loader.dataset.df.columns[1:]
 
     for i, qm in enumerate(best_quantized_models):

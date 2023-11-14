@@ -3,9 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import copy
 
-from inspect_models import pretty_print_classifier
 from utilities import get_all_weights
-from typing import Callable
 
 
 def R(weights: torch.Tensor, a: float):

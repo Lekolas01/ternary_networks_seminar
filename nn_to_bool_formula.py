@@ -12,7 +12,7 @@ from bool_formula import PARITY, Bool, Interpretation
 from dataloading import FileDataset
 from gen_data import generate_data
 from my_logging.loggers import LogMetrics, Tracker
-from neuron import InputNeuron, NeuronGraph, Neuron
+from neuron import InputNeuron, NeuronGraph
 from train_model import training_loop
 from utilities import acc
 
