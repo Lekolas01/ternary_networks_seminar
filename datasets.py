@@ -27,7 +27,7 @@ class FileDataset(Dataset):
         path: str
             Relative path to the file that contains the dataset.
             - Path must exist and point to a csv file.
-            - The first line of the csv file must contain the column names.
+            - The first line of the csv file MUST contain the column names.
         range: (float, float)
             What part of the dataset one wants to access.
             - Both values must be between 0 and 1 and the first must be smaller than the second.
@@ -88,12 +88,8 @@ class FileDataset(Dataset):
 
 def get_datasets(ds: str) -> tuple[FileDataset, FileDataset]:
     """
-    Factory function for obtaining dataloader based on the dataset name.
+    For obtaining two FileDatasets (one train, one validation) based on dataset name.
     """
-    datasets = ["adult", "logical_AND"]
-    assert (
-        ds in datasets
-    ), f"DataLoaderFactory does not support the dataset with the name {ds}."
     datasets = []
 
     if ds == "mnist":
@@ -101,7 +97,7 @@ def get_datasets(ds: str) -> tuple[FileDataset, FileDataset]:
         transform = transforms.Compose(
             [transforms.Resize((32, 32)), transforms.ToTensor()]
         )
-        dataset = datasets.MNIST(
+        train_ds = datasets.MNIST(
             root="data/", train=train, transform=transform, download=True
         )
         return datasets
@@ -113,7 +109,6 @@ def get_datasets(ds: str) -> tuple[FileDataset, FileDataset]:
         datasets.append(FileDataset(path=str(path), range=(split, 1), normalize=True))
 
     elif ds == "mushroom":
-        raise NotImplementedError()
         path = Path("data", "mushroom", "agaricus-lepiota.data")
         names = [
             "edible",
@@ -140,23 +135,14 @@ def get_datasets(ds: str) -> tuple[FileDataset, FileDataset]:
             "population",
             "habitat",
         ]
-        split = 1.0 if train else 0.0
-        dataset = FileDataset(
-            path=path,
-            train=train,
-            train_test_split=split,
-            first_is_target=True,
-            names=names,
-        )
-        datasets.append(DataLoader(dataset=dataset, **dl_args))
+        datasets.append(FileDataset(path=path, target="edible"))
+        datasets.append(FileDataset(path=path, target="edible"))
     elif ds == "logical_AND":
         path = Path("data", "generated", ds, "data.csv")
         datasets.append(FileDataset(path=path))
         datasets.append(FileDataset(path=path))
-
     else:
         raise ValueError("Non-existing dataset: {d}".format(d=ds))
-
     return datasets[0], datasets[1]
 
 

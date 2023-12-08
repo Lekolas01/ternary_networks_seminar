@@ -2,6 +2,7 @@ import copy
 import random
 from pathlib import Path
 from typing import Any, Dict, Optional
+import torch.functional as F
 
 import matplotlib.pyplot as plt
 import torch
@@ -9,19 +10,23 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from bool_formula import PARITY, Bool, Interpretation
-from dataloading import FileDataset
+from datasets import FileDataset
 from gen_data import generate_data
-from my_logging.loggers import LogMetrics, Tracker
+from my_logging.loggers import LogMetrics, LogModel, Tracker
 from neuron import InputNeuron, NeuronGraph
 from train_model import training_loop
-from utilities import acc
+from utilities import acc, plot_nn_dist, set_seed
 
 
 class BooleanGraph(Bool):
     def __init__(self, ng: NeuronGraph) -> None:
         super().__init__()
         self.ng = ng
-        self.bools = {n.name: n.to_bool() for n in self.ng.neurons}
+        self.bools = {}
+        for n in self.ng.neurons:
+            print(f"{n = }")
+            temp = n.to_bool()
+            self.bools[n.name] = temp
 
     def __call__(self, interpretation: Interpretation) -> bool:
         int_copy = copy.copy(interpretation)
@@ -55,59 +60,62 @@ class BooleanGraph(Bool):
         raise NotImplementedError
 
 
-def full_circle(
-    target_func: Bool, model, n_datapoints=4000, epochs=5, seed=None, verbose=False
-) -> Dict[str, Any]:
-    layer_1 = model[0]
-    assert isinstance(layer_1, nn.Linear)
-    _, shape_in = layer_1.weight.shape
-
+def gen_dataset_from_func(func: Bool, n_datapoints: int) -> Path:
     # generate data for function
-    vars = sorted(list(target_func.all_literals()))
-    if shape_in != len(vars):
-        raise ValueError(
-            f"The model's input shape must be same as the number of variables in target_func, but got: {len(vars) = },  {shape_in = }"
-        )
-    data = generate_data(n_datapoints, target_func, vars=vars, seed=seed)
-
+    vars = sorted(list(func.all_literals()))
+    data = generate_data(func, n_datapoints, vars=vars, seed=seed)
     # save it in a throwaway folder
     folder_path = Path("unittests/can_delete")
     data_path = folder_path / "gen_data.csv"
     data.to_csv(data_path, index=False, sep=",")
+    return data_path
 
-    # train a neural network on the dataset
-    dataset = FileDataset(data_path)
-    dataloader = DataLoader(dataset, batch_size=64, shuffle=True)
+
+def train_rules(
+    train_dl: DataLoader,
+    valid_dl: DataLoader,
+    nn_model: nn.Sequential,
+    epochs: int,
+    vars: list[str],
+) -> Dict[str, Any]:
+    # device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cpu"
+    print(f"{device = }")
     loss_fn = nn.BCELoss()
-    optim = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-6)
+    optim = torch.optim.Adam(nn_model.parameters(), lr=0.002, weight_decay=1e-6)
     tracker = Tracker()
-    if verbose:
-        tracker.add_logger(
-            LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=350)
-        )
+    tracker.add_logger(
+        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=2)
+    )
+    # tracker.add_logger(LogModel(log_every=10))
+
     losses = training_loop(
-        model,
+        nn_model,
         loss_fn,
         optim,
-        dataloader,
-        dataloader,
+        train_dl,
+        valid_dl,
         epochs=epochs,
+        lambda1=1e-4,
         tracker=tracker,
-        device="cuda" if torch.cuda.is_available() else "cpu",
+        device=device,
     )
-    model.train(False)
+    nn_model.train(False)
+
+    # plot parameter distribution
+
+    plot_nn_dist(nn_model)
 
     # transform the trained neural network to a directed graph of perceptrons
-    neuron_graph = NeuronGraph(vars, model)
-    # transform the output perceptron to a boolean function
+    neuron_graph = NeuronGraph(vars, nn_model)
+    # transform the neuron graph to a boolean function
     bool_graph = BooleanGraph(neuron_graph)
 
     # return the found boolean function
     return {
         "vars": vars,
-        "neural_network": model,
+        "neural_network": nn_model,
         "losses": losses,
-        "dataloader": dataloader,
         "neuron_graph": neuron_graph,
         "bool_graph": bool_graph,
     }
@@ -138,140 +146,71 @@ def fidelity(vars, model, bg, dl) -> tuple[float, float]:
     return fid / n_vals, bg_accuracy / n_vals
 
 
-def test_model(seed, target_func, model) -> tuple[float, float, float]:
-    ans = full_circle(target_func, model, epochs=200, seed=seed, verbose=False)
-    bg = ans["bool_graph"]
-    dl = ans["dataloader"]
-    vars = ans["vars"]
-
-    fid, bg_acc = fidelity(vars, model, bg, dl)
-    nn_acc = acc(model, dl, torch.device("cpu"))
-    return fid, bg_acc, nn_acc
-
-
-def plot_metrics():
-    n_vars = 10
+def learn_parity(n_vars: int):
+    assert n_vars > 1, f"n_vars must be >= 2, but got: {n_vars}"
     vars = [f"x{i + 1}" for i in range(n_vars)]
     target_func = PARITY(vars)
     n = len(target_func.all_literals())
 
-    activation_sig = []
-    activation_tanh = []
+    metrics = []
 
     best_bg_acc, best_bg_fid, best_bg_nn_acc = 0, 0, 0
     best_bg = None
 
-    for i in range(50):
-        print(f"\t------ {i} ------")
-        for act in ["tanh"]:
-            print(f"------ {act} ------")
-            if act == "sigmoid":
-                model = nn.Sequential(
-                    nn.Linear(n, n),
-                    nn.Sigmoid(),
-                    nn.Linear(n, n - 4),
-                    nn.Sigmoid(),
-                    nn.Linear(n - 4, n - 4),
-                    nn.Sigmoid(),
-                    nn.Linear(n - 4, 1),
-                    nn.Sigmoid(),
-                    nn.Flatten(0),
-                )
-            else:
-                model = nn.Sequential(
-                    nn.Linear(n, n - 4),
-                    nn.Tanh(),
-                    nn.Linear(n - 4, n - 4),
-                    nn.Tanh(),
-                    nn.Linear(n - 4, n - 7),
-                    nn.Tanh(),
-                    nn.Linear(n - 7, 1),
-                    nn.Sigmoid(),
-                    nn.Flatten(0),
-                )
+    model = nn.Sequential(
+        nn.Linear(n, 2 * n),
+        nn.Tanh(),
+        nn.Linear(2 * n, 2 * n),
+        nn.Tanh(),
+        nn.Linear(2 * n, 1),
+        nn.Sigmoid(),
+        nn.Flatten(0),
+    )
+    path = gen_dataset_from_func(target_func, n_datapoints=int(2**n))
+    train_dl = DataLoader(FileDataset(path))
+    valid_dl = DataLoader(FileDataset(path))
+    epochs = 350
+    ans = train_rules(train_dl, valid_dl, model, epochs, vars)
+    bg = ans["bool_graph"]
+    vars = ans["vars"]
 
-            ans = full_circle(target_func, model, epochs=350, seed=seed, verbose=True)
-            bg = ans["bool_graph"]
-            dl = ans["dataloader"]
-            vars = ans["vars"]
+    fid, bg_acc = fidelity(vars, model, bg, train_dl)
+    nn_acc = acc(model, train_dl, torch.device("cpu"))
 
-            fid, bg_acc = fidelity(vars, model, bg, dl)
-            nn_acc = acc(model, dl, torch.device("cpu"))
-
-            # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
-            # Accuracy: the percentage of test examples that are correctly classified by the rules
-            # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
-            # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
-            if act == "sigmoid":
-                activation_sig.append((nn_acc, bg_acc, fid))
-            else:
-                activation_tanh.append((nn_acc, bg_acc, fid))
-            if best_bg_acc < bg_acc:
-                best_bg = bg
-                best_bg_nn_acc = nn_acc
-                best_bg_fid = fid
-                best_bg_acc = bg_acc
+    # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
+    # Accuracy: the percentage of test examples that are correctly classified by the rules
+    # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
+    # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
+    metrics.append((nn_acc, bg_acc, fid))
+    if best_bg_acc < bg_acc:
+        best_bg = bg
+        best_bg_nn_acc = nn_acc
+        best_bg_fid = fid
+        best_bg_acc = bg_acc
 
     print(f"{best_bg = }")
     print(f"{best_bg_nn_acc = }")
     print(f"{best_bg_fid = }")
     print(f"{best_bg_acc = }")
 
-    sig_nn_acc = [val[0] for val in activation_sig]
-    sig_bg_acc = [val[1] for val in activation_sig]
-    sig_fid = [val[2] for val in activation_sig]
-
-    tanh_nn_acc = [val[0] for val in activation_tanh]
-    tanh_bg_acc = [val[1] for val in activation_tanh]
-    tanh_fid = [val[2] for val in activation_tanh]
+    tanh_nn_acc = [val[0] for val in metrics]
+    tanh_bg_acc = [val[1] for val in metrics]
+    tanh_fid = [val[2] for val in metrics]
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
-    ax.scatter(sig_nn_acc, sig_bg_acc, sig_fid, c="r", label="Sigmoid")
     ax.scatter(tanh_nn_acc, tanh_bg_acc, tanh_fid, c="g", label="Tanh")
     ax.set_xlabel("NN Accuracy")
     ax.set_ylabel("BG Accuracy")
-    ax.set_zlabel("Fidelity")
     plt.legend()
     plt.show()
 
 
-def knowledge_base(data: DataLoader, architecture: nn.Sequential, seed: int):
-    # TODO
-    pass
-
-
 if __name__ == "__main__":
-    # set seed to some integer if you want determinism during training
-    seed: Optional[int] = 93980824973900
-    # 32697229636700
-
-    if seed is None:
-        seed = torch.random.initial_seed()
-    else:
-        torch.manual_seed(seed)
-    random.seed(seed)
+    # 56056698460700
+    seed = set_seed(56056698460700)
     print(f"{seed = }")
 
-    n = 10
-    model = nn.Sequential(
-        nn.Linear(n, n - 4),
-        nn.Tanh(),
-        nn.Linear(n - 4, n - 4),
-        nn.Tanh(),
-        nn.Linear(n - 4, 1),
-        nn.Sigmoid(),
-        nn.Flatten(0),
-    )
-    plot_metrics()
+    n_vars = 10
+    learn_parity(n_vars)
 
-    target_func = PARITY([f"x{i + 1}" for i in range(n)])
-    ans = full_circle(target_func, model, epochs=10, seed=0, verbose=False)
-    bg = ans["bool_graph"]
-    dl = ans["dataloader"]
-    vars = ans["vars"]
-    print(bg)
-    fid, bg_acc = fidelity(vars, model, bg, dl)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    nn_acc = acc(model, dl, device)
-    print(nn_acc, fid, bg_acc)
-    print(bg.ng.neurons)
+    print(f"{seed = }")

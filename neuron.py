@@ -2,6 +2,9 @@ from enum import Enum
 from typing import Optional, Self
 import copy
 
+import numpy as np
+
+import torch
 import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
@@ -52,8 +55,8 @@ class Neuron:
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
-            dp: list[list[tuple[float, float, Bool]]] | None = None,
-        ) -> tuple[float, float, Bool]:
+            # dp: list[list[tuple[float, float, Bool]]] | None = None,
+        ) -> Bool:
             def find_in_ranges(
                 ranges: list[tuple[float, float, Bool]], val: float
             ) -> tuple[int, bool]:
@@ -69,38 +72,27 @@ class Neuron:
                         right = mid
                 return right, False
 
-            if dp is None:
-                dp = [[] for j in range(len(neurons_in))]
+            # if dp is None:
+            #    dp = [[] for j in range(len(neurons_in))]
 
             if threshold >= 0:
-                return threshold, float("inf"), Constant(True)
+                return Constant(True)
             if threshold < -sum(n[1] for n in neurons_in[i:]):
-                return float("-inf"), -threshold, Constant(False)
-            idx, is_found = find_in_ranges(dp[i], threshold)
-            if is_found:
-                return dp[i][idx]
+                return Constant(False)
+            # idx, is_found = find_in_ranges(dp[i], threshold)
+            #    return dp[i][idx]
 
             name = neurons_in[i][0].name
             weight = neurons_in[i][1]
             positive = not neuron_signs[i]
 
             # set to False
-            thr_l1, thr_r1, term1 = to_bool_rec(
-                neurons_in, neuron_signs, threshold, i + 1
-            )
+            term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
 
-            thr_l2, thr_r2, term2 = to_bool_rec(
-                neurons_in, neuron_signs, threshold + weight, i + 1
-            )
+            term2 = to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1)
             term2 = AND(
                 Literal(name) if positive else NOT(Literal(name)),
                 term2,
-            )
-            dp[i].insert(
-                (
-                    max(thr_l1, thr_l2),
-                    min(thr_r1, thr_r2),
-                )
             )
             # TODO: add to dp
             return OR(term1, term2).simplified()
@@ -130,6 +122,7 @@ class Neuron:
         positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
+
         return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
 
 

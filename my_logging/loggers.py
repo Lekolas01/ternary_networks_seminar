@@ -89,6 +89,14 @@ class LogMetrics(Logger):
             print(f"{self.m_format[metric]}", end="\t")
         print()
 
+    def batch_end(self):
+        for i, layer in enumerate(self.t.model):
+            if isinstance(layer, nn.Linear):
+                pass
+                # print(
+                #    f"Layer {i}: mean = {layer.weight.grad.mean()} | std = {layer.weight.grad.std()}"
+                # )
+
 
 class Plotter(Logger):
     "Dynamically updates a loss plot after every epoch."
@@ -144,13 +152,18 @@ class LogModel(Logger):
         # from train_model import validate
         # validate(self.t.valid_loader, self.t.model, self.t.criterion, self.t.device)
         # print(f"Model :\t{self.t.model}")
-        pass
+        utilities.plot_nn_dist(self.t.model)
+
+    def training_end(self):
+        utilities.plot_nn_dist(self.t.model)
 
     def epoch_start(self, **kwargs):
         pass
 
     def epoch_end(self, **kwargs):
-        print(self.t.model)
+        pass
+        # utilities.plot_nn_dist(self.t.model)
+        # print(self.t.model)
 
     def batch_start(self):
         pass

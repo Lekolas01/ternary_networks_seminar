@@ -1,4 +1,5 @@
 from ucimlrepo import fetch_ucirepo
+import datasets
 
 # fetch dataset
 mushroom = fetch_ucirepo(id=73)
@@ -11,4 +12,8 @@ y = mushroom.data.targets
 print(mushroom.metadata)
 
 # variable information
-print(mushroom.variables)
+train_ds, test_ds = datasets.get_datasets("mushroom")
+print(train_ds[0:5])
+print(X.head())
+print(len(train_ds[0]))
+print(len(train_ds))

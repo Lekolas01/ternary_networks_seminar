@@ -14,7 +14,7 @@ def random_interpretation(literals: Collection[str]) -> Interpretation:
 
 
 def generate_data(
-    n_samples: int, func: Bool, vars: Optional[list[str]] = None, seed=None
+    func: Bool, n_samples: int, vars: Optional[list[str]] = None, seed=None
 ) -> pd.DataFrame:
     assert (
         isinstance(n_samples, int) and n_samples >= 1
@@ -49,7 +49,6 @@ def main(path, n_rows, n_vars, sep=","):
     vars.append("target")
 
     n_cols = n_vars + 1
-    data = np.empty((n_rows, n_cols), dtype=bool)
     thresholds = [n * n_rows for n in [0.15, 0.35, 0.6, 1.0]]
     code = 0
     with open(path, "w") as of:
@@ -82,4 +81,4 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = os.path.join(dir_path, "data.csv")
     n_rows, n_vars = 100, 2
-    data = generate_data(100, AND("x1", NOT(Literal("x2"))))
+    data = generate_data(AND("x1", NOT(Literal("x2"))), 100)

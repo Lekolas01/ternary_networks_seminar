@@ -3,6 +3,18 @@ import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 from torch.types import Device
+import random
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+
+def plot_nn_dist(model: nn.Sequential):
+    params = [p.view(-1).tolist() for p in model.parameters() if p.dim() == 2]
+    n_plots = len(params)
+    fig, axs = plt.subplots(1, n_plots, sharex=True)
+    for i in range(n_plots):
+        sns.histplot(params[i], ax=axs[i])
+    plt.show()
 
 
 def acc(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
@@ -52,3 +64,14 @@ def get_all_weights(model: nn.Module):
     params = [param.view(-1) for param in model.parameters()]
     params = torch.cat(params)
     return params
+
+
+def set_seed(seed: int | None) -> int:
+    """Call this function if you need determinism."""
+
+    if seed is None:
+        seed = torch.random.initial_seed()
+    else:
+        torch.manual_seed(seed)
+    random.seed(seed)
+    return seed

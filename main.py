@@ -2,13 +2,14 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
 from config import Configuration, Grid, read_grid
 from my_logging.loggers import Tracker, Plotter
 from my_logging.checkpoints import Checkpoints
 
 from models.factory import ModelFactory
-from dataloading import get_dataset
+from datasets import get_datasets
 from train_model import training_loop
 
 
@@ -24,9 +25,10 @@ def run(
         str(conf.data), bool(conf.ternary), float(str(conf.a)), float(str(conf.b))
     ).to(device)
 
-    train_loader, valid_loader = get_dataset(
-        ds=str(conf.data), shuffle=True, batch_size=conf.batch_size
-    )
+    train_ds, valid_ds = get_datasets(str(conf.data))
+    assert isinstance(conf.batch_size, int)
+    train_loader = DataLoader(train_ds, batch_size=int(conf.batch_size), shuffle=True)
+    valid_loader = DataLoader(valid_ds, batch_size=int(conf.batch_size), shuffle=True)
 
     criterion = nn.CrossEntropyLoss() if conf.data == "mnist" else nn.BCELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=float(str(conf.lr)))

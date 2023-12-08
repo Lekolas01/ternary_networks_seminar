@@ -1,6 +1,8 @@
 from bool_formula import Constant, Literal, NOT, AND, OR, all_interpretations, overlap
 import torch.nn as nn
-from nn_to_bool_formula import full_circle
+from datasets import FileDataset
+from nn_to_bool_formula import gen_dataset_from_func, train_rules
+from torch.utils.data import DataLoader
 
 
 def test_binaryFunctions(self):
@@ -25,7 +27,10 @@ def test_binaryFunctions(self):
             nn.Sigmoid(),
             nn.Flatten(0),
         )
-        found = full_circle(target_func, model, epochs=8)["bool_graph"]
+        path = gen_dataset_from_func(target_func, n_datapoints=20)
+        dl = DataLoader(FileDataset(path))
+        ans = train_rules(dl, dl, model, 50, target_func.all_literals())
+        found = ans["bool_graph"]
         assert (
             target_func == found
         ), f"Did not produce an equivalent function: {target_func = }; {found = }"

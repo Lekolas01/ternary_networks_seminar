@@ -6,6 +6,7 @@ from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
 from my_logging.loggers import Tracker
 from typing import Optional
+import torch.nn as nn
 
 
 def train(
@@ -15,10 +16,12 @@ def train(
     optim: Optimizer,
     device: Device,
     tracker=Tracker(),
+    lambda1: float = 0,
 ) -> list[float]:
     """
     Function for the training step of the training loop
     """
+    model = model.to(device)
     model.train()
     losses = []
 
@@ -28,7 +31,14 @@ def train(
         y = y.to(device)
         optim.zero_grad()
         y_hat = model(X)
+        # we don't regularize bias
         loss = loss_fn(y_hat, y.float())
+        if lambda1 != 0:
+            all_linear1_params = torch.cat(
+                [x.view(-1) for x in model.parameters() if x.dim() == 2]
+            )
+            l1_regularization = lambda1 * torch.norm(all_linear1_params, 1)
+            loss = loss + l1_regularization
         losses.append(loss.item())
         loss.backward()
         optim.step()
@@ -44,6 +54,7 @@ def validate(
     """
     Function for the validation step of the training loop
     """
+    model = model.to(device)
     model.eval()
     losses = []
 
@@ -65,6 +76,7 @@ def training_loop(
     train_loader: DataLoader,
     valid_loader: DataLoader,
     epochs: int,
+    lambda1: float = 0.0,
     device: Device = "cpu",
     tracker: Tracker = Tracker(),
     scheduler: Optional[MultiStepLR] = None,
@@ -74,7 +86,9 @@ def training_loop(
     for epoch in range(epochs):
         tracker.epoch_start()
         # training
-        train_loss = train(train_loader, model, criterion, optimizer, device, tracker)
+        train_loss = train(
+            train_loader, model, criterion, optimizer, device, tracker, lambda1
+        )
 
         # validation
         with torch.no_grad():
