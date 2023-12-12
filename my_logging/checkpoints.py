@@ -1,5 +1,7 @@
+import glob
+import os
 from pathlib import Path
-import os, glob
+
 import torch
 
 from my_logging.loggers import Logger
@@ -47,7 +49,6 @@ class Errors(Logger):
         sparsity,
         compl,
         simple_compl,
-        **kwargs,
     ):
         # log errors
         with open(self.errors_path, "a") as f:
@@ -105,31 +106,6 @@ class Configs(Logger):
                     b=conf.b,
                 )
             )
-
-
-class Models(Logger):
-    """
-    Makes a checkpoint of the trained models every couple epochs
-    """
-
-    MODEL_FILE = "config{idx:02d}_epoch{epoch:03d}.pth"
-
-    def __init__(self, checkpoints, **kwargs):
-        super().__init__(**kwargs)
-        self.cp = checkpoints
-        self.model_path = self.cp.path / self.MODEL_FILE
-
-    def epoch_end(self, **kwargs):
-        self.save_model()
-
-    def save_model(self):
-        curr_model_path = str(self.model_path).format(
-            idx=self.cp.t.conf_idx, epoch=self.cp.t.epoch
-        )
-        try:
-            torch.save(self.cp.t.model, curr_model_path)
-        except Exception as inst:
-            print(f"Could not save model to {curr_model_path}: {inst}")
 
 
 class BestModels(Models):

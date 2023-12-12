@@ -1,15 +1,15 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from config import Configuration, Grid, read_grid
-from my_logging.loggers import Tracker, Plotter
-from my_logging.checkpoints import Checkpoints
-
-from models.factory import ModelFactory
 from datasets import get_datasets
+from models.factory import ModelFactory
+from my_logging.checkpoints import Checkpoints
+from my_logging.loggers import Plotter, Tracker
 from train_model import training_loop
 
 
@@ -45,6 +45,7 @@ def run(
         train_loader,
         valid_loader,
         epochs,
+        0,
         device,
         tracker,
         scheduler,

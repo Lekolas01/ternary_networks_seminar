@@ -1,8 +1,11 @@
+from abc import ABC
 from datetime import datetime
+from pathlib import Path
+from re import M
 from statistics import mean
 
 import matplotlib.pyplot as plt
-import numpy as np
+import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
 
@@ -10,7 +13,7 @@ import utilities
 from models.ternary import TernaryModule
 
 
-class Logger:
+class Logger(ABC):
     """Extracts and/or persists tracker information."""
 
     def __init__(self, log_every: int = 1):
@@ -39,33 +42,9 @@ class Logger:
         pass
 
     def epoch_end(self, **kwargs):
-        """
-        Enables the Logger to add a hook at the end of every epoch during training.
-
-        Parameters
-        ----------
-        epoch
-            Rank of the current epoch.
-        update
-            Rank of the current update.
-        loss
-            Loss value of the current batch.
-        """
         pass
 
     def training_end(self):
-        """
-        Log the summary of metrics on the current epoch.
-
-        Parameters
-        ----------
-        epoch
-            Rank of the current epoch.
-        update
-            Rank of the current update.
-        avg_loss
-            Summary value of the current epoch.
-        """
         pass
 
 
@@ -80,7 +59,7 @@ class LogMetrics(Logger):
         self.m_format = {
             "timestamp": f"{datetime.now().time().replace(microsecond=0)} ----",
             "epoch": f"Epoch: {self.t.epoch}",
-            "train_loss": f"Loss: {self.t.mean_train_losses[-1]:.4f}",
+            "train_loss": f"Loss: {self.t.mean_train_loss[-1]:.4f}",
             "train_acc": f"Train: {(self.t.train_acc * 100):.2f}%",
             "valid_acc": f"Valid: {(self.t.valid_acc * 100):.2f}%",
         }
@@ -88,14 +67,6 @@ class LogMetrics(Logger):
         for metric in self.metrics:
             print(f"{self.m_format[metric]}", end="\t")
         print()
-
-    def batch_end(self):
-        for i, layer in enumerate(self.t.model):
-            if isinstance(layer, nn.Linear):
-                pass
-                # print(
-                #    f"Layer {i}: mean = {layer.weight.grad.mean()} | std = {layer.weight.grad.std()}"
-                # )
 
 
 class Plotter(Logger):
@@ -147,27 +118,11 @@ class LogModel(Logger):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def training_start(self, **kwargs):
-        # print model at the start of training
-        # from train_model import validate
-        # validate(self.t.valid_loader, self.t.model, self.t.criterion, self.t.device)
-        # print(f"Model :\t{self.t.model}")
+    def training_start(self):
         utilities.plot_nn_dist(self.t.model)
 
     def training_end(self):
         utilities.plot_nn_dist(self.t.model)
-
-    def epoch_start(self, **kwargs):
-        pass
-
-    def epoch_end(self, **kwargs):
-        pass
-        # utilities.plot_nn_dist(self.t.model)
-        # print(self.t.model)
-
-    def batch_start(self):
-        pass
-        # print(f"Model :\t{self.t.model}")
 
 
 class Tracker:
@@ -196,15 +151,15 @@ class Tracker:
         valid_dl: DataLoader,
         loss_fn: nn.Module,
     ):
-        self.model = model
-        self.train_dl = train_dl
-        self.valid_dl = valid_dl
-        self.loss_fn = loss_fn
+        self.model, loss_fn = model, loss_fn
+        self.train_dl, self.valid_dl = train_dl, valid_dl
 
         self.device = next(self.model.parameters()).device
         self.epoch = 0
-        self.mean_train_losses = []  # the mean of every epochs training loss
-        self.mean_valid_losses = []  # the mean of every epochs validation loss
+        self.mean_train_loss, self.mean_valid_loss = (
+            [],
+            [],
+        )  # the mean of every epochs training loss
 
         for logger in self.loggers:
             logger.training_start()
@@ -223,14 +178,10 @@ class Tracker:
 
     def _compute_metrics(self, train_losses, valid_losses):
         # train- and test accuracy
-        self.mean_train_losses.append(mean(train_losses))
-        self.mean_valid_losses.append(mean(valid_losses))
+        self.mean_train_loss.append(mean(train_losses))
+        self.mean_valid_loss.append(mean(valid_losses))
         self.train_acc = utilities.acc(self.model, self.train_dl, self.device)
         self.valid_acc = utilities.acc(self.model, self.valid_dl, self.device)
-
-        # mean distance from full-precision and sparsity
-        weights = np.tanh(utilities.get_all_weights(self.model).detach().cpu().numpy())
-        distance, sparsity = utilities.distance_from_int_precision(weights)
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
@@ -258,4 +209,31 @@ class Tracker:
     def training_end(self) -> tuple[list[float], list[float]]:
         for logger in self.loggers:
             logger.training_end()
-        return self.mean_train_losses, self.mean_valid_losses
+        return self.mean_train_loss, self.mean_valid_loss
+
+
+class SaveModel(Logger):
+    """
+    Makes a checkpoint of the trained models every couple epochs
+    """
+
+    MODEL_FILE = "epoch{epoch:03d}.pth"
+
+    def __init__(self, path: Path, **kwargs):
+        super().__init__(**kwargs)
+        self.path = path
+        self.model_path = self.path / self.MODEL_FILE
+
+    def epoch_end(self):
+        model_path = str(self.model_path).format(epoch=self.t.epoch)
+        self.save_model(model_path)
+
+    def training_end(self):
+        model_path = str(self.model_path).format(epoch=self.t.epoch)
+        self.save_model(model_path)
+
+    def save_model(self, curr_model_path):
+        try:
+            torch.save(self.t.model, curr_model_path)
+        except Exception as inst:
+            print(f"Could not save model to {curr_model_path}: {inst}")

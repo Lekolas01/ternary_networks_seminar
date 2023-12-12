@@ -2,17 +2,17 @@ import copy
 import random
 from pathlib import Path
 from typing import Any, Dict, Optional
-import torch.functional as F
 
 import matplotlib.pyplot as plt
 import torch
+import torch.functional as F
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from bool_formula import PARITY, Bool, Interpretation
 from datasets import FileDataset
 from gen_data import generate_data
-from my_logging.loggers import LogMetrics, LogModel, Tracker
+from my_logging.loggers import LogMetrics, LogModel, SaveModel, Tracker
 from neuron import InputNeuron, NeuronGraph
 from train_model import training_loop
 from utilities import acc, plot_nn_dist, set_seed
@@ -24,8 +24,10 @@ class BooleanGraph(Bool):
         self.ng = ng
         self.bools = {}
         for n in self.ng.neurons:
-            print(f"{n = }")
+            print(f"{n}")
             temp = n.to_bool()
+            print(temp)
+            print()
             self.bools[n.name] = temp
 
     def __call__(self, interpretation: Interpretation) -> bool:
@@ -84,10 +86,9 @@ def train_rules(
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(nn_model.parameters(), lr=0.002, weight_decay=1e-6)
     tracker = Tracker()
-    tracker.add_logger(
-        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=2)
-    )
-    # tracker.add_logger(LogModel(log_every=10))
+    tracker.add_logger(LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"]))
+    path = Path("runs", "parity_10_5")
+    tracker.add_logger(SaveModel(path, log_every=50))
 
     losses = training_loop(
         nn_model,
@@ -96,7 +97,7 @@ def train_rules(
         train_dl,
         valid_dl,
         epochs=epochs,
-        lambda1=1e-4,
+        lambda1=3e-5,
         tracker=tracker,
         device=device,
     )
@@ -169,7 +170,7 @@ def learn_parity(n_vars: int):
     path = gen_dataset_from_func(target_func, n_datapoints=int(2**n))
     train_dl = DataLoader(FileDataset(path))
     valid_dl = DataLoader(FileDataset(path))
-    epochs = 350
+    epochs = 600
     ans = train_rules(train_dl, valid_dl, model, epochs, vars)
     bg = ans["bool_graph"]
     vars = ans["vars"]
@@ -203,6 +204,10 @@ def learn_parity(n_vars: int):
     ax.set_ylabel("BG Accuracy")
     plt.legend()
     plt.show()
+
+
+def nn_to_rule_set(model: nn.Sequential) -> BooleanGraph:
+    
 
 
 if __name__ == "__main__":
