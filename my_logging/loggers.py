@@ -235,5 +235,6 @@ class SaveModel(Logger):
     def save_model(self, curr_model_path):
         try:
             torch.save(self.t.model, curr_model_path)
+            print(f"Successfully saved model to {curr_model_path}")
         except Exception as inst:
             print(f"Could not save model to {curr_model_path}: {inst}")

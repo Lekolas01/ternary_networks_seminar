@@ -1,11 +1,12 @@
+import random
+
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 import torch
 import torch.nn as nn
-from torch.utils.data.dataloader import DataLoader
 from torch.types import Device
-import random
-import matplotlib.pyplot as plt
-import seaborn as sns
+from torch.utils.data.dataloader import DataLoader
 
 
 def plot_nn_dist(model: nn.Sequential):
@@ -74,4 +75,5 @@ def set_seed(seed: int | None) -> int:
     else:
         torch.manual_seed(seed)
     random.seed(seed)
+    np.random.seed(seed)
     return seed

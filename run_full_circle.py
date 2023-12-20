@@ -1,8 +1,9 @@
-from bool_formula import Constant, Literal, NOT, AND, OR, all_interpretations, overlap
 import torch.nn as nn
-from datasets import FileDataset
-from nn_to_bool_formula import gen_dataset_from_func, train_rules
 from torch.utils.data import DataLoader
+
+from bool_formula import AND, NOT, OR, Constant, Literal, all_interpretations, overlap
+from datasets import FileDataset
+from nn_to_rule_set import gen_dataset_from_func, train_nn
 
 
 def test_binaryFunctions(self):
@@ -29,7 +30,7 @@ def test_binaryFunctions(self):
         )
         path = gen_dataset_from_func(target_func, n_datapoints=20)
         dl = DataLoader(FileDataset(path))
-        ans = train_rules(dl, dl, model, 50, target_func.all_literals())
+        ans = train_nn(dl, dl, model, 50, target_func.all_literals())
         found = ans["bool_graph"]
         assert (
             target_func == found

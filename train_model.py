@@ -1,12 +1,14 @@
+from typing import Optional
+
 import torch
+import torch.nn as nn
 from torch.nn import Module
-from torch.utils.data.dataloader import DataLoader
-from torch.types import Device
 from torch.optim import Optimizer
 from torch.optim.lr_scheduler import MultiStepLR
+from torch.types import Device
+from torch.utils.data.dataloader import DataLoader
+
 from my_logging.loggers import Tracker
-from typing import Optional
-import torch.nn as nn
 
 
 def train(
@@ -31,9 +33,9 @@ def train(
         y = y.to(device)
         optim.zero_grad()
         y_hat = model(X)
-        # we don't regularize bias
         loss = loss_fn(y_hat, y.float())
         if lambda1 != 0:
+            # don't regularize bias
             all_linear1_params = torch.cat(
                 [x.view(-1) for x in model.parameters() if x.dim() == 2]
             )

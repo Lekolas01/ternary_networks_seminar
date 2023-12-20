@@ -1,9 +1,8 @@
+import copy
 from enum import Enum
 from typing import Optional, Self
-import copy
 
 import numpy as np
-
 import torch
 import torch.nn as nn
 
@@ -26,11 +25,11 @@ class Neuron:
         self.name = name
         self.neurons_in = neurons_in
         self.bias = bias
-        self.activation_in = activation_in
+        self.activation = activation_in
 
     def __str__(self) -> str:
         right_term = ""
-        act_str = "sig" if self.activation_in == Act.SIGMOID else "tanh"
+        act_str = "sig" if self.activation == Act.SIGMOID else "tanh"
 
         if len(self.neurons_in) >= 1:
             neuron, weight = self.neurons_in[0]
@@ -101,7 +100,7 @@ class Neuron:
         for idx, (neuron_in, weight) in enumerate(self.neurons_in):
             if (
                 not isinstance(neuron_in, InputNeuron)
-                and neuron_in.activation_in == Act.TANH
+                and neuron_in.activation == Act.TANH
             ):
                 # a = -1
                 self.bias -= weight
@@ -138,9 +137,7 @@ class InputNeuron(Neuron):
 
 
 class NeuronGraph:
-    def __init__(
-        self, vars: Optional[list[str]] = None, net: Optional[nn.Sequential] = None
-    ):
+    def __init__(self, vars: Optional[list[str]], net: Optional[nn.Sequential] = None):
         self.new_neuron_idx = 1  # for naming new neurons
         self.neurons: list[Neuron] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
@@ -165,7 +162,8 @@ class NeuronGraph:
 
         # create a neuron for each of the input nodes in the first layer
         for idx, name in enumerate(self.input_vars):
-            self.add(InputNeuron(name))
+            new_input_neuron = InputNeuron(name)
+            self.add(new_input_neuron)
 
         ll_start, ll_end = 0, len(self.neurons)
         curr_act = Act.SIGMOID

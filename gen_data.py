@@ -1,11 +1,13 @@
-import numpy as np
-from pathlib import Path
 import os
-from bool_formula import Bool, Interpretation, AND, NOT, Literal
-import pandas as pd
-from typing import Optional
 import random
 from collections.abc import Collection
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+
+from bool_formula import AND, NOT, Bool, Interpretation, Literal
 
 
 def random_interpretation(literals: Collection[str]) -> Interpretation:
@@ -13,7 +15,7 @@ def random_interpretation(literals: Collection[str]) -> Interpretation:
     return {l: random.random() >= 0.5 for l in literals}
 
 
-def generate_data(
+def gen_data(
     func: Bool, n_samples: int, vars: Optional[list[str]] = None, seed=None
 ) -> pd.DataFrame:
     assert (
@@ -81,4 +83,4 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = os.path.join(dir_path, "data.csv")
     n_rows, n_vars = 100, 2
-    data = generate_data(AND("x1", NOT(Literal("x2"))), 100)
+    data = gen_data(AND("x1", NOT(Literal("x2"))), 100)

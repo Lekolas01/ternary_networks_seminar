@@ -1,7 +1,8 @@
 import unittest
-from neuron import Neuron, InputNeuron, NeuronGraph
-from bool_formula import Constant, NOT, Literal, AND, OR, Bool
-from nn_to_bool_formula import BooleanGraph
+
+from bool_formula import AND, NOT, OR, Bool, Constant, Literal
+from neuron import InputNeuron, Neuron, NeuronGraph
+from nn_to_rule_set import BooleanGraph
 
 
 class TestToBool(unittest.TestCase):

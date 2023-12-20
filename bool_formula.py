@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import Dict
+
+import copy
 from abc import ABC, abstractmethod
 from collections.abc import Collection
-import copy
-from typing import Callable
+from typing import Callable, Dict
 
 Interpretation = Dict[str, bool]
 
@@ -52,6 +52,9 @@ class Bool(ABC):
             other = Constant(other)
         data = all_interpretations(names)
         return overlap(self, other, data) == 1
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class Constant(Bool):
