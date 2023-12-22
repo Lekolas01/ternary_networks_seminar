@@ -77,3 +77,7 @@ def set_seed(seed: int | None) -> int:
     random.seed(seed)
     np.random.seed(seed)
     return seed
+
+
+def flatten(l: list[list]) -> list:
+    return [x for row in l for x in row]

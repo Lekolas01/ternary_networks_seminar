@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
+from sklearn.neighbors import KernelDensity
 from torch.utils.data import DataLoader
 
 from bool_formula import Bool, Interpretation
@@ -35,7 +36,7 @@ class BooleanGraph(Bool):
             self.bools.append(n_bool)
             if not isinstance(neuron, InputNeuron):
                 pass
-                # plot_neuron_dist(neuron)
+                plot_neuron_dist(neuron)
             else:
                 self.input_neurons.add(neuron)
 
@@ -166,17 +167,18 @@ def nn_to_rule_set(model_path: Path, data_path: Path) -> BooleanGraph:
     return bool_graph
 
 
-def main(nn_model_path: Path, data_path: Path):
+def main():
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
     # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
-    fid, rules_acc = fidelity(vars, model, rules, df)
-    nn_acc = acc(model, train_dl, torch.device("cpu"))
-    print(f"{nn_acc = }")
-    print(f"{fid = }")
-    print(f"{rules_acc = }")
+    # fid, rules_acc = fidelity(vars, model, rules, df)
+    # nn_acc = acc(model, train_dl, torch.device("cpu"))
+    # print(f"{nn_acc = }")
+    # print(f"{fid = }")
+    # print(f"{rules_acc = }")
+    pass
 
 
 if __name__ == "__main__":
-    pass
+    main()

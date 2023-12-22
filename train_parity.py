@@ -74,7 +74,7 @@ def train_parity(n: int, path: Path, epochs: int, l1: float):
 
 
 def main():
-    n_vars = 8
+    n_vars = 3
     epochs = 2000
     l1 = 1e-4
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}.pth"
@@ -112,7 +112,6 @@ def main():
     print(f"{nn_acc = }")
     print(f"{fid = }")
     print(f"{rules_acc = }")
-    print(f"{seed = }")
 
 
 if __name__ == "__main__":
