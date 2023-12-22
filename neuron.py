@@ -1,29 +1,28 @@
-import copy
-from abc import ABC
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from enum import Enum
-from typing import Any, Optional, Self
+from typing import Optional, Self
 
 import numpy as np
-import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from ckmeans_1d_dp import ckmeans
 
-from bool_formula import AND, NOT, OR, Bool, Constant, Interpretation, Literal
+from bool_formula import AND, NOT, OR, Bool, Constant, Literal
+from node import Key, Node, NodeGraph, Val
 
 
-class Act(Enum):
+class Activation(Enum):
     SIGMOID = 1
     TANH = 2
 
 
-class Neuron:
+class Neuron2:
     def __init__(
         self,
         name: str,
         neurons_in: list[tuple[Self, float]] = [],
         bias: float = 0.0,
-        activation_in: Act = Act.SIGMOID,
+        activation_in: Activation = Activation.SIGMOID,
     ) -> None:
         self.name = name
         self.neurons_in = neurons_in
@@ -32,7 +31,7 @@ class Neuron:
 
     def __str__(self) -> str:
         right_term = ""
-        act_str = "sig" if self.activation == Act.SIGMOID else "tanh"
+        act_str = "sig" if self.activation == Activation.SIGMOID else "tanh"
 
         if len(self.neurons_in) >= 1:
             neuron, weight = self.neurons_in[0]
@@ -103,7 +102,7 @@ class Neuron:
         for idx, (neuron_in, weight) in enumerate(self.neurons_in):
             if (
                 not isinstance(neuron_in, InputNeuron)
-                and neuron_in.activation == Act.TANH
+                and neuron_in.activation == Activation.TANH
             ):
                 # a = -1
                 self.bias -= weight
@@ -131,7 +130,7 @@ class Neuron:
 class QuantizedNeuron:
     """Intermediate step between full-precision neurons and booleans as nodes. it contains both you should wrap this around, this sould not stay like this..."""
 
-    def __init__(self, neuron: Neuron, x: np.ndarray) -> None:
+    def __init__(self, neuron: Neuron2, x: np.ndarray) -> None:
         self.neuron = neuron
         self.input_dist = x
         y = np.tanh(x)
@@ -145,7 +144,7 @@ class QuantizedNeuron:
         x_thrs = np.arctanh(y_thrs)
 
 
-class InputNeuron(Neuron):
+class InputNeuron(Neuron2):
     def __init__(self, name: str) -> None:
         self.name = name
 
@@ -156,10 +155,10 @@ class InputNeuron(Neuron):
         return f'InputNeuron("{self.name}")'
 
 
-class NeuronGraph:
+class NeuronGraph2:
     def __init__(self, vars: Optional[list[str]], net: Optional[nn.Sequential] = None):
         self.new_neuron_idx = 1  # for naming new neurons
-        self.neurons: list[Neuron] = []  # collection of all neurons added to Network
+        self.neurons: list[Neuron2] = []  # collection of all neurons added to Network
         self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
         if net:
             assert vars is not None
@@ -186,14 +185,14 @@ class NeuronGraph:
             self.add(new_input_neuron)
 
         ll_start, ll_end = 0, len(self.neurons)
-        curr_act = Act.SIGMOID
+        curr_act = Activation.SIGMOID
         for idx, layer in enumerate(net):
             if isinstance(layer, nn.Linear):
                 next_layer = net[idx + 1]
                 if isinstance(next_layer, nn.Sigmoid):
-                    curr_act = Act.SIGMOID
+                    curr_act = Activation.SIGMOID
                 elif isinstance(next_layer, nn.Tanh):
-                    curr_act = Act.TANH
+                    curr_act = Activation.TANH
 
                 shape_out, shape_in = layer.weight.shape
                 weight = layer.weight.tolist()
@@ -202,7 +201,7 @@ class NeuronGraph:
                 for idx in range(shape_out):
                     neurons_in = list(zip(self.neurons[ll_start:ll_end], weight[idx]))
                     name = self._new_name()
-                    neuron = Neuron(
+                    neuron = Neuron2(
                         name,
                         neurons_in=neurons_in,
                         bias=bias[idx],
@@ -214,12 +213,12 @@ class NeuronGraph:
         # rename the last variable, so it is distinguishable from the rest
         self.rename(self.target(), "target")
 
-    def add(self, neuron: Neuron):
+    def add(self, neuron: Neuron2):
         assert neuron.name not in self.neuron_names
         self.neurons.append(neuron)
         self.neuron_names.add(neuron.name)
 
-    def rename(self, neuron: Neuron, new_name: str):
+    def rename(self, neuron: Neuron2, new_name: str):
         assert neuron in self.neurons
         assert new_name not in self.neuron_names
         neuron.name = new_name
@@ -229,5 +228,39 @@ class NeuronGraph:
             self.new_neuron_idx += 1
         return f"h{self.new_neuron_idx}"
 
-    def target(self) -> Neuron:
+    def target(self) -> Neuron2:
         return self.neurons[-1]
+
+
+class Neuron(Node[Key, float]):
+    """Full-precision neuron."""
+
+    def __init__(
+        self, name: Key, act: Activation, ins: Mapping[Key, float], bias: float
+    ) -> None:
+        super().__init__(name, ins.keys())
+        self.act = act
+        self.in_neurons = ins
+        self.bias = bias
+
+    def __call__(self, var_setting: Mapping[Key, float]) -> float:
+        ans = self.bias + sum(
+            var_setting[n_key] * self.in_neurons[n_key] for n_key in self.in_neurons
+        )
+        return np.tanh(ans) if self.act == Activation.TANH else 1 / (1 + np.exp(-ans))
+
+
+class NeuronGraph(NodeGraph[Key, float]):
+    def __init__(self, nodes: Sequence[Node[Key, float]]) -> None:
+        super().__init__(nodes)
+
+
+def main():
+    n1 = Neuron("n1", Activation.TANH, {"a1": 1.2, "a2": 2.4}, 3.5)
+    n2 = Neuron("n2", Activation.TANH, {"n1": 2.0}, 0.0)
+    neuron_graph = NeuronGraph([n1, n2])
+    print(neuron_graph({"a1": 0, "a2": 1.0}))
+
+
+if __name__ == "__main__":
+    main()

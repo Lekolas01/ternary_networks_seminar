@@ -13,14 +13,14 @@ from torch.utils.data import DataLoader
 from bool_formula import Bool, Interpretation
 from datasets import FileDataset
 from graphics import plot_neuron_dist
-from neuron import InputNeuron, Neuron, NeuronGraph
+from neuron import InputNeuron, Neuron2, NeuronGraph2
 
 
 class BooleanGraph(Bool):
-    def __init__(self, ng: NeuronGraph) -> None:
+    def __init__(self, ng: NeuronGraph2) -> None:
         super().__init__()
         self.ng = ng
-        self.neurons: list[Neuron] = []
+        self.neurons: list[Neuron2] = []
         self.neuron_names: list[str] = []
         self.bools: list[Bool] = []
         self.input_neurons = set()
@@ -159,7 +159,7 @@ def nn_to_rule_set(model_path: Path, data_path: Path) -> BooleanGraph:
 
     vars = list(df.columns[:-1])
     # transform the trained neural network to a directed graph of perceptrons
-    neuron_graph = NeuronGraph(vars, model)
+    neuron_graph = NeuronGraph2(vars, model)
     # transform the neuron graph to a boolean function
     bool_graph = BooleanGraph(neuron_graph)
     return bool_graph

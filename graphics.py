@@ -7,7 +7,7 @@ from ckmeans_1d_dp import ckmeans
 from matplotlib import pyplot as plt
 from sklearn.neighbors import KernelDensity
 
-from neuron import Act, InputNeuron, Neuron
+from neuron import Activation, InputNeuron, Neuron2
 from utilities import flatten, set_seed
 
 sns.set()
@@ -32,7 +32,7 @@ def possible_sums(vals: Sequence[float]) -> np.ndarray:
     return ans
 
 
-def plot_neuron_dist(neuron: Neuron) -> None:
+def plot_neuron_dist(neuron: Neuron2) -> None:
     sums = possible_sums([val for _, val in neuron.neurons_in]) + neuron.bias
     neuron.activation
     fig, axes = plt.subplots(
@@ -90,15 +90,18 @@ def main():
     rand_vals = np.random.normal(loc=loc, scale=scale, size=n)
     print(rand_vals)
 
-    neuron = Neuron(
-        "y", [(InputNeuron(f"x{i + 1}"), rand_vals[i]) for i in range(n)], 0.0, Act.TANH
+    neuron = Neuron2(
+        "y",
+        [(InputNeuron(f"x{i + 1}"), rand_vals[i]) for i in range(n)],
+        0.0,
+        Activation.TANH,
     )
     vals = [-1.55, -1.54, 1.6]
-    neuron2 = Neuron(
+    neuron2 = Neuron2(
         "y2",
         [(InputNeuron(f"x{i + 1}"), val) for i, val in enumerate(vals)],
         0.86,
-        Act.TANH,
+        Activation.TANH,
     )
     plot_neuron_dist(neuron2)
 
