@@ -1,12 +1,15 @@
 import copy
+from abc import ABC
+from collections.abc import Sequence
 from enum import Enum
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 import numpy as np
 import torch
 import torch.nn as nn
+from ckmeans_1d_dp import ckmeans
 
-from bool_formula import AND, NOT, OR, Bool, Constant, Literal
+from bool_formula import AND, NOT, OR, Bool, Constant, Interpretation, Literal
 
 
 class Act(Enum):
@@ -123,6 +126,23 @@ class Neuron:
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
         return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
+
+
+class QuantizedNeuron:
+    """Intermediate step between full-precision neurons and booleans as nodes. it contains both you should wrap this around, this sould not stay like this..."""
+
+    def __init__(self, neuron: Neuron, x: np.ndarray) -> None:
+        self.neuron = neuron
+        self.input_dist = x
+        y = np.tanh(x)
+        ans = ckmeans(np.tanh(x), k=(1, 2))
+        assert all(
+            ans.cluster[i] <= ans.cluster[i + 1] for i in range(len(ans.cluster) - 1)
+        ), "clusters must be sorted by their mean."
+        y_means = np.array([c for c in ans.centers if c != 0])
+
+        y_thrs = (y_means[:-1] + y_means[1:]) / 2
+        x_thrs = np.arctanh(y_thrs)
 
 
 class InputNeuron(Neuron):

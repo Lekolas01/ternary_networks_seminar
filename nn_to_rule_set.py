@@ -8,14 +8,12 @@ import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-from sklearn.neighbors import KernelDensity
 from torch.utils.data import DataLoader
 
 from bool_formula import Bool, Interpretation
 from datasets import FileDataset
 from graphics import plot_neuron_dist
 from neuron import InputNeuron, Neuron, NeuronGraph
-from utilities import acc
 
 
 class BooleanGraph(Bool):

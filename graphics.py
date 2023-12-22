@@ -44,8 +44,6 @@ def plot_neuron_dist(neuron: Neuron) -> None:
     y = np.tanh(x)
     sns.lineplot(ax=axes[0, 0], x=x, y=y, color="r", linewidth=1.0)
     sns.scatterplot(ax=axes[0, 0], x=sums, y=np.tanh(sums), c="black", marker="X", s=50)
-    # sns.histplot(sums, bins=12)
-    # sns.lineplot(ax=axes[0, 0], x=x, y=y)
     fig.suptitle(f"{str(neuron)}")
     axes[0, 0].set_xlabel("s(x)")
     axes[0, 0].set_ylabel("tanh(s(x))")
@@ -59,6 +57,9 @@ def plot_neuron_dist(neuron: Neuron) -> None:
     assert all(
         clusters[i] <= clusters[i + 1] for i in range(len(clusters) - 1)
     ), "clusters must be sorted by their mean."
+    cl_min_max: list[tuple[float, float]] = []
+    for cl in clusters:
+        cl_min_max.append((1, 1))
 
     centers = np.array([c for c in ans.centers if c != 0])
     y_thrs = (centers[:-1] + centers[1:]) / 2
