@@ -41,7 +41,7 @@ class NodeGraph(ABC, Generic[Key, Val]):
         assert len(output_names) == 1, "Only one output node may exist."
         self.out_name = output_names[0]
 
-        # introduce topological order of the nodes
+        # order nodes in order of execution
         d = {key: self.nodes[key].ins for key in self.names}
         sorter = TopologicalSorter(d)
         order = sorter.static_order()
@@ -53,6 +53,13 @@ class NodeGraph(ABC, Generic[Key, Val]):
             node = self.nodes[name]
             var_setting[name] = node(var_setting)
         return var_setting[self.out_name]
+
+    def __str__(self) -> str:
+        return (
+            "Graph[\n\t"
+            + "\n\t".join(str(self.nodes[name]) for name in self.names)
+            + "\n]"
+        )
 
     def topological_order(self) -> Iterable[Key]:
         return self.names

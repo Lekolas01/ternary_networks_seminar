@@ -1,13 +1,15 @@
 from collections.abc import Mapping, Sequence
 from enum import Enum
-from typing import Optional, Self
+from typing import AbstractSet, Optional, Self
 
 import numpy as np
+import pandas as pd
 import torch.nn as nn
 import torch.nn.functional as F
 from ckmeans_1d_dp import ckmeans
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
+from graphics import possible_sums
 from node import Key, Node, NodeGraph, Val
 
 
@@ -127,7 +129,7 @@ class Neuron2:
         return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
 
 
-class QuantizedNeuron:
+class QuantizedNeuron2:
     """Intermediate step between full-precision neurons and booleans as nodes. it contains both you should wrap this around, this sould not stay like this..."""
 
     def __init__(self, neuron: Neuron2, x: np.ndarray) -> None:
@@ -250,16 +252,23 @@ class Neuron(Node[Key, float]):
         return np.tanh(ans) if self.act == Activation.TANH else 1 / (1 + np.exp(-ans))
 
 
-class NeuronGraph(NodeGraph[Key, float]):
-    def __init__(self, nodes: Sequence[Node[Key, float]]) -> None:
-        super().__init__(nodes)
+class QuantizedNeuron(Neuron[Key]):
+    """Quantized neuron."""
+
+    def __init__(self, n: Neuron[Key], data: pd.DataFrame) -> None:
+        super.__init__(n.name, n.act, n.in_neurons, n.bias)
+        self.neuron = n
+
+    def __call__(self, var_setting: Mapping[Key, float]) -> float:
+        pass
 
 
 def main():
     n1 = Neuron("n1", Activation.TANH, {"a1": 1.2, "a2": 2.4}, 3.5)
     n2 = Neuron("n2", Activation.TANH, {"n1": 2.0}, 0.0)
-    neuron_graph = NeuronGraph([n1, n2])
+    neuron_graph = NodeGraph([n1, n2])
     print(neuron_graph({"a1": 0, "a2": 1.0}))
+    print(neuron_graph)
 
 
 if __name__ == "__main__":
