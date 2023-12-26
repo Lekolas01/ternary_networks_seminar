@@ -1,16 +1,34 @@
 from collections.abc import Mapping, Sequence
 from enum import Enum
-from typing import AbstractSet, Optional, Self
+from itertools import combinations
+from typing import Optional, Self
 
 import numpy as np
-import pandas as pd
 import torch.nn as nn
-import torch.nn.functional as F
 from ckmeans_1d_dp import ckmeans
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from graphics import possible_sums
-from node import Key, Node, NodeGraph, Val
+from graphics import plot_neuron_dist
+from node import Key, Node, NodeGraph
+
+
+def possible_sums(vals: Sequence[float]) -> np.ndarray:
+    """
+    Given n different float values, returns a list of length 2**n, consisting
+    of each value that can be produced as a sum of a subset of values in vals.
+    Comparable to the powerset function, but where the subsets are a sum of their elements instead of a set that includes the elements.
+    """
+    n = len(vals)
+    for i in range(2**n):
+        pass
+    ans = np.empty((2**n))
+    temp = [combinations(range(n), i) for i in range(n + 1)]
+    temp = [val for row in temp for val in row]
+
+    for idx, combination in enumerate(temp):
+        ans[idx] = sum(vals[c] for c in combination)
+    np.ndarray.sort(ans)
+    return ans
 
 
 class Activation(Enum):
@@ -260,12 +278,15 @@ class QuantizedNeuron(Neuron[Key]):
         self.neuron = n
 
     def __call__(self, var_setting: Mapping[Key, float]) -> float:
-        pass
+        return 0.0
 
 
 def main():
     n1 = Neuron("n1", Activation.TANH, {"a1": 1.2, "a2": 2.4}, 3.5)
     n2 = Neuron("n2", Activation.TANH, {"n1": 2.0}, 0.0)
+    in_neurons: dict[str, float] = {"a1": 1.2, "a2": 2.4}
+    data = possible_sums(list(in_neurons.values()))
+    q_n1 = QuantizedNeuron("n3", Activation.TANH, in_neurons, 3.5, data)
     neuron_graph = NodeGraph([n1, n2])
     print(neuron_graph({"a1": 0, "a2": 1.0}))
     print(neuron_graph)

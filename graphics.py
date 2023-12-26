@@ -1,40 +1,16 @@
-from collections.abc import Sequence
-from itertools import combinations
-
 import numpy as np
 import seaborn as sns
 from ckmeans_1d_dp import ckmeans
 from matplotlib import pyplot as plt
-from sklearn.neighbors import KernelDensity
 
-from neuron import Activation, InputNeuron, Neuron2
+from neuron import Activation, InputNeuron, Neuron2, possible_sums
 from utilities import flatten, set_seed
 
 sns.set()
 
 
-def possible_sums(vals: Sequence[float]) -> np.ndarray:
-    """
-    Given n different float values, returns a list of length 2**n, consisting
-    of each value that can be produced as a sum of a subset of values in vals.
-    Comparable to the powerset function, but where the subsets are a sum of their elements instead of a set that includes the elements.
-    """
-    n = len(vals)
-    for i in range(2**n):
-        pass
-    ans = np.empty((2**n))
-    temp = [combinations(range(n), i) for i in range(n + 1)]
-    temp = [val for row in temp for val in row]
-
-    for idx, combination in enumerate(temp):
-        ans[idx] = sum(vals[c] for c in combination)
-    np.ndarray.sort(ans)
-    return ans
-
-
 def plot_neuron_dist(neuron: Neuron2) -> None:
     sums = possible_sums([val for _, val in neuron.neurons_in]) + neuron.bias
-    neuron.activation
     fig, axes = plt.subplots(
         nrows=2, ncols=2, sharex=False, sharey=True, figsize=(10, 8)
     )
