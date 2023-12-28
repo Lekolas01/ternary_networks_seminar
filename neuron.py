@@ -272,15 +272,13 @@ class Neuron(Node[Key, float]):
         else:
             return np.exp(x) / (1.0 + np.exp(x))
 
-    def __call__(self, var_setting: Mapping[Key, float]) -> float:
-        ans = self.bias + sum(
-            var_setting[n_key] * self.ins[n_key] for n_key in self.ins
-        )
+    def __call__(self, vars: Mapping[Key, float]) -> float:
+        ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
         return np.tanh(ans) if self.act == Activation.TANH else self.sigmoid(ans)
 
 
 class QuantizedNeuron(Neuron[Key]):
-    """A neuron that was quantized to a step function with 0-1 steps."""
+    """A neuron that was quantized to a step function with either 0 or 1 steps."""
 
     def __init__(self, n: Neuron[Key], data_x: Collection[float]) -> None:
         super().__init__(n.key, n.act, n.ins, n.bias)
@@ -302,14 +300,22 @@ class QuantizedNeuron(Neuron[Key]):
         self.y_thrs = (self.y_centers[:-1] + self.y_centers[1:]) / 2
         self.x_thrs = np.arctanh(self.y_thrs)
 
-    def __call__(self, var_setting: Mapping[Key, float]) -> float:
-        ans = self.bias + sum(
-            var_setting[n_key] * self.ins[n_key] for n_key in self.ins
-        )
+    def __call__(self, vars: Mapping[Key, float]) -> float:
+        ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
         for idx, x_thr in enumerate(self.x_thrs):
             if x_thr > ans:
                 return self.y_centers[idx]
         return self.y_centers[-1]
+
+
+class BooleanNeuron(Node[Key, bool]):
+    def __init__(self, key: Key) -> None:
+        super().__init__(
+            key,
+        )
+
+    def __call__(self, vars: Mapping[Key, bool]) -> bool:
+        return False
 
 
 def to_neurons(net: nn.Sequential, vars: list[str]) -> list[Neuron[str]]:
@@ -359,7 +365,7 @@ def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
 def main():
     keys = ["a1", "a2", "a3"]
     in_neurons: dict[str, float] = {"a1": -1.55, "a2": -1.54, "a3": 1.6}
-    bias = 0.86
+    bias = -0.86
     n1 = Neuron("n1", Activation.TANH, in_neurons, bias)
 
     q_n1 = QuantizedNeuron(n1, in_neurons.values())

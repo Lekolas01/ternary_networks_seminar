@@ -18,7 +18,7 @@ class Node(ABC, Generic[Key, Val]):
         self.ins = ins
 
     @abstractmethod
-    def __call__(self, var_setting: Mapping[Key, Val]) -> Val:
+    def __call__(self, vars: Mapping[Key, Val]) -> Val:
         pass
 
     def __repr__(self) -> str:
@@ -53,12 +53,12 @@ class NodeGraph(ABC, Generic[Key, Val]):
         order = sorter.static_order()
         self.keys = [key for key in order if key not in self.input_vars]
 
-    def __call__(self, var_setting: MutableMapping[Key, Val]) -> Val:
-        var_setting = copy.copy(var_setting)
+    def __call__(self, vars: MutableMapping[Key, Val]) -> Val:
+        vars = copy.copy(vars)
         for name in self.keys:
             node = self.nodes[name]
-            var_setting[name] = node(var_setting)
-        return var_setting[self.out_key]
+            vars[name] = node(vars)
+        return vars[self.out_key]
 
     def __str__(self) -> str:
         return (
