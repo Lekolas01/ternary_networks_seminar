@@ -1,11 +1,36 @@
 import unittest
+from math import isclose
+
+import torch
+import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from neuron import InputNeuron, Neuron2, NeuronGraph2
+from neuron import InputNeuron, Neuron2, NeuronGraph2, to_neurons, to_vars
 from nn_to_rule_set import BooleanGraph
+from node import NodeGraph
 
 
 class TestToBool(unittest.TestCase):
+    def test_NeuronGraphs(self):
+        n = 5
+        keys = [f"a{i + 1}" for i in range(n)]
+        model = nn.Sequential(
+            nn.Linear(n, n + 1),
+            nn.Tanh(),
+            nn.Linear(n + 1, n - 1),
+            nn.Tanh(),
+            nn.Linear(n - 1, 1),
+            nn.Sigmoid(),
+            nn.Flatten(0),
+        ).train()
+        neurons = to_neurons(model, keys)
+        neuron_graph = NodeGraph(neurons)
+        random_x = torch.rand(n)
+        random_input_vars = to_vars(random_x, keys)
+        assert isclose(
+            model(random_x).float(), neuron_graph(random_input_vars), rel_tol=1e-7
+        )
+
     def test_True(self):
         x1 = Neuron2("x1")
         x2 = Neuron2("x2")

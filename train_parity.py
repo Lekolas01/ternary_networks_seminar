@@ -61,8 +61,7 @@ def train_parity(n: int, path: Path, epochs: int, l1: float):
     data_path = path / "data.csv"
 
     # generate a dataset, given a logical function
-    vars = [f"x{i + 1}" for i in range(n)]  # create variable names
-    data = gen_data(target_func, max(1024, int(2**n)), vars)
+    data = gen_data(target_func, n=max(1024, int(2**n)))
     # save it in a throwaway folder
     if not os.path.exists(path):
         os.makedirs(path)
@@ -74,13 +73,13 @@ def train_parity(n: int, path: Path, epochs: int, l1: float):
 
 
 def main():
-    n_vars = 3
+    n_vars = 8
     epochs = 2000
-    l1 = 1e-4
-    name = f"parity_{n_vars}_l{l1}_epoch{epochs}.pth"
+    l1 = 5e-5
+    name = f"parity_{n_vars}_l{l1}_epoch{epochs}"
     path = Path("runs")
-    model_path = path / name
-    data_path = path / "data.csv"
+    data_path = path / (name + ".csv")
+    model_path = path / (name + ".pth")
 
     if not os.path.exists(model_path):
         seed = set_seed(0)

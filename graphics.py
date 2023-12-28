@@ -10,7 +10,7 @@ sns.set()
 
 
 def plot_neuron_dist(neuron: Neuron2) -> None:
-    sums = possible_sums([val for _, val in neuron.neurons_in]) + neuron.bias
+    sums = np.array(possible_sums([val for _, val in neuron.neurons_in])) + neuron.bias
     fig, axes = plt.subplots(
         nrows=2, ncols=2, sharex=False, sharey=True, figsize=(10, 8)
     )
@@ -44,9 +44,6 @@ def plot_neuron_dist(neuron: Neuron2) -> None:
     x_vals = [x_min] + flatten([[t - eps, t + eps] for t in x_thrs]) + [x_max]
     y_vals = [y_val for y_val in centers for i in range(2)]
 
-    print(f"{centers = }")
-    # p rint(f"{x_thrs = }")
-    # p rint(f"{y_thrs = }")
     if len(centers) == 1:
         print(f"constant function at neuron {neuron}.")
     sns.lineplot(ax=axes[1, 1], x=x_vals, y=y_vals)

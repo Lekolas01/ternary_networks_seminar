@@ -14,6 +14,7 @@ from bool_formula import Bool, Interpretation
 from datasets import FileDataset
 from graphics import plot_neuron_dist
 from neuron import InputNeuron, Neuron2, NeuronGraph2
+from node import NodeGraph
 
 
 class BooleanGraph(Bool):

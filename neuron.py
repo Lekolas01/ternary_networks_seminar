@@ -1,34 +1,37 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Generator, Iterable, Mapping, Sequence
+from copy import copy
 from enum import Enum
-from itertools import combinations
-from typing import Optional, Self
+from itertools import chain, combinations
+from math import isclose
+from typing import AbstractSet, Dict, Optional, Self, TypeVar
 
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
+from urllib3 import encode_multipart_formdata
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from graphics import plot_neuron_dist
 from node import Key, Node, NodeGraph
 
+sns.set()
 
-def possible_sums(vals: Sequence[float]) -> np.ndarray:
+Val = TypeVar("Val")
+
+
+def powerset(it: Iterable[Val]) -> Iterable[Iterable[Val]]:
+    s = list(it)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+
+def possible_sums(vals: Collection[float]) -> Collection[float]:
     """
     Given n different float values, returns a list of length 2**n, consisting
     of each value that can be produced as a sum of a subset of values in vals.
-    Comparable to the powerset function, but where the subsets are a sum of their elements instead of a set that includes the elements.
     """
-    n = len(vals)
-    for i in range(2**n):
-        pass
-    ans = np.empty((2**n))
-    temp = [combinations(range(n), i) for i in range(n + 1)]
-    temp = [val for row in temp for val in row]
-
-    for idx, combination in enumerate(temp):
-        ans[idx] = sum(vals[c] for c in combination)
-    np.ndarray.sort(ans)
-    return ans
+    return [sum(subset) for subset in powerset(vals)]
 
 
 class Activation(Enum):
@@ -148,7 +151,7 @@ class Neuron2:
 
 
 class QuantizedNeuron2:
-    """Intermediate step between full-precision neurons and booleans as nodes. it contains both you should wrap this around, this sould not stay like this..."""
+    """Intermediate step between full-precision neurons and booleans as nodes."""
 
     def __init__(self, neuron: Neuron2, x: np.ndarray) -> None:
         self.neuron = neuron
@@ -253,43 +256,146 @@ class NeuronGraph2:
 
 
 class Neuron(Node[Key, float]):
-    """Full-precision neuron."""
+    """A full-precision neuron."""
 
     def __init__(
         self, name: Key, act: Activation, ins: Mapping[Key, float], bias: float
     ) -> None:
         super().__init__(name, ins.keys())
         self.act = act
-        self.in_neurons = ins
+        self.ins = ins
         self.bias = bias
+
+    def sigmoid(self, x: float) -> float:
+        if x >= 0:
+            return 1.0 / (1.0 + np.exp(-x))
+        else:
+            return np.exp(x) / (1.0 + np.exp(x))
 
     def __call__(self, var_setting: Mapping[Key, float]) -> float:
         ans = self.bias + sum(
-            var_setting[n_key] * self.in_neurons[n_key] for n_key in self.in_neurons
+            var_setting[n_key] * self.ins[n_key] for n_key in self.ins
         )
-        return np.tanh(ans) if self.act == Activation.TANH else 1 / (1 + np.exp(-ans))
+        return np.tanh(ans) if self.act == Activation.TANH else self.sigmoid(ans)
 
 
 class QuantizedNeuron(Neuron[Key]):
-    """Quantized neuron."""
+    """A neuron that was quantized to a step function with 0-1 steps."""
 
-    def __init__(self, n: Neuron[Key], data: pd.DataFrame) -> None:
-        super.__init__(n.name, n.act, n.in_neurons, n.bias)
+    def __init__(self, n: Neuron[Key], data_x: Collection[float]) -> None:
+        super().__init__(n.key, n.act, n.ins, n.bias)
+
+        data_x = possible_sums(data_x)
+        data_x = np.fromiter(data_x, dtype=float)
+        data_x.sort()
+        data_x += self.bias
+
         self.neuron = n
+        data_y = np.tanh(data_x)
+        ans = ckmeans(data_y, (1, 2))
+        print(f"{data_x = }")
+        print(f"{data_y = }")
+        cluster = ans.cluster
+        n_cluster = len(np.unique(cluster))
+        self.y_centers = np.array([ans.centers[i] for i in range(n_cluster)])
+        self.x_centers = np.arctanh(self.y_centers)
+        self.y_thrs = (self.y_centers[:-1] + self.y_centers[1:]) / 2
+        self.x_thrs = np.arctanh(self.y_thrs)
 
     def __call__(self, var_setting: Mapping[Key, float]) -> float:
-        return 0.0
+        ans = self.bias + sum(
+            var_setting[n_key] * self.ins[n_key] for n_key in self.ins
+        )
+        for idx, x_thr in enumerate(self.x_thrs):
+            if x_thr > ans:
+                return self.y_centers[idx]
+        return self.y_centers[-1]
+
+
+def to_neurons(net: nn.Sequential, vars: list[str]) -> list[Neuron[str]]:
+    def name_generator():
+        idx = 0
+        while True:
+            idx += 1
+            yield f"h{idx}"
+
+    name_gen = name_generator()
+    ans: list[Neuron[str]] = []
+    names = copy(vars)
+    shape_out, shape_in = net[0].weight.shape
+    assert (
+        len(vars) == shape_in
+    ), f"vars needs same shape as first layer input, but got: {len(vars)} != {shape_in}."
+    n_layers = len(net)
+    if isinstance(net[-1], nn.Flatten):
+        n_layers -= 1  # ignore the last layer if it's a Flatten layer.
+    for idx in range(0, n_layers, 2):
+        lin_layer = net[idx]
+        act_layer = net[idx + 1]
+        assert isinstance(lin_layer, nn.Linear)
+        assert isinstance(act_layer, nn.Sigmoid) or isinstance(act_layer, nn.Tanh)
+        act = (
+            Activation.SIGMOID if isinstance(act_layer, nn.Sigmoid) else Activation.TANH
+        )
+        shape_out, shape_in = lin_layer.weight.shape
+        weight = lin_layer.weight.tolist()
+        bias = lin_layer.bias.tolist()
+        in_names = names[-shape_in:]
+        for j in range(shape_out):
+            new_name = next(name_gen)
+            ins = {name: weight[j][i] for i, name in enumerate(in_names)}
+            neuron = Neuron(new_name, act, ins, bias[j])
+            ans.append(neuron)
+            names.append(new_name)
+    return ans
+
+
+def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
+    t_list = t.tolist()
+    assert len(t_list) == len(names)
+    return {names[i]: t_list[i] for i in range(len(t_list))}
 
 
 def main():
-    n1 = Neuron("n1", Activation.TANH, {"a1": 1.2, "a2": 2.4}, 3.5)
-    n2 = Neuron("n2", Activation.TANH, {"n1": 2.0}, 0.0)
-    in_neurons: dict[str, float] = {"a1": 1.2, "a2": 2.4}
-    data = possible_sums(list(in_neurons.values()))
-    q_n1 = QuantizedNeuron("n3", Activation.TANH, in_neurons, 3.5, data)
-    neuron_graph = NodeGraph([n1, n2])
-    print(neuron_graph({"a1": 0, "a2": 1.0}))
-    print(neuron_graph)
+    keys = ["a1", "a2", "a3"]
+    in_neurons: dict[str, float] = {"a1": -1.55, "a2": -1.54, "a3": 1.6}
+    bias = 0.86
+    n1 = Neuron("n1", Activation.TANH, in_neurons, bias)
+
+    q_n1 = QuantizedNeuron(n1, in_neurons.values())
+
+    neuron_graph = NodeGraph([n1])
+    q_neuron_graph = NodeGraph([q_n1])
+    input_vals = {"a1": 1.0, "a2": 1.0, "a3": 0.0}
+    pset = powerset(keys)
+    diffs = []
+    for subset in pset:
+        input_vals = {key: 1.0 if key in subset else 0.0 for key in keys}
+        diff = np.abs(neuron_graph(input_vals) - q_neuron_graph(input_vals))
+        diffs.append(diff)
+    sns.histplot(diffs, bins=12)
+    plt.show()
+
+    n = 5
+    keys = [f"a{i + 1}" for i in range(n)]
+    model = nn.Sequential(
+        nn.Linear(n, n + 1, dtype=torch.float64),
+        nn.Tanh(),
+        nn.Linear(n + 1, n - 1, dtype=torch.float64),
+        nn.Tanh(),
+        nn.Linear(n - 1, 1, dtype=torch.float64),
+        nn.Sigmoid(),
+        nn.Flatten(0),
+    ).train(False)
+    neurons = to_neurons(model, keys)
+    neuron_graph = NodeGraph(neurons)
+    random_x = torch.rand(n, dtype=torch.float64)
+    random_input_vars = to_vars(random_x, keys)
+    print(f"{model(random_x).item() = }")
+    print(f"{neuron_graph(random_input_vars) = }")
+    assert isclose(
+        model(random_x).float(), neuron_graph(random_input_vars), rel_tol=1e-6
+    )
 
 
 if __name__ == "__main__":

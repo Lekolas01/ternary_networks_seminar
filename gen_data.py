@@ -1,40 +1,55 @@
 import os
 import random
-from collections.abc import Collection
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
 
-from bool_formula import AND, NOT, Bool, Interpretation, Literal
+from bool_formula import AND, NOT, Bool, Literal
+from neuron import powerset
 
 
-def random_interpretation(literals: Collection[str]) -> Interpretation:
-    literals = list(literals)
-    return {l: random.random() >= 0.5 for l in literals}
+def gen_data(func: Bool, n: int = 0, seed: int | None = None) -> pd.DataFrame:
+    """Generate data from a boolean/logical function with k variables and save it in a DataFrame.
+    The target variable is saved in the "target" column of the df.
+    The function chooses data points either deterministically or randomly, based on parameter n.
 
+    Parameters
+    ----------
+    func : Bool
+        The target function for which to generate a dataset.
+    n : int | None
+        If n is <= 0, the DataFrame will contain every possible sample from the input space exactly once,
+        i.e. the DataFrame will have exactly 2**n data points.
+        If n is an int >= 1, the DataFrame will contain n data points with each data point sampled
+        randomly from the whole input space.
+    seed: int | None
+        Set the seed for the random sampling. Obviously only relevant if n >= 1.
 
-def gen_data(
-    func: Bool, n_samples: int, vars: Optional[list[str]] = None, seed=None
-) -> pd.DataFrame:
-    assert (
-        isinstance(n_samples, int) and n_samples >= 1
-    ), f"n_rows must be int type and greater than 0."
-    if seed is not None:
-        random.seed(seed)
-    if not vars:
-        vars = list(func.all_literals())
-    columns = vars.copy()
+    Returns
+    -------
+    df : pandas.DataFrame
+        The DataFrame that contains the data, with shape (n, k + 1).
+        The first k columns are named after each variable occuring in func sorted lexicographically,
+        the last column is the "target" column.
+    """
+    vars = sorted(list(func.all_literals()))
     target_col = "target"
-    columns.append(target_col)
-    df = pd.DataFrame(columns=columns)
-    # for every sample, pick a random interpretation,
-    # calculate the value and add that row to the DataFrame
-    for _ in range(n_samples):
-        interpretation = random_interpretation(vars)
-        interpretation[target_col] = func(interpretation)
-        df.loc[len(df)] = interpretation  # type: ignore
+    df = pd.DataFrame(columns=vars + [target_col])
+
+    if n <= 0:
+        # generate a data point for each possible point in the input space
+        for subset in powerset(vars):
+            interpretation = {l: True if l in subset else False for l in vars}
+            interpretation[target_col] = func(interpretation)
+            df.loc[len(df)] = interpretation  # type: ignore
+    elif n >= 1:
+        # generate n randomly selected data points from the input space
+        random.seed(seed)
+        for _ in range(n):
+            interpretation = {l: random.random() >= 0.5 for l in vars}
+            interpretation[target_col] = func(interpretation)
+            df.loc[len(df)] = interpretation  # type: ignore
     return df.astype(int)
 
 
