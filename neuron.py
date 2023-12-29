@@ -309,10 +309,8 @@ class QuantizedNeuron(Neuron[Key]):
 
 
 class BooleanNeuron(Node[Key, bool]):
-    def __init__(self, key: Key) -> None:
-        super().__init__(
-            key,
-        )
+    def __init__(self, q_neuron: QuantizedNeuron[Key]) -> None:
+        super().__init__(q_neuron.key, q_neuron.ins.keys())
 
     def __call__(self, vars: Mapping[Key, bool]) -> bool:
         return False
