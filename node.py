@@ -8,7 +8,7 @@ Val = TypeVar("Val")
 
 
 class Node(ABC, Generic[Val]):
-    def __init__(self, key: str, ins: Collection[str]) -> None:
+    def __init__(self, key: str, ins: Sequence[str]) -> None:
         self.key = key
         self.ins = ins
 
