@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Collection
-from typing import Callable, Dict
+from collections.abc import Collection, Mapping
+from typing import Callable, Dict, TypeVar
 
-Interpretation = Dict[str, bool]
+Key = TypeVar("Key")
+Interpretation = Mapping[Key, bool]
 
 
 def all_interpretations(names: Collection[str]) -> list[Interpretation]:

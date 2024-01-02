@@ -5,9 +5,9 @@ import torch
 import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from neuron import InputNeuron, Neuron2, NeuronGraph2, to_neurons, to_vars
+from neuron import NeuronGraph, to_vars
 from nn_to_rule_set import BooleanGraph
-from node import NodeGraph
+from node import Graph
 
 
 class TestToBool(unittest.TestCase):
@@ -23,8 +23,7 @@ class TestToBool(unittest.TestCase):
             nn.Sigmoid(),
             nn.Flatten(0),
         ).train()
-        neurons = to_neurons(model, keys)
-        neuron_graph = NodeGraph(neurons)
+        neuron_graph = NeuronGraph(model, keys)
         random_x = torch.rand(n)
         random_input_vars = to_vars(random_x, keys)
         assert isclose(
@@ -139,6 +138,24 @@ class TestToBool(unittest.TestCase):
         xor = OR(xor_1, xor_2)
         assert BooleanGraph(neurons) == xor
 
-    def test_tanh(self):
-        # TODO
-        pass
+    def test_random_model(self):
+        n = 5
+        keys = [f"x{i + 1}" for i in range(n)]
+        model = nn.Sequential(
+            nn.Linear(n, n + 1, dtype=torch.float64),
+            nn.Tanh(),
+            nn.Linear(n + 1, n - 1, dtype=torch.float64),
+            nn.Tanh(),
+            nn.Linear(n - 1, 1, dtype=torch.float64),
+            nn.Sigmoid(),
+            nn.Flatten(0),
+        ).train(False)
+        neurons = to_neurons(model, keys)
+        neuron_graph = Graph(neurons)
+        random_x = torch.rand(n, dtype=torch.float64)
+        random_input_vars = to_vars(random_x, keys)
+        print(f"{model(random_x).item() = }")
+        print(f"{neuron_graph(random_input_vars) = }")
+        assert isclose(
+            model(random_x).float(), neuron_graph(random_input_vars), rel_tol=1e-6
+        )

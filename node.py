@@ -1,64 +1,59 @@
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
 from graphlib import TopologicalSorter
 from typing import Dict, Generic, TypeVar
 
 Val = TypeVar("Val")
-Key = TypeVar("Key")
 
 
-class Node(ABC, Generic[Key, Val]):
-    def __init__(
-        self,
-        key: Key,
-        ins: Set[Key] = set(),
-    ) -> None:
+class Node(ABC, Generic[Val]):
+    def __init__(self, key: str, ins: Collection[str]) -> None:
         self.key = key
         self.ins = ins
 
     @abstractmethod
-    def __call__(self, vars: Mapping[Key, Val]) -> Val:
+    def __call__(self, vars: Mapping[str, Val]) -> Val:
         pass
 
-    def __repr__(self) -> str:
+    def __str__(self) -> str:
         return f"Node({self.key})"
 
-    def __str__(self) -> str:
-        return f"{self.key} <- [{', '.join(str(key) for key in self.ins)}]"
 
-
-class NodeGraph(ABC, Generic[Key, Val]):
-    def __init__(self, nodes: Sequence[Node[Key, Val]]) -> None:
-        self.nodes: Dict[Key, Node[Key, Val]] = {}
+class Graph(ABC, Generic[Val]):
+    def __init__(self, nodes: Sequence[Node[Val]]) -> None:
+        self.nodes: Dict[str, Node[Val]] = {}
         for node in nodes:
             self.nodes[node.key] = node
 
-        # perform various checks on the validity of the nodes data strucutre
+        # perform various checks on the validity of the nodes data structure
         # uniqueness check of names
         assert len(self.nodes) == len(nodes), "Multiple nodes with the same name found."
 
         self.keys = set(self.nodes.keys())
 
         in_keys = set(in_key for node in self.nodes.values() for in_key in node.ins)
-        self.input_vars = in_keys.difference(self.keys)
 
-        output_keys = [key for key in self.keys if key not in in_keys]
-        assert len(output_keys) == 1, "Only one output node may exist."
-        self.out_key = output_keys[0]
+        # uniqueness of the target node
+        self.out_keys = [key for key in self.keys if key not in in_keys]
 
-        # order nodes in order of execution
+        # sort nodes by order of execution
         d = {key: self.nodes[key].ins for key in self.keys}
         sorter = TopologicalSorter(d)
         order = sorter.static_order()
+
+        self.input_vars = in_keys.difference(self.keys)
         self.keys = [key for key in order if key not in self.input_vars]
 
-    def __call__(self, vars: MutableMapping[Key, Val]) -> Val:
+    def __call__(self, vars: MutableMapping[str, Val], target: str) -> Val:
+        assert target in self.keys, f"target must be in nodes, but got {target}."
         vars = copy.copy(vars)
         for name in self.keys:
             node = self.nodes[name]
             vars[name] = node(vars)
-        return vars[self.out_key]
+            if name == target:
+                return vars[name]
+        raise ValueError("Unaccessible code.")
 
     def __str__(self) -> str:
         return (
@@ -67,5 +62,8 @@ class NodeGraph(ABC, Generic[Key, Val]):
             + "\n]"
         )
 
-    def topological_order(self) -> Iterable[Key]:
+    def topological_order(self) -> Iterable[str]:
         return self.keys
+
+    def target_vars(self) -> Collection[str]:
+        return self.out_keys

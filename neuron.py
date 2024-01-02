@@ -1,20 +1,18 @@
-from collections.abc import Collection, Generator, Iterable, Mapping, Sequence
+import math
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from copy import copy
 from enum import Enum
 from itertools import chain, combinations
-from math import isclose
-from typing import AbstractSet, Dict, Optional, Self, TypeVar
+from typing import Dict, Self, TypeVar
 
-import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
-from urllib3 import encode_multipart_formdata
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from node import Key, Node, NodeGraph
+from node import Graph, Node
 
 sns.set()
 
@@ -39,39 +37,143 @@ class Activation(Enum):
     TANH = 2
 
 
-class Neuron2:
+class Neuron(Node[float]):
+    """A full-precision neuron."""
+
     def __init__(
-        self,
-        name: str,
-        neurons_in: list[tuple[Self, float]] = [],
-        bias: float = 0.0,
-        activation_in: Activation = Activation.SIGMOID,
+        self, key: str, act: Activation, ins: Mapping[str, float], bias: float
     ) -> None:
-        self.name = name
-        self.neurons_in = neurons_in
+        super().__init__(key, ins.keys())
+        self.key = key
+        self.act = act
+        self.ins = ins
         self.bias = bias
-        self.activation = activation_in
 
-    def __str__(self) -> str:
-        right_term = ""
-        act_str = "sig" if self.activation == Activation.SIGMOID else "tanh"
+    def sigmoid(self, x):
+        return np.where(x >= 0, 1.0 / (1.0 + np.exp(-x)), np.exp(x) / (1.0 + np.exp(x)))
 
-        if len(self.neurons_in) >= 1:
-            neuron, weight = self.neurons_in[0]
-            right_term += f"{round(weight, 2):>5}*{neuron.name:<5}"
-        for neuron, weight in self.neurons_in[1:]:
-            weight_sign = "+" if weight >= 0 else "-"
-            right_term += f"{weight_sign}{round(abs(weight), 2):>5}*{neuron.name:<5}"
+    def act_fn(self, x):
+        return np.tanh(x) if self.act == Activation.TANH else self.sigmoid(x)
 
-        if self.bias:
-            weight_sign = "+" if self.bias >= 0 else "-"
-            right_term += f"{weight_sign}{round(abs(self.bias), 2)}"
-        if not right_term:
-            right_term = self.name
-        return f"{self.name:>8}  :=  {act_str}({right_term})"
+    def inv_act(self, x):
+        return (
+            np.arctanh(x) if self.act == Activation.TANH else np.log(x) - np.log(1 - x)
+        )
 
-    def __repr__(self) -> str:
-        return f'Neuron("{str(self)}")'
+    def __call__(self, vars: Mapping[str, float]) -> float:
+        x = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
+        return self.act_fn(np.array([x]))[0]
+
+    def __str__(self):
+        act_str = {Activation.SIGMOID: "sig", Activation.TANH: "tanh"}[self.act]
+        params = [f"{self.ins[key]} * {key}" for key in self.ins]
+        ans = f"{self.key} := {act_str}({str.join(' + ', params)} + {self.bias})"
+        return ans
+
+
+class NeuronGraph(Graph[float]):
+    def __init__(self, neurons: Sequence[Neuron]) -> None:
+        super().__init__(neurons)
+        self.neurons = neurons
+
+    @classmethod
+    def from_nn(cls, net: nn.Sequential, vars: list[str]) -> list[Neuron]:
+        def key_gen():
+            idx = 0
+            while True:
+                idx += 1
+                yield f"h{idx}"
+
+        names = key_gen()
+        ans: list[Neuron] = []
+        vars = copy(vars)
+        shape_out, shape_in = net[0].weight.shape
+        assert (
+            len(vars) == shape_in
+        ), f"vars needs same shape as first layer input, but got: {len(vars)} != {shape_in}."
+        n_layers = len(net)
+        if isinstance(net[-1], nn.Flatten):
+            n_layers -= 1  # ignore the last layer if it's a Flatten layer.
+        for idx in range(0, n_layers, 2):
+            lin_layer = net[idx]
+            act_layer = net[idx + 1]
+            assert isinstance(lin_layer, nn.Linear)
+            assert isinstance(act_layer, nn.Sigmoid) or isinstance(act_layer, nn.Tanh)
+            act = (
+                Activation.SIGMOID
+                if isinstance(act_layer, nn.Sigmoid)
+                else Activation.TANH
+            )
+            shape_out, shape_in = lin_layer.weight.shape
+            weight = lin_layer.weight.tolist()
+            bias = lin_layer.bias.tolist()
+            in_names = vars[-shape_in:]
+            for j in range(shape_out):
+                new_name = next(names)
+                ins = {name: weight[j][i] for i, name in enumerate(in_names)}
+                neuron = Neuron(new_name, act, ins, bias[j])
+                ans.append(neuron)
+                vars.append(new_name)
+        return ans
+
+
+class QuantizedNeuron(Node[float]):
+    """A neuron that was quantized to a step function with either 0 or 1 steps."""
+
+    def __init__(
+        self, n: Neuron, x_thrs: Collection[float], y_centers: Sequence[float]
+    ) -> None:
+        super().__init__(n.key, n.ins)
+        self.n = n
+        self.x_thrs = x_thrs
+        self.y_centers = y_centers
+
+    def __call__(self, vars: Mapping[str, float]) -> float:
+        ans = self.n.bias + sum(vars[n_key] * self.n.ins[n_key] for n_key in self.ins)
+        for idx, x_thr in enumerate(self.x_thrs):
+            if x_thr > ans:
+                return self.y_centers[idx]
+        return self.y_centers[-1]
+
+    @classmethod
+    def from_neuron(cls, n: Neuron, data_x: Collection[float] | None = None):
+        if data_x is None:
+            data_x = n.ins.values()
+        data_x = possible_sums(data_x)
+        data_x = np.fromiter(data_x, dtype=float)
+        data_x.sort()
+        data_x += n.bias
+        data_y = n.act_fn(data_x)
+
+        if len(data_y) == 1:
+            y_centers = data_y
+        else:
+            ans = ckmeans(data_y, 2)
+            cluster = ans.cluster
+            n_cluster = len(np.unique(cluster))
+            y_centers = np.array([ans.centers[i] for i in range(n_cluster)])
+
+        y_thrs = (y_centers[:-1] + y_centers[1:]) / 2
+        x_thrs = n.inv_act(y_thrs)
+        return QuantizedNeuron(n, x_thrs, list(y_centers))
+
+
+class QuantizedNeuronGraph(Graph[float]):
+    def __init__(self, ng: NeuronGraph) -> None:
+        q_neurons = [QuantizedNeuron.from_neuron(n) for n in ng.neurons]
+        super().__init__(q_neurons)
+
+
+class BooleanNeuron(Node[bool]):
+    def __init__(
+        self, q_neuron: QuantizedNeuron, q_neuron_ins: Collection[QuantizedNeuron]
+    ) -> None:
+        super().__init__(q_neuron.key, q_neuron.ins.keys())
+        self.q_neuron_ins = q_neuron_ins
+        self.b_val = self.to_bool()
+
+    def __call__(self, vars: Mapping[str, bool]) -> bool:
+        return self.b_val(vars)
 
     def to_bool(self) -> Bool:
         def to_bool_rec(
@@ -79,34 +181,13 @@ class Neuron2:
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
-            # dp: list[list[tuple[float, float, Bool]]] | None = None,
         ) -> Bool:
-            def find_in_ranges(
-                ranges: list[tuple[float, float, Bool]], val: float
-            ) -> tuple[int, bool]:
-                left, right = 0, len(ranges)
-                while left < right:
-                    mid = (left + right) // 2
-                    curr_range_left, curr_range_right, _ = ranges[mid]
-                    if curr_range_left <= val <= curr_range_right:
-                        return mid, True
-                    elif curr_range_right < val:
-                        left = mid + 1
-                    else:
-                        right = mid
-                return right, False
-
-            # if dp is None:
-            #    dp = [[] for j in range(len(neurons_in))]
-
             if threshold >= 0:
                 return Constant(True)
             if threshold < -sum(n[1] for n in neurons_in[i:]):
                 return Constant(False)
-            # idx, is_found = find_in_ranges(dp[i], threshold)
-            #    return dp[i][idx]
 
-            name = neurons_in[i][0].name
+            key = neurons_in[i][0].key
             weight = neurons_in[i][1]
             positive = not neuron_signs[i]
 
@@ -115,14 +196,14 @@ class Neuron2:
 
             term2 = to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1)
             term2 = AND(
-                Literal(name) if positive else NOT(Literal(name)),
+                Literal(key) if positive else NOT(Literal(key)),
                 term2,
             )
-            # TODO: add to dp
             return OR(term1, term2).simplified()
 
         # step 1: adjust Neuron so that all activations from input are boolean, while preserving equality
-        for idx, (neuron_in, weight) in enumerate(self.neurons_in):
+        for idx, q_neuron_in in enumerate(self.q_neuron_ins):
+            weight = self.ins[q_neuron_in.key]
             if (
                 not isinstance(neuron_in, InputNeuron)
                 and neuron_in.activation == Activation.TANH
@@ -150,210 +231,6 @@ class Neuron2:
         return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
 
 
-class QuantizedNeuron2:
-    """Intermediate step between full-precision neurons and booleans as nodes."""
-
-    def __init__(self, neuron: Neuron2, x: np.ndarray) -> None:
-        self.neuron = neuron
-        self.input_dist = x
-        y = np.tanh(x)
-        ans = ckmeans(np.tanh(x), k=(1, 2))
-        assert all(
-            ans.cluster[i] <= ans.cluster[i + 1] for i in range(len(ans.cluster) - 1)
-        ), "clusters must be sorted by their mean."
-        y_means = np.array([c for c in ans.centers if c != 0])
-
-        y_thrs = (y_means[:-1] + y_means[1:]) / 2
-        x_thrs = np.arctanh(y_thrs)
-
-
-class InputNeuron(Neuron2):
-    def __init__(self, name: str) -> None:
-        self.name = name
-
-    def to_bool(self) -> Bool:
-        return Literal(self.name)
-
-    def __str__(self) -> str:
-        return f'InputNeuron("{self.name}")'
-
-
-class NeuronGraph2:
-    def __init__(self, vars: Optional[list[str]], net: Optional[nn.Sequential] = None):
-        self.new_neuron_idx = 1  # for naming new neurons
-        self.neurons: list[Neuron2] = []  # collection of all neurons added to Network
-        self.neuron_names: set[str] = set()  # keeps track of the names of all neurons
-        if net:
-            assert vars is not None
-            self.add_module(net, vars)
-
-    def __len__(self):
-        return len(self.neurons)
-
-    def __str__(self) -> str:
-        return "\n".join(str(neuron) for neuron in self.neurons)
-
-    def add_module(self, net: nn.Sequential, input_vars: list[str]):
-        self.input_vars = input_vars  # the names of the input variables
-        first_layer = net[0]
-        if not isinstance(first_layer, nn.Linear):
-            raise ValueError("First layer must always be a linear layer.")
-        shape_out, shape_in = first_layer.weight.shape
-        if len(self.input_vars) != shape_in:
-            raise ValueError("varnames need same shape as input of first layer")
-
-        # create a neuron for each of the input nodes in the first layer
-        for idx, name in enumerate(self.input_vars):
-            new_input_neuron = InputNeuron(name)
-            self.add(new_input_neuron)
-
-        ll_start, ll_end = 0, len(self.neurons)
-        curr_act = Activation.SIGMOID
-        for idx, layer in enumerate(net):
-            if isinstance(layer, nn.Linear):
-                next_layer = net[idx + 1]
-                if isinstance(next_layer, nn.Sigmoid):
-                    curr_act = Activation.SIGMOID
-                elif isinstance(next_layer, nn.Tanh):
-                    curr_act = Activation.TANH
-
-                shape_out, shape_in = layer.weight.shape
-                weight = layer.weight.tolist()
-                bias = layer.bias.tolist()
-
-                for idx in range(shape_out):
-                    neurons_in = list(zip(self.neurons[ll_start:ll_end], weight[idx]))
-                    name = self._new_name()
-                    neuron = Neuron2(
-                        name,
-                        neurons_in=neurons_in,
-                        bias=bias[idx],
-                        activation_in=curr_act,
-                    )
-                    self.add(neuron)
-                ll_start, ll_end = ll_end, len(self.neurons)
-
-        # rename the last variable, so it is distinguishable from the rest
-        self.rename(self.target(), "target")
-
-    def add(self, neuron: Neuron2):
-        assert neuron.name not in self.neuron_names
-        self.neurons.append(neuron)
-        self.neuron_names.add(neuron.name)
-
-    def rename(self, neuron: Neuron2, new_name: str):
-        assert neuron in self.neurons
-        assert new_name not in self.neuron_names
-        neuron.name = new_name
-
-    def _new_name(self):
-        while f"h{self.new_neuron_idx}" in self.neuron_names:
-            self.new_neuron_idx += 1
-        return f"h{self.new_neuron_idx}"
-
-    def target(self) -> Neuron2:
-        return self.neurons[-1]
-
-
-class Neuron(Node[Key, float]):
-    """A full-precision neuron."""
-
-    def __init__(
-        self, name: Key, act: Activation, ins: Mapping[Key, float], bias: float
-    ) -> None:
-        super().__init__(name, ins.keys())
-        self.act = act
-        self.ins = ins
-        self.bias = bias
-
-    def sigmoid(self, x: float) -> float:
-        if x >= 0:
-            return 1.0 / (1.0 + np.exp(-x))
-        else:
-            return np.exp(x) / (1.0 + np.exp(x))
-
-    def __call__(self, vars: Mapping[Key, float]) -> float:
-        ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
-        return np.tanh(ans) if self.act == Activation.TANH else self.sigmoid(ans)
-
-
-class QuantizedNeuron(Neuron[Key]):
-    """A neuron that was quantized to a step function with either 0 or 1 steps."""
-
-    def __init__(self, n: Neuron[Key], data_x: Collection[float]) -> None:
-        super().__init__(n.key, n.act, n.ins, n.bias)
-
-        data_x = possible_sums(data_x)
-        data_x = np.fromiter(data_x, dtype=float)
-        data_x.sort()
-        data_x += self.bias
-
-        self.neuron = n
-        data_y = np.tanh(data_x)
-        ans = ckmeans(data_y, (1, 2))
-        print(f"{data_x = }")
-        print(f"{data_y = }")
-        cluster = ans.cluster
-        n_cluster = len(np.unique(cluster))
-        self.y_centers = np.array([ans.centers[i] for i in range(n_cluster)])
-        self.x_centers = np.arctanh(self.y_centers)
-        self.y_thrs = (self.y_centers[:-1] + self.y_centers[1:]) / 2
-        self.x_thrs = np.arctanh(self.y_thrs)
-
-    def __call__(self, vars: Mapping[Key, float]) -> float:
-        ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
-        for idx, x_thr in enumerate(self.x_thrs):
-            if x_thr > ans:
-                return self.y_centers[idx]
-        return self.y_centers[-1]
-
-
-class BooleanNeuron(Node[Key, bool]):
-    def __init__(self, q_neuron: QuantizedNeuron[Key]) -> None:
-        super().__init__(q_neuron.key, q_neuron.ins.keys())
-
-    def __call__(self, vars: Mapping[Key, bool]) -> bool:
-        return False
-
-
-def to_neurons(net: nn.Sequential, vars: list[str]) -> list[Neuron[str]]:
-    def name_generator():
-        idx = 0
-        while True:
-            idx += 1
-            yield f"h{idx}"
-
-    name_gen = name_generator()
-    ans: list[Neuron[str]] = []
-    names = copy(vars)
-    shape_out, shape_in = net[0].weight.shape
-    assert (
-        len(vars) == shape_in
-    ), f"vars needs same shape as first layer input, but got: {len(vars)} != {shape_in}."
-    n_layers = len(net)
-    if isinstance(net[-1], nn.Flatten):
-        n_layers -= 1  # ignore the last layer if it's a Flatten layer.
-    for idx in range(0, n_layers, 2):
-        lin_layer = net[idx]
-        act_layer = net[idx + 1]
-        assert isinstance(lin_layer, nn.Linear)
-        assert isinstance(act_layer, nn.Sigmoid) or isinstance(act_layer, nn.Tanh)
-        act = (
-            Activation.SIGMOID if isinstance(act_layer, nn.Sigmoid) else Activation.TANH
-        )
-        shape_out, shape_in = lin_layer.weight.shape
-        weight = lin_layer.weight.tolist()
-        bias = lin_layer.bias.tolist()
-        in_names = names[-shape_in:]
-        for j in range(shape_out):
-            new_name = next(name_gen)
-            ins = {name: weight[j][i] for i, name in enumerate(in_names)}
-            neuron = Neuron(new_name, act, ins, bias[j])
-            ans.append(neuron)
-            names.append(new_name)
-    return ans
-
-
 def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
     t_list = t.tolist()
     assert len(t_list) == len(names)
@@ -361,45 +238,43 @@ def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
 
 
 def main():
-    keys = ["a1", "a2", "a3"]
-    in_neurons: dict[str, float] = {"a1": -1.55, "a2": -1.54, "a3": 1.6}
-    bias = -0.86
-    n1 = Neuron("n1", Activation.TANH, in_neurons, bias)
+    keys = ["x1", "x2", "x3"]
+    k = 10
 
-    q_n1 = QuantizedNeuron(n1, in_neurons.values())
+    h1 = Neuron("h1", Activation.SIGMOID, {"x1": k, "x2": k}, -0.5 * k)
+    h2 = Neuron("h2", Activation.SIGMOID, {"x1": -k, "x2": -k}, 0.5 * k)
+    h3 = Neuron("h3", Activation.SIGMOID, {"x3": k}, -0.5 * k)
+    h4 = Neuron("h4", Activation.SIGMOID, {"h1": k, "h2": k}, -1.5 * k)
+    h5 = Neuron("h5", Activation.SIGMOID, {}, -100)
+    h6 = Neuron("h6", Activation.SIGMOID, {"h3": k}, -0.5 * k)
+    h7 = Neuron("h7", Activation.SIGMOID, {"h4": k, "h6": k}, -0.5 * k)
+    h8 = Neuron("h8", Activation.SIGMOID, {}, -100)
+    h9 = Neuron("h9", Activation.SIGMOID, {"h4": -k, "h6": -k}, 0.5 * k)
+    h10 = Neuron("h10", Activation.SIGMOID, {"h7": k, "h9": k}, -0.5 * k)
 
-    neuron_graph = NodeGraph([n1])
-    q_neuron_graph = NodeGraph([q_n1])
-    input_vals = {"a1": 1.0, "a2": 1.0, "a3": 0.0}
-    pset = powerset(keys)
-    diffs = []
-    for subset in pset:
-        input_vals = {key: 1.0 if key in subset else 0.0 for key in keys}
-        diff = np.abs(neuron_graph(input_vals) - q_neuron_graph(input_vals))
-        diffs.append(diff)
-    sns.histplot(diffs, bins=12)
-    plt.show()
+    neurons = [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10]
 
-    n = 5
-    keys = [f"a{i + 1}" for i in range(n)]
-    model = nn.Sequential(
-        nn.Linear(n, n + 1, dtype=torch.float64),
-        nn.Tanh(),
-        nn.Linear(n + 1, n - 1, dtype=torch.float64),
-        nn.Tanh(),
-        nn.Linear(n - 1, 1, dtype=torch.float64),
-        nn.Sigmoid(),
-        nn.Flatten(0),
-    ).train(False)
-    neurons = to_neurons(model, keys)
-    neuron_graph = NodeGraph(neurons)
-    random_x = torch.rand(n, dtype=torch.float64)
-    random_input_vars = to_vars(random_x, keys)
-    print(f"{model(random_x).item() = }")
-    print(f"{neuron_graph(random_input_vars) = }")
-    assert isclose(
-        model(random_x).float(), neuron_graph(random_input_vars), rel_tol=1e-6
-    )
+    for n_nodes in range(1, 11):
+        # bool_neurons = [BooleanNeuron(q_neuron) for q_neuron in q_neurons]
+        neuron_graph = NeuronGraph(neurons[:n_nodes])
+        q_neuron_graph = QuantizedNeuronGraph(neuron_graph)
+
+        n_correct, n_total = 0.0, 0.0
+        for subset in powerset(keys):
+            vars = {key: 1.0 if key in subset else 0.0 for key in keys}
+            bool_vars = {key: True if key in subset else False for key in keys}
+            neuron_output = neuron_graph(vars, neurons[n_nodes - 1].key)
+            q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
+
+            # print(f"{vars = }")
+            # print(f"{neuron_output}")
+            # print(f"{q_neuron_output}")
+            # print()
+            if round(neuron_output) == round(q_neuron_output):
+                n_correct += 1.0
+            n_total += 1.0
+        print(f"n_nodes: {n_nodes} | fidelity: {n_correct / n_total}")
+        # print(f"{bool_neuron_graph(bool_vars)}")
 
 
 if __name__ == "__main__":
