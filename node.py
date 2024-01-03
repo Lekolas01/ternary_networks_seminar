@@ -1,6 +1,6 @@
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence, Set
 from graphlib import TopologicalSorter
 from typing import Dict, Generic, TypeVar
 
@@ -8,7 +8,7 @@ Val = TypeVar("Val")
 
 
 class Node(ABC, Generic[Val]):
-    def __init__(self, key: str, ins: Sequence[str]) -> None:
+    def __init__(self, key: str, ins: Set[str]) -> None:
         self.key = key
         self.ins = ins
 

@@ -1,15 +1,15 @@
-from collections.abc import Collection, Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
 from copy import copy
 from enum import Enum
 from itertools import chain, combinations
-from typing import Dict, Self, TypeVar
+from typing import Dict, TypeVar
 
 import numpy as np
 import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 
-from bool_formula import AND, NOT, OR, Bool, Constant, Literal
+from bool_formula import AND, NOT, OR, PARITY, Bool, Constant, Literal
 from node import Graph, Node
 
 Val = TypeVar("Val")
@@ -37,9 +37,8 @@ class Neuron(Node[float]):
     """A full-precision neuron."""
 
     def __init__(
-        self, key: str, act: Activation, ins: Mapping[str, float], bias: float
+        self, key: str, act: Activation, ins: MutableMapping[str, float], bias: float
     ) -> None:
-        super().__init__(key, ins.keys())
         self.key = key
         self.act = act
         self.ins = ins
@@ -83,7 +82,7 @@ class NeuronGraph(Graph[float]):
         names = key_gen()
         ans: list[Neuron] = []
         vars = copy(vars)
-        shape_out, shape_in = net[0].weight.shape
+        shape_out, shape_in = net[0].weight.shape  # type: ignore
         assert (
             len(vars) == shape_in
         ), f"vars needs same shape as first layer input, but got: {len(vars)} != {shape_in}."
@@ -117,15 +116,16 @@ class QuantizedNeuron(Node[float]):
     """A neuron that was quantized to a step function with either 0 or 1 steps."""
 
     def __init__(
-        self, n: Neuron, x_thrs: Collection[float], y_centers: Sequence[float]
+        self, n: Neuron, x_thrs: Sequence[float], y_centers: Sequence[float]
     ) -> None:
-        super().__init__(n.key, n.ins)
+        self.key = n.key
+        self.ins = n.ins
         self.n = n
         self.x_thrs = x_thrs
         self.y_centers = y_centers
 
     def __call__(self, vars: Mapping[str, float]) -> float:
-        ans = self.n.bias + sum(vars[n_key] * self.n.ins[n_key] for n_key in self.ins)
+        ans = self.n.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
         for idx, x_thr in enumerate(self.x_thrs):
             if x_thr > ans:
                 return self.y_centers[idx]
@@ -167,16 +167,17 @@ class QuantizedNeuronGraph(Graph[float]):
 
 class BooleanNeuron(Node[bool]):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
-        super().__init__(q_neuron.key, q_neuron.ins)
-        self.q_n = q_neuron
+        self.q_neuron = q_neuron
+        self.key = q_neuron.key
+        self.ins = q_neuron.ins
         self.b_val = self.to_bool()
 
-    def __call__(self, vars: Mapping[str, bool]) -> bool:
+    def __call__(self, vars: MutableMapping[str, bool]) -> bool:
         return self.b_val(vars)
 
     def to_bool(self) -> Bool:
         def to_bool_rec(
-            neurons_in: list[tuple[Self, float]],
+            neurons_in: list[tuple[str, float]],
             neuron_signs: list[bool],
             threshold: float,
             i: int = 0,
@@ -186,7 +187,7 @@ class BooleanNeuron(Node[bool]):
             if threshold < -sum(n[1] for n in neurons_in[i:]):
                 return Constant(False)
 
-            key = neurons_in[i][0].key
+            key = neurons_in[i][0]
             weight = neurons_in[i][1]
             positive = not neuron_signs[i]
 
@@ -200,35 +201,44 @@ class BooleanNeuron(Node[bool]):
             )
             return OR(term1, term2).simplified()
 
+        x_thrs = self.q_neuron.x_thrs
+        y_centers = self.q_neuron.y_centers
+        bias = self.q_neuron.n.bias
+        # bias += x_thrs[0]
+
         # step 1: adjust Neuron so that all activations from input are boolean, while preserving equality
-        for idx, key in enumerate(self.q_n.n.ins):
-            weight = self.q_n.n.ins[key]
+        for idx, key in enumerate(self.ins):
+            weight = self.ins[key]
 
             # a = self.q_n.y_centers[0]
-            assert len(self.q_n.y_centers) == 2
-            self.q_n.n.bias += weight * self.q_n.y_centers[0]
+            assert len(y_centers) == 2
+            bias += weight * y_centers[0]
 
             # k = self.q_n.y_centers[1] - self.q_n.y_centers[0]
-            k = self.q_n.y_centers[1] - self.q_n.y_centers[0]
-            self.q_n.ins[key] *= 
-            # TODO: this right here is not yet working!
+            k = y_centers[1] - y_centers[0]
+            self.ins[key] = self.ins[key] * k
 
         # sort neurons by their weight
-        neurons_in = sorted(self.neurons_in, key=lambda x: abs(x[1]), reverse=True)
+        ins = list(self.ins.items())
+
+        ins = sorted(ins, key=lambda x: abs(x[1]), reverse=True)
 
         # remember which weights are negative and then invert all of them (needed for negative numbers)
-        negative = [tup[1] < 0 for tup in neurons_in]
-        neurons_in = [(tup[0], abs(tup[1])) for tup in neurons_in]
+        negative = [tup[1] < 0 for tup in ins]
+        ins = [(tup[0], abs(tup[1])) for tup in ins]
 
-        positive_weights = list(zip(negative, [tup[1] for tup in neurons_in]))
+        positive_weights = list(zip(negative, [tup[1] for tup in ins]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        return to_bool_rec(neurons_in, negative, self.bias - bias_diff)
+        return to_bool_rec(ins, negative, bias - bias_diff)
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
         return BooleanNeuron(q_neuron)
+
+    def __str__(self) -> str:
+        return f"{self.key} := {str(self.b_val)}"
 
 
 class BooleanGraph(Graph[bool]):
@@ -248,45 +258,56 @@ def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
 
 def main():
     keys = ["x1", "x2", "x3"]
-    k = 10
+    k = 5
 
     h1 = Neuron("h1", Activation.SIGMOID, {"x1": k, "x2": k}, -0.5 * k)
-    h2 = Neuron("h2", Activation.SIGMOID, {"x1": -k, "x2": -k}, 0.5 * k)
+    h2 = Neuron("h2", Activation.SIGMOID, {"x1": -k, "x2": -k}, 1.5 * k)
     h3 = Neuron("h3", Activation.SIGMOID, {"x3": k}, -0.5 * k)
     h4 = Neuron("h4", Activation.SIGMOID, {"h1": k, "h2": k}, -1.5 * k)
     h5 = Neuron("h5", Activation.SIGMOID, {}, -100)
     h6 = Neuron("h6", Activation.SIGMOID, {"h3": k}, -0.5 * k)
-    h7 = Neuron("h7", Activation.SIGMOID, {"h4": k, "h6": k}, -0.5 * k)
+    h7 = Neuron("h7", Activation.SIGMOID, {"h4": -k, "h6": k}, -0.5 * k)
     h8 = Neuron("h8", Activation.SIGMOID, {}, -100)
-    h9 = Neuron("h9", Activation.SIGMOID, {"h4": -k, "h6": -k}, 0.5 * k)
+    h9 = Neuron("h9", Activation.SIGMOID, {"h4": k, "h6": -k}, -0.5 * k)
     h10 = Neuron("h10", Activation.SIGMOID, {"h7": k, "h9": k}, -0.5 * k)
 
     neurons = [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10]
 
-    for n_nodes in range(1, 11):
-        # bool_neurons = [BooleanNeuron(q_neuron) for q_neuron in q_neurons]
-        neuron_graph = NeuronGraph(neurons[:n_nodes])
-        q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph)
+    n_nodes = 10
+    neuron_graph = NeuronGraph(neurons[:n_nodes])
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph)
+    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    parity = PARITY(keys)
 
-        bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    n_correct, n_total = 0.0, 0.0
+    for subset in powerset(keys):
+        vars = {key: 1.0 if key in subset else 0.0 for key in keys}
+        bool_vars = {key: True if key in subset else False for key in keys}
+        neuron_output = neuron_graph(vars, neurons[n_nodes - 1].key)
+        q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
+        bool_output = bool_graph(bool_vars, neurons[n_nodes - 1].key)
+        neuron_b = True if neuron_output >= 0.5 else False
+        q_neuron_b = True if q_neuron_output >= 0.5 else False
+        p_out = parity(bool_vars)
+        # print(f"{vars = }")
+        # print(f"{neuron_output}")
+        # print(f"{q_neuron_output}")
+        # print(f"{bool_output}")
+        # print()
 
-        n_correct, n_total = 0.0, 0.0
-        for subset in powerset(keys):
-            vars = {key: 1.0 if key in subset else 0.0 for key in keys}
-            bool_vars = {key: True if key in subset else False for key in keys}
-            neuron_output = neuron_graph(vars, neurons[n_nodes - 1].key)
-            q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
-            bool_output = bool_graph(bool_vars, neurons[n_nodes - 1].key)
+        if neuron_b == q_neuron_b == bool_output == p_out:
+            n_correct += 1.0
+        else:
+            print(f"{subset}")
+            print(f"{neuron_b} {q_neuron_b} {bool_output} {p_out}")
+            print(f"{neuron_output} {q_neuron_output}")
+            print()
 
-            # print(f"{vars = }")
-            # print(f"{neuron_output}")
-            # print(f"{q_neuron_output}")
-            # print()
-            if round(neuron_output) == round(q_neuron_output):
-                n_correct += 1.0
-            n_total += 1.0
-        print(f"n_nodes: {n_nodes} | fidelity: {n_correct / n_total}")
-        # print(f"{bool_neuron_graph(bool_vars)}")
+        n_total += 1.0
+    print(f"n_nodes: {n_nodes} | fidelity: {n_correct / n_total}")
+    print(str(bool_graph))
+    # TODO: fix fidelity: it has to be 1.0 in this example
+    # _ = input("Continue?")
 
 
 if __name__ == "__main__":
