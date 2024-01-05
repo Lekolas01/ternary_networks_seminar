@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import os
+from collections.abc import Callable, Collection
 from pathlib import Path
 
 import numpy as np
@@ -13,11 +14,10 @@ from torch.utils.data import DataLoader
 from bool_formula import Bool, Interpretation
 from datasets import FileDataset
 from graphics import plot_neuron_dist
-from neuron import InputNeuron, Neuron2, NeuronGraph2
-from node import Graph
+from neuron import BooleanGraph, NeuronGraph, QuantizedNeuronGraph
 
-
-class BooleanGraph(Bool):
+"""
+class BoolGraph(Bool):
     def __init__(self, ng: NeuronGraph2) -> None:
         super().__init__()
         self.ng = ng
@@ -117,12 +117,17 @@ class BooleanGraph(Bool):
                 del self.bools[i]
                 del self.neuron_names[i]
                 del self.neuron_names[i]
+"""
 
 
 def fidelity(
-    model1: nn.Sequential, bg: BooleanGraph, data_path: Path
+    nn_model: nn.Sequential,
+    neuron_model: NeuronGraph,
+    q_neuron_model: QuantizedNeuronGraph,
+    bg: BooleanGraph,
+    data_path: Path,
 ) -> tuple[float, float]:
-    dl = DataLoader(FileDataset(data_path))
+    dl = DataLoader(FileDataset(data_path), batch_size=1)
     fid = 0
     n_vals = 0
     bg_accuracy = 0
@@ -130,16 +135,18 @@ def fidelity(
     vars = list(df.columns[:-1])
 
     for X, y in dl:
-        nn_pred = model1(X)
+        nn_pred = nn_model(X)
         nn_pred = [bool(val.round()) for val in nn_pred]
 
-        data = []
+        bool_data = []
         n_rows, n_cols = X.shape
         for i in range(n_rows):
             row = X[i]
             new_var = {vars[j]: bool(row[j]) for j in range(n_cols)}
-            data.append(new_var)
-        bg_pred = [bg(datapoint) for datapoint in data]
+            bool_data.append(new_var)
+
+        bg_pred = [bg(datapoint) for datapoint in bool_data]
+
         bg_correct = [bg_pred[i] == y[i] for i in range(n_rows)]
         n_correct = len(list(filter(lambda x: x, bg_correct)))
         bg_accuracy += n_correct
@@ -150,20 +157,21 @@ def fidelity(
     return fid / n_vals, bg_accuracy / n_vals
 
 
-def nn_to_rule_set(model_path: Path, data_path: Path) -> BooleanGraph:
+def nn_to_rule_set(model_path: Path, data_path: Path):
     assert os.path.isfile(model_path)
     assert os.path.isfile(data_path)
     model = torch.load(model_path)
 
     df = pd.read_csv(data_path)
-    dl = DataLoader(FileDataset(data_path))
+    dl = DataLoader(FileDataset(data_path))  # dl not needed for now
 
     vars = list(df.columns[:-1])
     # transform the trained neural network to a directed graph of perceptrons
-    neuron_graph = NeuronGraph2(vars, model)
+    neuron_graph = NeuronGraph.from_nn(model, vars)
     # transform the neuron graph to a boolean function
-    bool_graph = BooleanGraph(neuron_graph)
-    return bool_graph
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph)
+    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    return (neuron_graph, q_neuron_graph, bool_graph)
 
 
 def main():

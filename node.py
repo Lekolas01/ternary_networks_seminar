@@ -45,13 +45,12 @@ class Graph(ABC, Generic[Val]):
         self.input_vars = in_keys.difference(self.keys)
         self.keys = [key for key in order if key not in self.input_vars]
 
-    def __call__(self, vars: MutableMapping[str, Val], target: str) -> Val:
-        assert target in self.keys, f"target must be in nodes, but got {target}."
+    def __call__(self, vars: MutableMapping[str, Val]) -> Val:
         vars = copy.copy(vars)
         for name in self.keys:
             node = self.nodes[name]
             vars[name] = node(vars)
-            if name == target:
+            if name == "target":
                 return vars[name]
         raise ValueError("Unaccessible code.")
 

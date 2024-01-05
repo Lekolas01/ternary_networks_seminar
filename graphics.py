@@ -3,14 +3,14 @@ import seaborn as sns
 from ckmeans_1d_dp import ckmeans
 from matplotlib import pyplot as plt
 
-from neuron import Activation, InputNeuron, Neuron2, possible_sums
+from neuron import Activation, Neuron, QuantizedNeuron, possible_sums
 from utilities import flatten, set_seed
 
 sns.set()
 
 
-def plot_neuron_dist(neuron: Neuron2) -> None:
-    sums = np.array(possible_sums([val for _, val in neuron.neurons_in])) + neuron.bias
+def plot_neuron_dist(neuron: Neuron) -> None:
+    sums = np.array(possible_sums(val for val in neuron.ins.values())) + neuron.bias
     fig, axes = plt.subplots(
         nrows=2, ncols=2, sharex=False, sharey=True, figsize=(10, 8)
     )
@@ -20,7 +20,8 @@ def plot_neuron_dist(neuron: Neuron2) -> None:
     y = np.tanh(x)
     sns.lineplot(ax=axes[0, 0], x=x, y=y, color="r", linewidth=1.0)
     sns.scatterplot(ax=axes[0, 0], x=sums, y=np.tanh(sums), c="black", marker="X", s=50)
-    fig.suptitle(f"{str(neuron)}")
+    q_neuron = QuantizedNeuron.from_neuron(neuron)
+    fig.suptitle(f"{str(neuron)}\n{str(q_neuron)}")
     axes[0, 0].set_xlabel("s(x)")
     axes[0, 0].set_ylabel("tanh(s(x))")
     axes[0, 0].set_ylim((-1 - margin, 1 + margin))
@@ -63,20 +64,10 @@ def main():
     rand_vals = np.random.normal(loc=loc, scale=scale, size=n)
     print(rand_vals)
 
-    neuron = Neuron2(
-        "y",
-        [(InputNeuron(f"x{i + 1}"), rand_vals[i]) for i in range(n)],
-        0.0,
-        Activation.TANH,
-    )
-    vals = [-1.55, -1.54, 1.6]
-    neuron2 = Neuron2(
-        "y2",
-        [(InputNeuron(f"x{i + 1}"), val) for i, val in enumerate(vals)],
-        0.86,
-        Activation.TANH,
-    )
-    plot_neuron_dist(neuron2)
+    k = 3.0
+    h1 = Neuron("h1", Activation.SIGMOID, {"x1": k, "x2": k}, -0.6 * k)
+    q_neuron = QuantizedNeuron.from_neuron(h1)
+    plot_neuron_dist(h1)
 
 
 if __name__ == "__main__":

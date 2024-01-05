@@ -2,7 +2,7 @@ from collections.abc import Collection, Iterable, Mapping, MutableMapping, Seque
 from copy import copy
 from enum import Enum
 from itertools import chain, combinations
-from typing import Dict, TypeVar
+from typing import Dict, Self, TypeVar
 
 import numpy as np
 import torch
@@ -20,7 +20,7 @@ def powerset(it: Iterable[Val]) -> Iterable[Iterable[Val]]:
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
 
 
-def possible_sums(vals: Collection[float]) -> Collection[float]:
+def possible_sums(vals: Iterable[float]) -> list[float]:
     """
     Given n different float values, returns a list of length 2**n, consisting
     of each value that can be produced as a sum of a subset of values in vals.
@@ -61,8 +61,8 @@ class Neuron(Node[float]):
 
     def __str__(self):
         act_str = {Activation.SIGMOID: "sig", Activation.TANH: "tanh"}[self.act]
-        params = [f"{self.ins[key]} * {key}" for key in self.ins]
-        ans = f"{self.key} := {act_str}({str.join(' + ', params)} + {self.bias})"
+        params = [f"{self.ins[key]:.2f} * {key}" for key in self.ins]
+        ans = f"{self.key} := {act_str}({str.join(' + ', params)} + {self.bias:.2f})"
         return ans
 
 
@@ -72,7 +72,7 @@ class NeuronGraph(Graph[float]):
         self.neurons = neurons
 
     @classmethod
-    def from_nn(cls, net: nn.Sequential, vars: list[str]) -> list[Neuron]:
+    def from_nn(cls, net: nn.Sequential, vars: list[str]):
         def key_gen():
             idx = 0
             while True:
@@ -109,7 +109,10 @@ class NeuronGraph(Graph[float]):
                 neuron = Neuron(new_name, act, ins, bias[j])
                 ans.append(neuron)
                 vars.append(new_name)
-        return ans
+                if idx == n_layers - 2:
+                    assert shape_out == 1
+                    neuron.key = "target"
+        return NeuronGraph(ans)
 
 
 class QuantizedNeuron(Node[float]):
@@ -143,15 +146,29 @@ class QuantizedNeuron(Node[float]):
 
         if len(data_y) == 1:
             y_centers = data_y
+            y_thrs = y_centers[0]
         else:
             ans = ckmeans(data_y, 2)
-            cluster = ans.cluster
-            n_cluster = len(np.unique(cluster))
+            n_cluster = len(np.unique(ans.cluster))
             y_centers = np.array([ans.centers[i] for i in range(n_cluster)])
+            # find first value that corresponds to second group
+            new_grp_idx = np.nonzero(ans.cluster == 1)[0][0]
+            y_thrs = (data_y[new_grp_idx - 1] + data_y[new_grp_idx]) / 2
 
-        y_thrs = (y_centers[:-1] + y_centers[1:]) / 2
         x_thrs = n.inv_act(y_thrs)
         return QuantizedNeuron(n, x_thrs, list(y_centers))
+
+    def __str__(self):
+        params = [f"{self.ins[key]:.2f} * {key}" for key in self.ins]
+        cond = str.join("\t+ ", params)
+        cond += f"\t+ {self.n.bias:.2f} >= {self.x_thrs:.2f}"
+        ans = (
+            f"{self.key} := "
+            + f"[ {self.y_centers[1]:.2f} ] IF [ "
+            + cond
+            + f" ] ELSE [ {self.y_centers[0]:.2f} ]"
+        )
+        return ans
 
 
 class QuantizedNeuronGraph(Graph[float]):
@@ -162,6 +179,7 @@ class QuantizedNeuronGraph(Graph[float]):
     @classmethod
     def from_neuron_graph(cls, ng: NeuronGraph):
         q_neurons = [QuantizedNeuron.from_neuron(n) for n in ng.neurons]
+
         return QuantizedNeuronGraph(q_neurons)
 
 
@@ -258,7 +276,7 @@ def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
 
 def main():
     keys = ["x1", "x2", "x3"]
-    k = 5
+    k = 6
 
     h1 = Neuron("h1", Activation.SIGMOID, {"x1": k, "x2": k}, -0.5 * k)
     h2 = Neuron("h2", Activation.SIGMOID, {"x1": -k, "x2": -k}, 1.5 * k)
@@ -269,7 +287,7 @@ def main():
     h7 = Neuron("h7", Activation.SIGMOID, {"h4": -k, "h6": k}, -0.5 * k)
     h8 = Neuron("h8", Activation.SIGMOID, {}, -100)
     h9 = Neuron("h9", Activation.SIGMOID, {"h4": k, "h6": -k}, -0.5 * k)
-    h10 = Neuron("h10", Activation.SIGMOID, {"h7": k, "h9": k}, -0.5 * k)
+    h10 = Neuron("target", Activation.SIGMOID, {"h7": k, "h9": k}, -0.5 * k)
 
     neurons = [h1, h2, h3, h4, h5, h6, h7, h8, h9, h10]
 
@@ -283,11 +301,11 @@ def main():
     for subset in powerset(keys):
         vars = {key: 1.0 if key in subset else 0.0 for key in keys}
         bool_vars = {key: True if key in subset else False for key in keys}
-        neuron_output = neuron_graph(vars, neurons[n_nodes - 1].key)
-        q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
-        bool_output = bool_graph(bool_vars, neurons[n_nodes - 1].key)
+        neuron_output = neuron_graph(vars)
+        # q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
+        # bool_output = bool_graph(bool_vars, neurons[n_nodes - 1].key)
         neuron_b = True if neuron_output >= 0.5 else False
-        q_neuron_b = True if q_neuron_output >= 0.5 else False
+        # q_neuron_b = True if q_neuron_output >= 0.5 else False
         p_out = parity(bool_vars)
         # print(f"{vars = }")
         # print(f"{neuron_output}")
@@ -295,13 +313,13 @@ def main():
         # print(f"{bool_output}")
         # print()
 
-        if neuron_b == q_neuron_b == bool_output == p_out:
+        if neuron_b == p_out:
             n_correct += 1.0
-        else:
-            print(f"{subset}")
-            print(f"{neuron_b} {q_neuron_b} {bool_output} {p_out}")
-            print(f"{neuron_output} {q_neuron_output}")
-            print()
+        # else:
+        #    print(f"{subset}")
+        #    print(f"{neuron_b} {q_neuron_b} {bool_output} {p_out}")
+        #    print(f"{neuron_output} {q_neuron_output}")
+        #    print()
 
         n_total += 1.0
     print(f"n_nodes: {n_nodes} | fidelity: {n_correct / n_total}")

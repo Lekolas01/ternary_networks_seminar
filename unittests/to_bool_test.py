@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
 from neuron import NeuronGraph, to_vars
-from nn_to_rule_set import BooleanGraph
+from nn_to_rule_set import BoolGraph
 from node import Graph
 
 
@@ -120,7 +120,7 @@ class TestToBool(unittest.TestCase):
         xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
         xor = OR(xor_1, xor_2)
 
-        assert BooleanGraph(n_graph) == xor
+        assert BoolGraph(n_graph) == xor
 
     def test_XOR_2(self):
         neurons = NeuronGraph2()
@@ -136,7 +136,7 @@ class TestToBool(unittest.TestCase):
         xor_1 = AND(Literal(x1.name), NOT(Literal(x2.name)))
         xor_2 = AND(NOT(Literal(x1.name)), Literal(x2.name))
         xor = OR(xor_1, xor_2)
-        assert BooleanGraph(neurons) == xor
+        assert BoolGraph(neurons) == xor
 
     def test_random_model(self):
         n = 5

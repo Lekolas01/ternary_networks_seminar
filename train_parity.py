@@ -9,6 +9,7 @@ from bool_formula import PARITY
 from datasets import FileDataset
 from gen_data import gen_data
 from my_logging.loggers import LogMetrics, Tracker
+from neuron import powerset
 from nn_to_rule_set import fidelity, nn_to_rule_set
 from train_model import training_loop
 from utilities import acc, set_seed
@@ -42,14 +43,10 @@ def train_nn(
     )
 
 
-def train_parity(n: int, path: Path, epochs: int, l1: float):
+def train_parity(n: int, data_path: Path, epochs: int, l1: float):
     vars = [f"x{i + 1}" for i in range(n)]
     target_func = PARITY(vars)
     model = nn.Sequential(
-        nn.Linear(n, n),
-        nn.Tanh(),
-        nn.Linear(n, n),
-        nn.Tanh(),
         nn.Linear(n, n),
         nn.Tanh(),
         nn.Linear(n, n),
@@ -58,13 +55,9 @@ def train_parity(n: int, path: Path, epochs: int, l1: float):
         nn.Sigmoid(),
         nn.Flatten(0),
     )
-    data_path = path / "data.csv"
 
     # generate a dataset, given a logical function
     data = gen_data(target_func, n=max(1024, int(2**n)))
-    # save it in a throwaway folder
-    if not os.path.exists(path):
-        os.makedirs(path)
     data.to_csv(data_path, index=False, sep=",", mode="w")
     train_dl = DataLoader(FileDataset(data_path), batch_size=64)
     valid_dl = DataLoader(FileDataset(data_path), batch_size=64)
@@ -73,19 +66,20 @@ def train_parity(n: int, path: Path, epochs: int, l1: float):
 
 
 def main():
-    n_vars = 8
-    epochs = 2000
+    seed = 1
+    n_vars = 2
+    epochs = 1000
     l1 = 5e-5
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}"
     path = Path("runs")
     data_path = path / (name + ".csv")
     model_path = path / (name + ".pth")
 
-    if not os.path.exists(model_path):
-        seed = set_seed(0)
+    if not os.path.isfile(model_path) or not os.path.isfile(data_path):
+        seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
-        model = train_parity(n_vars, path, epochs=epochs, l1=l1)
+        model = train_parity(n_vars, data_path, epochs=epochs, l1=l1)
         try:
             torch.save(model, model_path)
             print(f"Successfully saved model to {model_path}")
@@ -98,15 +92,25 @@ def main():
     model = torch.load(model_path)
 
     print("Transforming model to rule set...")
-    rules = nn_to_rule_set(model_path, data_path)
-    print(rules)
+    neuron_graph, q_neuron_graph, bool_graph = nn_to_rule_set(model_path, data_path)
+    print(neuron_graph)
+    print()
+    print(q_neuron_graph)
+    print()
+    print(bool_graph)
+    print()
 
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
     # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
     train_dl = DataLoader(FileDataset(data_path))
-    fid, rules_acc = fidelity(model, rules, data_path)
+    keys = [f"x{i + 1}" for i in range(n_vars)]
+    p_set = powerset(keys)
+    data = [{key: 1.0 if key in subset else 0.0 for key in keys} for subset in p_set]
+    fid, rules_acc = fidelity(
+        model, neuron_graph, q_neuron_graph, bool_graph, data_path
+    )
     nn_acc = acc(model, train_dl, torch.device("cpu"))
     print(f"{nn_acc = }")
     print(f"{fid = }")
