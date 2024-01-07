@@ -1,15 +1,15 @@
-from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
-from copy import copy
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from copy import copy, deepcopy
 from enum import Enum
 from itertools import chain, combinations
-from typing import Dict, Self, TypeVar
+from typing import Dict, TypeVar
 
 import numpy as np
 import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 
-from bool_formula import AND, NOT, OR, PARITY, Bool, Constant, Literal
+from bool_formula import AND, NOT, OR, PARITY, Bool, Constant, Literal, possible_data
 from node import Graph, Node
 
 Val = TypeVar("Val")
@@ -33,11 +33,15 @@ class Activation(Enum):
     TANH = 2
 
 
-class Neuron(Node[float]):
+class Neuron(Node):
     """A full-precision neuron."""
 
     def __init__(
-        self, key: str, act: Activation, ins: MutableMapping[str, float], bias: float
+        self,
+        key: str,
+        act: Activation,
+        ins: MutableMapping[str, float],
+        bias: float,
     ) -> None:
         self.key = key
         self.act = act
@@ -55,9 +59,9 @@ class Neuron(Node[float]):
             np.arctanh(x) if self.act == Activation.TANH else np.log(x) - np.log(1 - x)
         )
 
-    def __call__(self, vars: Mapping[str, float]) -> float:
-        x = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
-        return self.act_fn(np.array([x]))[0]
+    def __call__(self, vars: Mapping[str, np.ndarray]) -> np.ndarray:
+        x = self.bias + sum(vars[key] * self.ins[key] for key in self.ins)
+        return self.act_fn(x)
 
     def __str__(self):
         act_str = {Activation.SIGMOID: "sig", Activation.TANH: "tanh"}[self.act]
@@ -66,13 +70,13 @@ class Neuron(Node[float]):
         return ans
 
 
-class NeuronGraph(Graph[float]):
+class NeuronGraph(Graph):
     def __init__(self, neurons: Sequence[Neuron]) -> None:
         super().__init__(neurons)
-        self.neurons = neurons
+        self.neurons: dict[str, Neuron] = {n.key: n for n in neurons}
 
     @classmethod
-    def from_nn(cls, net: nn.Sequential, vars: list[str]):
+    def from_nn(cls, net: nn.Sequential, varnames: Sequence[str]):
         def key_gen():
             idx = 0
             while True:
@@ -81,11 +85,11 @@ class NeuronGraph(Graph[float]):
 
         names = key_gen()
         ans: list[Neuron] = []
-        vars = copy(vars)
+        varnames = list(copy(varnames))
         shape_out, shape_in = net[0].weight.shape  # type: ignore
         assert (
-            len(vars) == shape_in
-        ), f"vars needs same shape as first layer input, but got: {len(vars)} != {shape_in}."
+            len(varnames) == shape_in
+        ), f"vars needs same shape as first layer input, but got: {len(varnames)} != {shape_in}."
         n_layers = len(net)
         if isinstance(net[-1], nn.Flatten):
             n_layers -= 1  # ignore the last layer if it's a Flatten layer.
@@ -100,68 +104,47 @@ class NeuronGraph(Graph[float]):
                 else Activation.TANH
             )
             shape_out, shape_in = lin_layer.weight.shape
-            weight = lin_layer.weight.tolist()
+            weight: list[list[float]] = lin_layer.weight.tolist()
             bias = lin_layer.bias.tolist()
-            in_names = vars[-shape_in:]
+            in_keys = varnames[-shape_in:]
             for j in range(shape_out):
                 new_name = next(names)
-                ins = {name: weight[j][i] for i, name in enumerate(in_names)}
+                ins = {key: weight[j][i] for i, key in enumerate(in_keys)}
+                neuron = Neuron(new_name, act, ins, bias[j])
                 neuron = Neuron(new_name, act, ins, bias[j])
                 ans.append(neuron)
-                vars.append(new_name)
+                varnames.append(new_name)
                 if idx == n_layers - 2:
                     assert shape_out == 1
                     neuron.key = "target"
         return NeuronGraph(ans)
 
 
-class QuantizedNeuron(Node[float]):
-    """A neuron that was quantized to a step function with either 0 or 1 steps."""
+class QuantizedNeuron(Node):
+    """A neuron that was quantized to a step function with 1 step."""
 
     def __init__(
-        self, n: Neuron, x_thrs: Sequence[float], y_centers: Sequence[float]
+        self,
+        key: str,
+        ins: Mapping[str, float],
+        bias: float,
+        x_thr=0.0,
+        y_centers: list[float] = [0.0, 1.0],
     ) -> None:
-        self.key = n.key
-        self.ins = n.ins
-        self.n = n
-        self.x_thrs = x_thrs
+        self.key = key
+        self.bias = bias
+        self.ins = ins
+        self.x_thr = x_thr
         self.y_centers = y_centers
 
-    def __call__(self, vars: Mapping[str, float]) -> float:
-        ans = self.n.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
-        for idx, x_thr in enumerate(self.x_thrs):
-            if x_thr > ans:
-                return self.y_centers[idx]
-        return self.y_centers[-1]
-
-    @classmethod
-    def from_neuron(cls, n: Neuron, data_x: Collection[float] | None = None):
-        if data_x is None:
-            data_x = n.ins.values()
-        data_x = possible_sums(data_x)
-        data_x = np.fromiter(data_x, dtype=float)
-        data_x.sort()
-        data_x += n.bias
-        data_y = n.act_fn(data_x)
-
-        if len(data_y) == 1:
-            y_centers = data_y
-            y_thrs = y_centers[0]
-        else:
-            ans = ckmeans(data_y, 2)
-            n_cluster = len(np.unique(ans.cluster))
-            y_centers = np.array([ans.centers[i] for i in range(n_cluster)])
-            # find first value that corresponds to second group
-            new_grp_idx = np.nonzero(ans.cluster == 1)[0][0]
-            y_thrs = (data_y[new_grp_idx - 1] + data_y[new_grp_idx]) / 2
-
-        x_thrs = n.inv_act(y_thrs)
-        return QuantizedNeuron(n, x_thrs, list(y_centers))
+    def __call__(self, vars: Mapping[str, float | np.ndarray]) -> float | np.ndarray:
+        ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
+        return np.where(ans >= self.x_thr, self.y_centers[1], self.y_centers[0])
 
     def __str__(self):
         params = [f"{self.ins[key]:.2f} * {key}" for key in self.ins]
         cond = str.join("\t+ ", params)
-        cond += f"\t+ {self.n.bias:.2f} >= {self.x_thrs:.2f}"
+        cond += f"\t+ {self.bias:.2f} >= {self.x_thr:.2f}"
         ans = (
             f"{self.key} := "
             + f"[ {self.y_centers[1]:.2f} ] IF [ "
@@ -171,26 +154,73 @@ class QuantizedNeuron(Node[float]):
         return ans
 
 
-class QuantizedNeuronGraph(Graph[float]):
-    def __init__(self, q_neurons: Sequence[QuantizedNeuron]) -> None:
+class QuantizedNeuronGraph(Graph):
+    def __init__(self, q_neurons: list[QuantizedNeuron]) -> None:
         super().__init__(q_neurons)
-        self.q_neurons = q_neurons
 
     @classmethod
-    def from_neuron_graph(cls, ng: NeuronGraph):
-        q_neurons = [QuantizedNeuron.from_neuron(n) for n in ng.neurons]
+    def from_neuron_graph(cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray]):
+        new_ng = deepcopy(ng)
+        q_neuron_graph = QuantizedNeuronGraph([])
+        reverse_ins = new_ng.reverse_ins()
+        graph_ins = new_ng.graph_ins()
+        # print(f"{reverse_ins = }")
+        # print(f"{graph_ins = }")
+        for key, neuron in new_ng.neurons.items():
+            ins = graph_ins[key]
+            if key not in new_ng.out_keys:  # non-output nodes
+                outs = reverse_ins[neuron.key]
+                data_y = neuron(data)
+                assert isinstance(data_y, np.ndarray)
+                data[key] = data_y
 
-        return QuantizedNeuronGraph(q_neurons)
+                ck_ans = ckmeans(data_y, (2))
+                # print(f"{ck_ans.tot_withinss / len(data_y)}")
+                # print(f"{ck_ans.totss / len(data_y)}")
+                cluster = ck_ans.cluster
+                n_cluster = len(np.unique(ck_ans.cluster))
+                assert n_cluster == 2, NotImplementedError
+
+                y_centers = ck_ans.centers
+
+                # the threshold for the two groups lies in between the largest
+                # of the small group and the smallest of the large group
+                max_0 = np.max(data_y[cluster == 0])
+                min_1 = np.min(data_y[cluster == 1])
+                y_thr = (max_0 + min_1) / 2
+                x_thr = neuron.inv_act(y_thr)
+                x_thrs = neuron.inv_act(np.array([max_0, min_1]))
+
+                # TODO: delete the node and add it's center value to the bias of the target nodes
+
+                # adjust other weights such that the new q_neuron can have y_centers [-1.0, 1.0]
+                a = y_centers[0]
+                k = y_centers[1] - y_centers[0]
+
+                for out_key in outs:
+                    out_neuron = new_ng.nodes[out_key]
+                    assert isinstance(out_neuron, Neuron)
+                    w = out_neuron.ins[neuron.key]
+                    out_neuron.bias += a * w  # update bias
+                    out_neuron.ins[neuron.key] = w * k  # update weight
+
+                q_neuron = QuantizedNeuron(neuron.key, neuron.ins, neuron.bias - x_thr)
+                q_neuron_graph.add(q_neuron)
+            else:  # output nodes
+                q_neuron = QuantizedNeuron(neuron.key, neuron.ins, neuron.bias)
+                q_neuron_graph.add(q_neuron)
+
+        return q_neuron_graph
 
 
-class BooleanNeuron(Node[bool]):
+class BooleanNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
         self.b_val = self.to_bool()
 
-    def __call__(self, vars: MutableMapping[str, bool]) -> bool:
+    def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         return self.b_val(vars)
 
     def to_bool(self) -> Bool:
@@ -219,22 +249,9 @@ class BooleanNeuron(Node[bool]):
             )
             return OR(term1, term2).simplified()
 
-        x_thrs = self.q_neuron.x_thrs
-        y_centers = self.q_neuron.y_centers
-        bias = self.q_neuron.n.bias
-        # bias += x_thrs[0]
-
-        # step 1: adjust Neuron so that all activations from input are boolean, while preserving equality
-        for idx, key in enumerate(self.ins):
-            weight = self.ins[key]
-
-            # a = self.q_n.y_centers[0]
-            assert len(y_centers) == 2
-            bias += weight * y_centers[0]
-
-            # k = self.q_n.y_centers[1] - self.q_n.y_centers[0]
-            k = y_centers[1] - y_centers[0]
-            self.ins[key] = self.ins[key] * k
+        assert self.q_neuron.y_centers == [0.0, 1.0]
+        assert self.q_neuron.x_thr == 0.0
+        bias = self.q_neuron.bias
 
         # sort neurons by their weight
         ins = list(self.ins.items())
@@ -259,13 +276,31 @@ class BooleanNeuron(Node[bool]):
         return f"{self.key} := {str(self.b_val)}"
 
 
-class BooleanGraph(Graph[bool]):
+class BooleanGraph(Graph):
     def __init__(self, bools: Sequence[BooleanNeuron]) -> None:
         super().__init__(bools)
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
-        return BooleanGraph([BooleanNeuron(q_neuron) for q_neuron in q_ng.q_neurons])
+        return BooleanGraph(
+            [
+                BooleanNeuron(q_n)
+                for key, q_n in q_ng.nodes.items()
+                if isinstance(q_n, QuantizedNeuron)
+            ]
+        )
+
+
+def nn_to_rule_set(
+    model: nn.Sequential, data: MutableMapping[str, np.ndarray], vars: Sequence[str]
+):
+    # transform the trained neural network to a directed graph of full-precision neurons
+    neuron_graph = NeuronGraph.from_nn(model, vars)
+    # transform the graph to a new graph of perceptrons with quantized step functions
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
+    # transform the quantized graph to a set of if-then rules
+    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    return (neuron_graph, q_neuron_graph, bool_graph)
 
 
 def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
@@ -276,7 +311,7 @@ def to_vars(t: torch.Tensor, names: list[str]) -> Dict[str, float]:
 
 def main():
     keys = ["x1", "x2", "x3"]
-    k = 6
+    k = 10
 
     h1 = Neuron("h1", Activation.SIGMOID, {"x1": k, "x2": k}, -0.5 * k)
     h2 = Neuron("h2", Activation.SIGMOID, {"x1": -k, "x2": -k}, 1.5 * k)
@@ -293,37 +328,19 @@ def main():
 
     n_nodes = 10
     neuron_graph = NeuronGraph(neurons[:n_nodes])
-    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph)
-    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    data = possible_data(keys)
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
+    # bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
     parity = PARITY(keys)
 
     n_correct, n_total = 0.0, 0.0
-    for subset in powerset(keys):
-        vars = {key: 1.0 if key in subset else 0.0 for key in keys}
-        bool_vars = {key: True if key in subset else False for key in keys}
-        neuron_output = neuron_graph(vars)
-        # q_neuron_output = q_neuron_graph(vars, neurons[n_nodes - 1].key)
-        # bool_output = bool_graph(bool_vars, neurons[n_nodes - 1].key)
-        neuron_b = True if neuron_output >= 0.5 else False
-        # q_neuron_b = True if q_neuron_output >= 0.5 else False
-        p_out = parity(bool_vars)
-        # print(f"{vars = }")
-        # print(f"{neuron_output}")
-        # print(f"{q_neuron_output}")
-        # print(f"{bool_output}")
-        # print()
+    ng_pred = neuron_graph(data)
+    q_ng_pred = q_neuron_graph(data)
+    print(f"{ng_pred = }")
+    print(f"{q_ng_pred = }")
 
-        if neuron_b == p_out:
-            n_correct += 1.0
-        # else:
-        #    print(f"{subset}")
-        #    print(f"{neuron_b} {q_neuron_b} {bool_output} {p_out}")
-        #    print(f"{neuron_output} {q_neuron_output}")
-        #    print()
-
-        n_total += 1.0
     print(f"n_nodes: {n_nodes} | fidelity: {n_correct / n_total}")
-    print(str(bool_graph))
+    # print(str(bool_graph))
     # TODO: fix fidelity: it has to be 1.0 in this example
     # _ = input("Continue?")
 

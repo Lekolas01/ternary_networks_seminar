@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 
 from bool_formula import AND, NOT, Bool, Literal
-from neuron import powerset
+from neuron import possible_data, powerset
 
 
 def gen_data(func: Bool, n: int = 0, seed: int | None = None) -> pd.DataFrame:
@@ -39,10 +39,8 @@ def gen_data(func: Bool, n: int = 0, seed: int | None = None) -> pd.DataFrame:
 
     if n <= 0:
         # generate a data point for each possible point in the input space
-        for subset in powerset(vars):
-            interpretation = {l: True if l in subset else False for l in vars}
-            interpretation[target_col] = func(interpretation)
-            df.loc[len(df)] = interpretation  # type: ignore
+        for datapoint in possible_data(vars):
+            df.loc[len(df)] = func(datapoint)  # type: ignore
     elif n >= 1:
         # generate n randomly selected data points from the input space
         random.seed(seed)

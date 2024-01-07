@@ -1,21 +1,3 @@
-from __future__ import annotations
-
-import copy
-import os
-from collections.abc import Callable, Collection
-from pathlib import Path
-
-import numpy as np
-import pandas as pd
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-
-from bool_formula import Bool, Interpretation
-from datasets import FileDataset
-from graphics import plot_neuron_dist
-from neuron import BooleanGraph, NeuronGraph, QuantizedNeuronGraph
-
 """
 class BoolGraph(Bool):
     def __init__(self, ng: NeuronGraph2) -> None:
@@ -119,7 +101,7 @@ class BoolGraph(Bool):
                 del self.neuron_names[i]
 """
 
-
+"""
 def fidelity(
     nn_model: nn.Sequential,
     neuron_model: NeuronGraph,
@@ -155,23 +137,7 @@ def fidelity(
         fid += n_same
         n_vals += n_rows
     return fid / n_vals, bg_accuracy / n_vals
-
-
-def nn_to_rule_set(model_path: Path, data_path: Path):
-    assert os.path.isfile(model_path)
-    assert os.path.isfile(data_path)
-    model = torch.load(model_path)
-
-    df = pd.read_csv(data_path)
-    dl = DataLoader(FileDataset(data_path))  # dl not needed for now
-
-    vars = list(df.columns[:-1])
-    # transform the trained neural network to a directed graph of perceptrons
-    neuron_graph = NeuronGraph.from_nn(model, vars)
-    # transform the neuron graph to a boolean function
-    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph)
-    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
-    return (neuron_graph, q_neuron_graph, bool_graph)
+"""
 
 
 def main():

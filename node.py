@@ -1,68 +1,90 @@
-import copy
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence, Set
+from collections.abc import Mapping, MutableMapping, Sequence, Set
+from copy import deepcopy
 from graphlib import TopologicalSorter
-from typing import Dict, Generic, TypeVar
+from typing import AbstractSet, Dict, Generic, Self, TypeVar
 
-Val = TypeVar("Val")
+import numpy as np
 
 
-class Node(ABC, Generic[Val]):
+class Node(ABC):
     def __init__(self, key: str, ins: Set[str]) -> None:
         self.key = key
         self.ins = ins
 
     @abstractmethod
-    def __call__(self, vars: Mapping[str, Val]) -> Val:
+    def __call__(self, vars: Mapping[str, np.ndarray]) -> np.ndarray:
         pass
 
     def __str__(self) -> str:
         return f"Node({self.key})"
 
 
-class Graph(ABC, Generic[Val]):
-    def __init__(self, nodes: Sequence[Node[Val]]) -> None:
-        self.nodes: Dict[str, Node[Val]] = {}
+class Graph(ABC):
+    def __init__(self, nodes: Sequence[Node]) -> None:
+        self.nodes: dict[str, Node] = {}
+        self.in_keys = set()
+        self.out_keys = set()
+
         for node in nodes:
-            self.nodes[node.key] = node
+            self.add(node)
 
-        # perform various checks on the validity of the nodes data structure
-        # uniqueness check of names
-        assert len(self.nodes) == len(nodes), "Multiple nodes with the same name found."
-
-        self.keys = set(self.nodes.keys())
-
-        in_keys = set(in_key for node in self.nodes.values() for in_key in node.ins)
-
-        # uniqueness of the target node
-        self.out_keys = [key for key in self.keys if key not in in_keys]
-
-        # sort nodes by order of execution
-        d = {key: self.nodes[key].ins for key in self.keys}
-        sorter = TopologicalSorter(d)
-        order = sorter.static_order()
-
-        self.input_vars = in_keys.difference(self.keys)
-        self.keys = [key for key in order if key not in self.input_vars]
-
-    def __call__(self, vars: MutableMapping[str, Val]) -> Val:
-        vars = copy.copy(vars)
-        for name in self.keys:
-            node = self.nodes[name]
-            vars[name] = node(vars)
-            if name == "target":
-                return vars[name]
-        raise ValueError("Unaccessible code.")
+    def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
+        order = self.topological_order()
+        for key in order:
+            vars[key] = self.nodes[key](vars)
+            if key == "target":
+                return vars[key]
+        raise ValueError("Could not find a node with key 'target'.")
 
     def __str__(self) -> str:
-        return (
-            "Graph[\n\t"
-            + "\n\t".join(str(self.nodes[name]) for name in self.keys)
-            + "\n]"
-        )
+        order = self.topological_order()
+        ans = "Graph[\n\t" + "\n\t".join(str(self.nodes[key]) for key in order) + "\n]"
+        return ans
 
-    def topological_order(self) -> Iterable[str]:
-        return self.keys
+    def graph_ins(self) -> Dict[str, Set[str]]:
+        """
+        A Mapping of nodes to a set of all nodes that point to the node
+        """
+        return {key: node.ins for key, node in self.nodes.items()}
 
-    def target_vars(self) -> Collection[str]:
-        return self.out_keys
+    def reverse_ins(self) -> Dict[str, Set[str]]:
+        """
+        Same as graph_ins, except that the set contains all nodes that the node points towards.
+        """
+        inverse = {}
+        graph_ins = self.graph_ins()
+        for k, v in graph_ins.items():
+            for x in v:
+                inverse.setdefault(x, {})[k] = x
+        return inverse
+
+    def topological_order(self) -> list[str]:
+        # sort nodes by order of execution
+        sorter = TopologicalSorter(self.graph_ins())
+        order = sorter.static_order()
+        order = filter(lambda key: key not in self.in_keys, order)
+        return list(order)
+
+    def add(self, n: Node):
+        self.nodes[n.key] = n
+
+        if n.key in self.in_keys:
+            # adding a new node can delete an in_key (if the in_key with the same name exists)
+            self.in_keys.remove(n.key)
+        else:
+            # adding a new node can create new out_key (if no node has this as in)
+            self.out_keys.add(n.key)
+
+        for in_key in n.ins:
+            if in_key in self.nodes:
+                # adding a new node can delete out_keys (for each in node that is in the graph)
+                self.out_keys.discard(in_key)
+            else:
+                # adding a new node can create new in_keys (for each in node that is not in the graph)
+                self.in_keys.add(in_key)
+
+    def debug(self) -> None:
+        print(f"{self.nodes = }")
+        print(f"{self.in_keys = }")
+        print(f"{self.out_keys = }")

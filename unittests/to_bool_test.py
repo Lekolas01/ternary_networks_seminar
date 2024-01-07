@@ -6,7 +6,6 @@ import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
 from neuron import NeuronGraph, to_vars
-from nn_to_rule_set import BoolGraph
 from node import Graph
 
 

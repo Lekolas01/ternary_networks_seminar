@@ -1,9 +1,8 @@
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from bool_formula import AND, NOT, OR, Constant, Literal, all_interpretations, overlap
+from bool_formula import AND, NOT, OR, Constant, Literal, overlap, possible_data
 from datasets import FileDataset
-from nn_to_rule_set import gen_dataset_from_func, train_nn
 
 
 def test_binaryFunctions(self):
