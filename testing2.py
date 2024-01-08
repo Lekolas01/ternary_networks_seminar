@@ -1,16 +1,15 @@
-import itertools
-from graphlib import TopologicalSorter
-
-import numpy as np
-
-from bool_formula import PARITY
+from neuron import BooleanGraph, QuantizedNeuron, QuantizedNeuronGraph
 
 a = [3, 1, 5, 2]
 
 
 keys = [f"x{i + 1}" for i in range(5)]
-a = PARITY(keys)
 
-data = {key: np.random.binomial(1, 0.5, 5) for key in keys}
-print(data)
-print(a(data))
+h1 = QuantizedNeuron(
+    "h1",
+    {"x1": 3.0, "x2": 3.0, "x3": 1.0, "x4": 1.0, "x5": 1.0},
+    -5.5,
+)
+q_ng = QuantizedNeuronGraph([h1])
+b_ng = BooleanGraph.from_q_neuron_graph(q_ng)
+print(b_ng)

@@ -49,10 +49,14 @@ class Bool(ABC):
     def simplified(self) -> Bool:
         return self
 
-    def __eq__(self, other: Bool) -> bool:
-        names = self.all_literals().union(other.all_literals())
+    def __eq__(self, other: Bool | bool) -> bool:
+        names = (
+            self.all_literals().union(other.all_literals())
+            if isinstance(other, Bool)
+            else self.all_literals()
+        )
         data = possible_data(names, is_float=False)
-        return np.mean(self(data), other(data)) == 1.0
+        return np.all(self(data))
 
     def __repr__(self) -> str:
         return str(self)

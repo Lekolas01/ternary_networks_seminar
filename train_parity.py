@@ -112,12 +112,12 @@ def main():
 
     print("ng = ", ng)
     print("q_ng = ", q_ng)
-    # print("b_ng = ", b_ng)
+    print("b_ng = ", b_ng)
 
     nn_out = model(nn_data).detach().numpy().round()
     ng_out = ng(ng_data).round()
     q_ng_out = q_ng(ng_data)
-    # b_ng_out = b_ng(ng_data)
+    b_ng_out = b_ng(ng_data)
 
     print(f"{nn_out = }")
     print(f"{ng_out = }")

@@ -215,6 +215,7 @@ class QuantizedNeuronGraph(Graph):
 
 class BooleanNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
+        print("BooleanNeuron.init()")
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
@@ -231,9 +232,9 @@ class BooleanNeuron(Node):
             i: int = 0,
         ) -> Bool:
             if threshold >= 0:
-                return Constant(True)
+                return Constant(np.array(True))
             if threshold < -sum(n[1] for n in neurons_in[i:]):
-                return Constant(False)
+                return Constant(np.array(False))
 
             key = neurons_in[i][0]
             weight = neurons_in[i][1]
@@ -282,7 +283,6 @@ class BooleanGraph(Graph):
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
-        return BooleanGraph([])
         return BooleanGraph(
             [
                 BooleanNeuron(q_n)
