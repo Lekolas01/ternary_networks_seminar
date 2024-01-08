@@ -3,24 +3,36 @@ import seaborn as sns
 from ckmeans_1d_dp import ckmeans
 from matplotlib import pyplot as plt
 
-from neuron import Activation, Neuron, QuantizedNeuron, possible_sums
+from bool_formula import possible_data
+from neuron import (
+    Activation,
+    Neuron,
+    NeuronGraph,
+    QuantizedNeuron,
+    QuantizedNeuronGraph,
+    possible_sums,
+)
 from utilities import flatten, set_seed
 
 sns.set()
 
 
 def plot_neuron_dist(neuron: Neuron) -> None:
-    sums = np.array(possible_sums(val for val in neuron.ins.values())) + neuron.bias
+    keys = neuron.ins
+    data = possible_data(keys)
+    ng = NeuronGraph([neuron])
+    q_ng = QuantizedNeuronGraph.from_neuron_graph(ng, data)
     fig, axes = plt.subplots(
         nrows=2, ncols=2, sharex=False, sharey=True, figsize=(10, 8)
     )
+    data_y = ng(data)
     margin = 0.1
     x_min, x_max = sums[0], sums[-1]
     x = np.linspace(start=x_min - margin, stop=x_max + margin, num=100)
     y = np.tanh(x)
     sns.lineplot(ax=axes[0, 0], x=x, y=y, color="r", linewidth=1.0)
     sns.scatterplot(ax=axes[0, 0], x=sums, y=np.tanh(sums), c="black", marker="X", s=50)
-    q_neuron = QuantizedNeuron.from_neuron(neuron)
+
     fig.suptitle(f"{str(neuron)}\n{str(q_neuron)}")
     axes[0, 0].set_xlabel("s(x)")
     axes[0, 0].set_ylabel("tanh(s(x))")

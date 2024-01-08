@@ -66,10 +66,10 @@ def train_on_parity(
 
 def main():
     seed = 1
-    n_vars = 2
-    epochs = 2000
-    l1 = 0.0
-    batch_size = 128
+    n_vars = 10
+    epochs = 3000
+    l1 = 2e-5
+    batch_size = 64
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
     data_path = path / (name + ".csv")
@@ -81,7 +81,7 @@ def main():
         print(f"No pre-trained model found. Starting training...")
         model = nn.Sequential(
             nn.Linear(n_vars, n_vars),
-            nn.Sigmoid(),
+            nn.Tanh(),
             nn.Linear(n_vars, 1),
             nn.Sigmoid(),
             nn.Flatten(0),
@@ -102,6 +102,7 @@ def main():
     df = pd.read_csv(data_path, dtype=float)
     keys = list(df.columns)
     keys.pop()  # remove target column
+    y = df["target"]
     ng_data = {key: np.array(df[key], dtype=float) for key in keys}
     nn_data = np.stack([ng_data[key] for key in keys], axis=1)
     nn_data = torch.Tensor(nn_data)
@@ -111,25 +112,30 @@ def main():
 
     print("ng = ", ng)
     print("q_ng = ", q_ng)
-    print("b_ng = ", b_ng)
+    # print("b_ng = ", b_ng)
 
     nn_out = model(nn_data).detach().numpy().round()
     ng_out = ng(ng_data).round()
     q_ng_out = q_ng(ng_data)
-    b_ng_out = b_ng(ng_data)
+    # b_ng_out = b_ng(ng_data)
 
     print(f"{nn_out = }")
     print(f"{ng_out = }")
     print(f"{q_ng_out = }")
-    print(f"{b_ng_out = }")
+    # print(f"{b_ng_out = }")
 
     print("--------------------------------------")
     print("mean error nn - ng: ", np.mean(np.abs(nn_out - ng_out)))
     print("mean error nn - q_ng: ", np.mean(np.abs(nn_out - q_ng_out)))
-    print("mean error nn - b_ng: ", np.mean(np.abs(nn_out - b_ng_out)))
+    # print("mean error nn - b_ng: ", np.mean(np.abs(nn_out - b_ng_out)))
+
     print("fidelity nn - ng:\t", np.mean(nn_out == ng_out))
     print("fidelity nn - q_ng:\t", np.mean(nn_out == q_ng_out))
-    print("fidelity nn - b_ng:\t", np.mean(nn_out == b_ng_out))
+    # print("fidelity nn - b_ng:\t", np.mean(nn_out == b_ng_out))
+
+    print("accuracy nn:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y)))
+    print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(ng_out - y)))
+    print("accuracy q_ng:\t", np.array(1.0) - np.mean(np.abs(q_ng_out - y)))
     print("--------------------------------------")
     exit()
 

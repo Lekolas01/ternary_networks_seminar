@@ -282,6 +282,7 @@ class BooleanGraph(Graph):
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
+        return BooleanGraph([])
         return BooleanGraph(
             [
                 BooleanNeuron(q_n)
