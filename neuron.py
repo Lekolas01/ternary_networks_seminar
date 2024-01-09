@@ -2,7 +2,7 @@ from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from copy import copy, deepcopy
 from enum import Enum
 from itertools import chain, combinations
-from typing import Dict, TypeVar
+from typing import Dict, Tuple, TypeVar
 
 import numpy as np
 import torch
@@ -224,30 +224,31 @@ class BooleanNeuron(Node):
         return self.b_val(vars)
 
     def to_bool(self) -> Bool:
-        def to_bool_rec(
-            neurons_in: list[tuple[str, float]],
-            neuron_signs: list[bool],
-            threshold: float,
-            i: int = 0,
-        ) -> Bool:
-            if threshold >= 0:
-                return Constant(np.array(True))
-            if threshold < -sum(n[1] for n in neurons_in[i:]):
-                return Constant(np.array(False))
+        def to_bool_rec(k: int, threshold: float) -> Tuple[Bool, Tuple[float, float]]:
+            # how much one could posible add by setting everyr variable to 1
+            max_sum = sum(n[1] for n in self.n_ins[k:])
+            # if already positive, return True
+            if threshold >= 0.0:
+                return (Constant(np.array(True)), (-threshold, float("inf")))
+            # if you can't reach positive values, return False
+            if max_sum + threshold <= 0.0:
+                return (
+                    Constant(np.array(False)),
+                    (float("-inf"), -(max_sum + threshold)),
+                )
 
-            key = neurons_in[i][0]
-            weight = neurons_in[i][1]
-            positive = not neuron_signs[i]
+            key = self.n_ins[k][0]
+            weight = self.n_ins[k][1]
+            positive = not self.signs[k]
 
             # set to False
-            term1 = to_bool_rec(neurons_in, neuron_signs, threshold, i + 1)
-
-            term2 = to_bool_rec(neurons_in, neuron_signs, threshold + weight, i + 1)
+            (term1, (min1, max1)) = to_bool_rec(k + 1, threshold)
+            (term2, (min2, max2)) = to_bool_rec(k + 1, threshold + weight)
             term2 = AND(
                 Literal(key) if positive else NOT(Literal(key)),
                 term2,
             )
-            return OR(term1, term2).simplified()
+            return (OR(term1, term2).simplified(), (max(min1, min2), min(max1, max2)))
 
         assert self.q_neuron.y_centers == [0.0, 1.0]
         assert self.q_neuron.x_thr == 0.0
@@ -255,18 +256,20 @@ class BooleanNeuron(Node):
 
         # sort neurons by their weight
         ins = list(self.ins.items())
-
         ins = sorted(ins, key=lambda x: abs(x[1]), reverse=True)
 
         # remember which weights are negative and then invert all of them (needed for negative numbers)
-        negative = [tup[1] < 0 for tup in ins]
-        ins = [(tup[0], abs(tup[1])) for tup in ins]
+        self.signs = [tup[1] < 0 for tup in ins]
+        self.n_ins = [(tup[0], abs(tup[1])) for tup in ins]
 
-        positive_weights = list(zip(negative, [tup[1] for tup in ins]))
+        positive_weights = list(zip(self.signs, [tup[1] for tup in self.n_ins]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        return to_bool_rec(ins, negative, bias - bias_diff)
+        (term, (min_thr, max_thr)) = to_bool_rec(0, bias - bias_diff)
+        print(f"{min_thr = }")
+        print(f"{max_thr = }")
+        return term
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
