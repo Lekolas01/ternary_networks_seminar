@@ -224,7 +224,23 @@ class BooleanNeuron(Node):
         return self.b_val(vars)
 
     def to_bool(self) -> Bool:
-        def to_bool_rec(k: int, threshold: float) -> Tuple[Bool, Tuple[float, float]]:
+        def init_dp(n_ins: list[float]) -> list[list[Tuple[float, float]]]:
+            dp = []
+            n_vars = len(n_ins)
+            curr_sum = 0.0
+            dp.append([])
+            dp[-1].append((False, (float("-inf"), -curr_sum)))
+            dp[-1].append((True, (0.0, float("inf"))))
+            for k in range(n_vars):
+                curr_sum += n_ins[k]
+                dp.append([])
+                dp[-1].append((False, (float("-inf"), -curr_sum)))
+                dp[-1].append((True, (0.0, float("inf"))))
+            return dp
+
+        def to_bool_rec(
+            k: int, threshold: float, dp
+        ) -> Tuple[Bool, Tuple[float, float]]:
             # how much one could posible add by setting everyr variable to 1
             max_sum = sum(n[1] for n in self.n_ins[k:])
             # if already positive, return True
@@ -242,13 +258,16 @@ class BooleanNeuron(Node):
             positive = not self.signs[k]
 
             # set to False
-            (term1, (min1, max1)) = to_bool_rec(k + 1, threshold)
-            (term2, (min2, max2)) = to_bool_rec(k + 1, threshold + weight)
+            (term1, (min1, max1)) = to_bool_rec(k + 1, threshold, dp)
+            (term2, (min2, max2)) = to_bool_rec(k + 1, threshold + weight, dp)
             term2 = AND(
                 Literal(key) if positive else NOT(Literal(key)),
                 term2,
             )
-            return (OR(term1, term2).simplified(), (max(min1, min2), min(max1, max2)))
+            ans = (OR(term1, term2).simplified(), (max(min1, min2), min(max1, max2)))
+            # add to dp
+
+            return ans
 
         assert self.q_neuron.y_centers == [0.0, 1.0]
         assert self.q_neuron.x_thr == 0.0
@@ -266,7 +285,10 @@ class BooleanNeuron(Node):
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        (term, (min_thr, max_thr)) = to_bool_rec(0, bias - bias_diff)
+        dp = init_dp([n[1] for n in self.n_ins])
+        for row in dp:
+            print(row)
+        (term, (min_thr, max_thr)) = to_bool_rec(0, bias - bias_diff, dp)
         print(f"{min_thr = }")
         print(f"{max_thr = }")
         return term

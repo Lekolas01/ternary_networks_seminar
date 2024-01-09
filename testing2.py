@@ -1,4 +1,4 @@
-from neuron import BooleanGraph, BooleanNeuron, QuantizedNeuron, QuantizedNeuronGraph
+from neuron import BooleanNeuron, QuantizedNeuron
 
 a = [3, 1, 5, 2]
 
