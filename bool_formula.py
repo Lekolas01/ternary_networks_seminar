@@ -112,7 +112,9 @@ class NOT(Bool):
         self.child = child
 
     def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
-        return ~self.child(interpretation)
+        ans = self.child(interpretation)
+        # print(ans)
+        return ~(ans)
 
     def __str__(self) -> str:
         return f"!{self.child.__str__()}"

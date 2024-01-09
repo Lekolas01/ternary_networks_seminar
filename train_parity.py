@@ -66,10 +66,10 @@ def train_on_parity(
 
 def main():
     seed = 1
-    n_vars = 10
-    epochs = 3000
-    l1 = 2e-5
-    batch_size = 64
+    n_vars = 3
+    epochs = 2000
+    l1 = 0.0
+    batch_size = 128
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
     data_path = path / (name + ".csv")
@@ -106,38 +106,45 @@ def main():
     ng_data = {key: np.array(df[key], dtype=float) for key in keys}
     nn_data = np.stack([ng_data[key] for key in keys], axis=1)
     nn_data = torch.Tensor(nn_data)
+    bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, b_ng = nn_to_rule_set(model, ng_data, keys)
+    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
 
     print("ng = ", ng)
     print("q_ng = ", q_ng)
-    print("b_ng = ", b_ng)
+    print("bg = ", bg)
 
     nn_out = model(nn_data).detach().numpy().round()
     ng_out = ng(ng_data).round()
     q_ng_out = q_ng(ng_data)
-    b_ng_out = b_ng(ng_data)
+    bg_out = bg(bg_data)
+
+    print("----------------- Outputs -----------------")
 
     print(f"{nn_out = }")
     print(f"{ng_out = }")
     print(f"{q_ng_out = }")
-    # print(f"{b_ng_out = }")
+    print(f"{bg_out = }")
 
-    print("--------------------------------------")
+    print("----------------- Mean Errors -----------------")
+
     print("mean error nn - ng: ", np.mean(np.abs(nn_out - ng_out)))
     print("mean error nn - q_ng: ", np.mean(np.abs(nn_out - q_ng_out)))
-    # print("mean error nn - b_ng: ", np.mean(np.abs(nn_out - b_ng_out)))
+    print("mean error nn - b_ng: ", np.mean(np.abs(nn_out - bg_out)))
+
+    print("----------------- Fidelity -----------------")
 
     print("fidelity nn - ng:\t", np.mean(nn_out == ng_out))
     print("fidelity nn - q_ng:\t", np.mean(nn_out == q_ng_out))
-    # print("fidelity nn - b_ng:\t", np.mean(nn_out == b_ng_out))
+    print("fidelity nn - b_ng:\t", np.mean(nn_out == bg_out))
+
+    print("----------------- Final Acc. -----------------")
 
     print("accuracy nn:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y)))
     print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(ng_out - y)))
     print("accuracy q_ng:\t", np.array(1.0) - np.mean(np.abs(q_ng_out - y)))
-    print("--------------------------------------")
-    exit()
+    print("accuracy bg:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules

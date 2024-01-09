@@ -215,7 +215,6 @@ class QuantizedNeuronGraph(Graph):
 
 class BooleanNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
-        print("BooleanNeuron.init()")
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins

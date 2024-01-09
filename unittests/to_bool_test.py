@@ -1,11 +1,19 @@
 import unittest
 from math import isclose
 
+import numpy as np
 import torch
 import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
-from neuron import NeuronGraph, to_vars
+from neuron import (
+    BooleanGraph,
+    Neuron,
+    NeuronGraph,
+    QuantizedNeuron,
+    QuantizedNeuronGraph,
+    to_vars,
+)
 from node import Graph
 
 
@@ -30,10 +38,10 @@ class TestToBool(unittest.TestCase):
         )
 
     def test_True(self):
-        x1 = Neuron2("x1")
-        x2 = Neuron2("x2")
-        b = Neuron2("b", [(x1, 1.5), (x2, 1.4)], 2.2)
-        assert b.to_bool() == Constant(True)
+        b = QuantizedNeuron("b", {"x1": 1.5, "x2": 1.4}, -1.0)
+        q_ng = QuantizedNeuronGraph([b])
+        bg = BooleanGraph.from_q_neuron_graph(q_ng)
+        assert bg.nodes["b"].to_bool() == Constant(np.array(True))
 
     def test_False(self):
         x1 = Neuron2("x1")
