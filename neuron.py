@@ -213,6 +213,31 @@ class QuantizedNeuronGraph(Graph):
         return q_neuron_graph
 
 
+class Dp:
+    def __init__(self, n_ins: list[float]) -> None:
+        dp: list[list[Tuple[Bool, Tuple[float, float]]]] = []
+        n_vars = len(n_ins)
+        curr_sum = 0.0
+        dp.append([])
+        dp[-1].append((Constant(np.array(False)), (float("-inf"), -curr_sum)))
+        dp[-1].append((Constant(np.array(True)), (0.0, float("inf"))))
+        for k in range(n_vars):
+            curr_sum += n_ins[k]
+            dp.append([])
+            dp[-1].append((Constant(np.array(False)), (float("-inf"), -curr_sum)))
+            dp[-1].append((Constant(np.array(True)), (0.0, float("inf"))))
+        self.data = dp
+
+    def find(self, k: int, val: float) -> Tuple[Bool, Tuple[float, float]] | None:
+        assert k >= 0, f"k must be >= 0, but got {k}."
+        arr = self.data[k]
+        for t in arr:
+            _, r = t
+            if r[0] <= val <= r[1]:
+                return t
+        return None
+
+
 class BooleanNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
         self.q_neuron = q_neuron
@@ -224,42 +249,43 @@ class BooleanNeuron(Node):
         return self.b_val(vars)
 
     def to_bool(self) -> Bool:
-        def init_dp(n_ins: list[float]) -> list[list[Tuple[float, float]]]:
-            dp = []
-            n_vars = len(n_ins)
-            curr_sum = 0.0
-            dp.append([])
-            dp[-1].append((False, (float("-inf"), -curr_sum)))
-            dp[-1].append((True, (0.0, float("inf"))))
-            for k in range(n_vars):
-                curr_sum += n_ins[k]
-                dp.append([])
-                dp[-1].append((False, (float("-inf"), -curr_sum)))
-                dp[-1].append((True, (0.0, float("inf"))))
-            return dp
-
         def to_bool_rec(
-            k: int, threshold: float, dp
+            k: int, threshold: float, dp: Dp
         ) -> Tuple[Bool, Tuple[float, float]]:
-            # how much one could posible add by setting everyr variable to 1
+            a = False
             max_sum = sum(n[1] for n in self.n_ins[k:])
+            # how much one could posible add by setting everyr variable to 1
+            found = dp.find(k, threshold)
+            if isinstance(found, Tuple):  # if already calculated once
+                print(f"{k = } | {found = }")
+                a = True
+                # return found
+
             # if already positive, return True
             if threshold >= 0.0:
-                return (Constant(np.array(True)), (-threshold, float("inf")))
+                temp = (-threshold, float("inf"))
+                print(f"{threshold = }")
+                if a:
+                    print(f"we return {temp}.")
+                return (Constant(np.array(True)), temp)
             # if you can't reach positive values, return False
             if max_sum + threshold <= 0.0:
+                temp = -(max_sum + threshold)
+                if a:
+                    print(f"we return {temp}.")
                 return (
                     Constant(np.array(False)),
-                    (float("-inf"), -(max_sum + threshold)),
+                    (float("-inf"), temp),
                 )
-
             key = self.n_ins[k][0]
             weight = self.n_ins[k][1]
             positive = not self.signs[k]
 
             # set to False
             (term1, (min1, max1)) = to_bool_rec(k + 1, threshold, dp)
+            # min1, max1 = min1 - threshold, max1 - threshold
             (term2, (min2, max2)) = to_bool_rec(k + 1, threshold + weight, dp)
+            # min2, max2 = min2 - (threshold + weight), max2 - (threshold + weight)
             term2 = AND(
                 Literal(key) if positive else NOT(Literal(key)),
                 term2,
@@ -285,9 +311,7 @@ class BooleanNeuron(Node):
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        dp = init_dp([n[1] for n in self.n_ins])
-        for row in dp:
-            print(row)
+        dp = Dp([n[1] for n in self.n_ins])
         (term, (min_thr, max_thr)) = to_bool_rec(0, bias - bias_diff, dp)
         print(f"{min_thr = }")
         print(f"{max_thr = }")
