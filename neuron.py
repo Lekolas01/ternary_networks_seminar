@@ -215,7 +215,8 @@ class QuantizedNeuronGraph(Graph):
 
 
 class Dp:
-    def __init__(self, n_ins: list[float]) -> None:
+    def __init__(self, n_vars: int) -> None:
+        """
         dp: list[list[Tuple[Bool, float, float]]] = []
         self.n_vars = len(n_ins)
         curr_sum = 0.0
@@ -228,15 +229,31 @@ class Dp:
             dp[-1].append((Constant(np.array(False)), float("-inf"), -curr_sum))
             dp[-1].append((Constant(np.array(True)), 0.0, float("inf")))
         self.data = dp
+        """
+        assert 0 <= n_vars
+        self.n_vars = n_vars
+        self.data: list[list[Tuple[Bool, float, float]]] = [
+            [] for _ in range(self.n_vars + 1)
+        ]
 
     def find(self, k: int, val: float) -> Tuple[Bool, float, float] | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
         arr = self.data[k]
         for t in arr:
             _, min, max = t
-            if min <= val <= max:
+            if min <= val < max:
                 return t
         return None
+
+    def insert(self, k: int, val: Tuple[Bool, float, float]):
+        # assert you don't add part of a range that is already included
+        if self.find(k, val[1]) is not None or self.find(k, val[2]) is not None:
+            print(f"{self.data = }")
+            print(f"{k = }")
+            print(f"{val = }")
+            raise ValueError
+
+        bisect.insort(self.data[k], val, key=lambda x: x[1])
 
     def __getitem__(self, key: int):
         assert 0 <= key <= self.n_vars
@@ -245,7 +262,7 @@ class Dp:
     def __str__(self) -> str:
         ans = []
         for i in range(self.n_vars + 1):
-            ans.append(", ".join(str(t) for t in self.data[i]))
+            ans.append("[" + ", ".join(str((t[1], t[2])) for t in self.data[i]) + "]")
         return "\n".join(ans)
 
     def __repr__(self) -> str:
@@ -264,24 +281,23 @@ class BooleanNeuron(Node):
 
     def to_bool(self) -> Bool:
         def to_bool_rec(k: int, threshold: float, dp: Dp) -> Tuple[Bool, float, float]:
-            max_sum = sum(n[1] for n in self.n_ins[k:])
-            # how much one could posible add by setting everyr variable to 1
+            max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
+            # how much one could add by setting everyr variable to 1 without chaning the formula
             found = dp.find(k, threshold)
-            if isinstance(found, Tuple):  # if already calculated once
-                # print(f"{k = } | {found = }")
-                # return found
-                pass
+            if isinstance(found, Tuple):
+                return found
 
             # if already positive, return True
             if threshold >= 0.0:
-                return (Constant(np.array(True)), 0.0, float("inf"))
+                ans = (Constant(np.array(True)), 0.0, float("inf"))
+                dp.insert(k, ans)
+                return ans
             # if you can't reach positive values, return False
             if max_sum + threshold <= 0.0:
-                return (
-                    Constant(np.array(False)),
-                    float("-inf"),
-                    -max_sum,
-                )
+                ans = (Constant(np.array(False)), float("-inf"), -max_sum)
+                dp.insert(k, ans)
+                return ans
+
             key = self.n_ins[k][0]
             weight = self.n_ins[k][1]
             positive = not self.signs[k]
@@ -316,7 +332,7 @@ class BooleanNeuron(Node):
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        dp = Dp([n[1] for n in self.n_ins])
+        dp = Dp(len(self.n_ins))
         (term, min_thr, max_thr) = to_bool_rec(0, bias - bias_diff, dp)
         print(f"{min_thr = }")
         print(f"{max_thr = }")
