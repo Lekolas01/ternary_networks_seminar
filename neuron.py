@@ -216,20 +216,6 @@ class QuantizedNeuronGraph(Graph):
 
 class Dp:
     def __init__(self, n_vars: int) -> None:
-        """
-        dp: list[list[Tuple[Bool, float, float]]] = []
-        self.n_vars = len(n_ins)
-        curr_sum = 0.0
-        dp.append([])
-        dp[-1].append((Constant(np.array(False)), float("-inf"), -curr_sum))
-        dp[-1].append((Constant(np.array(True)), 0.0, float("inf")))
-        for k in range(self.n_vars):
-            curr_sum += n_ins[k]
-            dp.append([])
-            dp[-1].append((Constant(np.array(False)), float("-inf"), -curr_sum))
-            dp[-1].append((Constant(np.array(True)), 0.0, float("inf")))
-        self.data = dp
-        """
         assert 0 <= n_vars
         self.n_vars = n_vars
         self.data: list[list[Tuple[Bool, float, float]]] = [
@@ -262,7 +248,11 @@ class Dp:
     def __str__(self) -> str:
         ans = []
         for i in range(self.n_vars + 1):
-            ans.append("[" + ", ".join(str((t[1], t[2])) for t in self.data[i]) + "]")
+            ans.append(
+                "["
+                + ", ".join(str((round(t[1], 2), round(t[2], 2))) for t in self.data[i])
+                + "]"
+            )
         return "\n".join(ans)
 
     def __repr__(self) -> str:
@@ -274,12 +264,12 @@ class BooleanNeuron(Node):
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        self.b_val = self.to_bool()
+        (self.b_val, self.min_thr, self.max_thr), self.dp = self.to_bool()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         return self.b_val(vars)
 
-    def to_bool(self) -> Bool:
+    def to_bool(self) -> Tuple[Tuple[Bool, float, float], Dp]:
         def to_bool_rec(k: int, threshold: float, dp: Dp) -> Tuple[Bool, float, float]:
             max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
             # how much one could add by setting everyr variable to 1 without chaning the formula
@@ -333,18 +323,15 @@ class BooleanNeuron(Node):
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
         dp = Dp(len(self.n_ins))
-        (term, min_thr, max_thr) = to_bool_rec(0, bias - bias_diff, dp)
-        print(f"{min_thr = }")
-        print(f"{max_thr = }")
-        print(f"{dp = }")
-        return term
+        ans = to_bool_rec(0, bias - bias_diff, dp)
+        return ans, dp
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
         return BooleanNeuron(q_neuron)
 
     def __str__(self) -> str:
-        return f"{self.key} := {str(self.b_val)}"
+        return f"{self.key} := {str(self.dp)}"
 
 
 class BooleanGraph(Graph):
