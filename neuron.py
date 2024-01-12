@@ -214,32 +214,73 @@ class QuantizedNeuronGraph(Graph):
         return q_neuron_graph
 
 
+class Rule(Node):
+    def __init__(
+        self, key: str, ins: list[Tuple[str, bool]], val: bool | None = None
+    ) -> None:
+        self.key = key
+        self.ins = ins
+        self.val = val
+        self.is_const = self.val is not None
+
+    def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
+        ans = np.ones_like(vars[self.ins[0][0]], dtype=bool)
+        if not self.is_const:
+            for name, val in self.ins:
+                ans = ans & (vars[name] if val else ~vars[name])
+            return ans
+        return ans if self.val else np.zeros_like(vars[self.ins[0][0]], dtype=bool)
+
+    def __repr__(self) -> str:
+        if self.is_const:
+            return f"{self.key} := {'T' if self.val else 'F'}"
+        ans = f"{self.key} := "
+        ans += ", ".join(f"{'' if b else '!'}{key}" for key, b in self.ins)
+        return ans
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+
+class DpNode:
+    def __init__(self, key: str, min_thr: float, max_thr: float) -> None:
+        self.key = key
+        self.min_thr = min_thr
+        self.max_thr = max_thr
+        self.mean = (min_thr + max_thr) / 2
+
+    def __repr__(self) -> str:
+        return f"DpNode({self.key}, {self.min_thr}, {self.max_thr})"
+
+
 class Dp:
     def __init__(self, n_vars: int) -> None:
         assert 0 <= n_vars
         self.n_vars = n_vars
-        self.data: list[list[Tuple[Bool, float, float]]] = [
-            [] for _ in range(self.n_vars + 1)
-        ]
+        self.data: list[list[DpNode]] = [[] for _ in range(self.n_vars + 1)]
 
-    def find(self, k: int, val: float) -> Tuple[Bool, float, float] | None:
+    def find(self, k: int, val: float) -> DpNode | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
+        if k > len(self.data):
+            return None
         arr = self.data[k]
         for t in arr:
-            _, min, max = t
-            if min <= val < max:
+            if t.min_thr < val < t.max_thr:
                 return t
         return None
 
-    def insert(self, k: int, val: Tuple[Bool, float, float]):
+    def insert(self, k: int, val: DpNode):
         # assert you don't add part of a range that is already included
-        if self.find(k, val[1]) is not None or self.find(k, val[2]) is not None:
+        if (
+            self.find(k, val.min_thr) is not None
+            or self.find(k, val.max_thr) is not None
+        ):
             print(f"{self.data = }")
             print(f"{k = }")
             print(f"{val = }")
             raise ValueError
 
-        bisect.insort(self.data[k], val, key=lambda x: x[1])
+        bisect.insort(self.data[k], val, key=lambda x: x.min_thr)
 
     def __getitem__(self, key: int):
         assert 0 <= key <= self.n_vars
@@ -248,27 +289,11 @@ class Dp:
     def __str__(self) -> str:
         ans = []
         for i in range(self.n_vars + 1):
-            ans.append(
-                "["
-                + ", ".join(str((round(t[1], 2), round(t[2], 2))) for t in self.data[i])
-                + "]"
-            )
+            ans.append("[" + ", ".join(str(t) for t in self.data[i]) + "]")
         return "\n".join(ans)
 
     def __repr__(self) -> str:
         return str(self)
-
-
-class Rule(Node):
-    def __init__(self, key: str, ins: list[Tuple[str, bool]]) -> None:
-        self.key = key
-        self.ins = ins
-
-    def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
-        ans = np.ones_like(vars[self.ins[0][0]], dtype=bool)
-        for name, val in self.ins:
-            ans = ans & (vars[name] if val else ~vars[name])
-        return ans
 
 
 class BooleanNeuron(Node):
@@ -276,7 +301,6 @@ class BooleanNeuron(Node):
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        self.names = self.name_gen()
         self.rules = self.to_rule_set()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
@@ -289,40 +313,37 @@ class BooleanNeuron(Node):
             yield f"{self.key}_{idx}"
 
     def to_bool(self) -> None:
-        def to_bool_rec(k: int, threshold: float, dp: Dp) -> Tuple[Bool, float, float]:
+        def to_bool_rec(k: int, threshold: float, dp: Dp) -> DpNode:
             max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
             # how much one could add by setting every variable to 1 without changing the formula
             found = dp.find(k, threshold)
-            if isinstance(found, Tuple):
+            if found is not None:
                 return found
 
             # if already positive, return True
             if threshold >= 0.0:
-                ans = (Constant(np.array(True)), 0.0, float("inf"))
+                ans = DpNode("rename_me", 0.0, float("inf"))
                 dp.insert(k, ans)
                 return ans
             # if you can't reach positive values, return False
             if max_sum + threshold <= 0.0:
-                ans = (Constant(np.array(False)), float("-inf"), -max_sum)
+                ans = DpNode("rename_me", float("-inf"), -max_sum)
                 dp.insert(k, ans)
                 return ans
 
-            key = self.n_ins[k][0]
+            # key = self.n_ins[k][0]
             weight = self.n_ins[k][1]
-            positive = not self.signs[k]
+            # positive = not self.signs[k]
 
             # set to False
-            (term1, min1, max1) = to_bool_rec(k + 1, threshold, dp)
-            (term2, min2, max2) = to_bool_rec(k + 1, threshold + weight, dp)
-            min2, max2 = min2 - weight, max2 - weight
-            term2 = AND(
-                Literal(key) if positive else NOT(Literal(key)),
-                term2,
+            n1 = to_bool_rec(k + 1, threshold, dp)
+            n2 = to_bool_rec(k + 1, threshold + weight, dp)
+            new_min, new_max = (
+                max(n1.min_thr, n2.min_thr - weight),
+                min(n1.max_thr, n2.max_thr - weight),
             )
-            new_min, new_max = (max(min1, min2), min(max1, max2))
-            ans = (OR(term1, term2).simplified(), new_min, new_max)
-            # sorted insert into dp
-            bisect.insort(dp[k], ans, key=lambda x: x[1])
+            ans = DpNode("rename_me", new_min, new_max)
+            dp.insert(k, ans)
             return ans
 
         assert self.q_neuron.y_centers == [0.0, 1.0]
@@ -336,15 +357,14 @@ class BooleanNeuron(Node):
         # remember which weights are negative and then invert all of them (needed for negative numbers)
         self.signs = [tup[1] < 0 for tup in ins]
         self.n_ins = [(tup[0], abs(tup[1])) for tup in ins]
+        self.n_vars = len(self.n_ins)
 
         positive_weights = list(zip(self.signs, [tup[1] for tup in self.n_ins]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         self.bias_diff = sum(tup[1] for tup in filtered_weights)
 
         self.dp = Dp(len(self.n_ins))
-        (self.b_val, self.min_thr, self.max_thr) = to_bool_rec(
-            0, self.bias - self.bias_diff, self.dp
-        )
+        self.ans = to_bool_rec(0, self.bias - self.bias_diff, self.dp)
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
@@ -355,13 +375,38 @@ class BooleanNeuron(Node):
 
     def to_rule_set(self) -> Set[Rule]:
         self.to_bool()
+        self.names = self.name_gen()
+        ans = []
         print(self)
         print(f"{self.signs = }")
         print(f"{self.n_ins = }")
         print(f"{self.bias = }")
         print(f"{self.bias_diff = }")
+        # first, give every node in the directed bool graph a name
+        for k in range(self.n_vars + 1):
+            for node in self.dp[k]:
+                node.key = next(self.names)
+        # then create a set of rules for each node
+        for k in range(self.n_vars + 1):
+            for node in self.dp[k]:
+                if node.min_thr == float("-inf"):
+                    ans.append(Rule(node.key, [], False))
+                elif node.max_thr == float("inf"):
+                    ans.append(Rule(node.key, [], True))
+                else:
+                    target_1 = self.dp.find(k + 1, node.mean)
+                    assert target_1 is not None
+                    ans.append(Rule(node.key, [(target_1.key, True)], None))
 
-        return set()
+                    target_2 = self.dp.find(k + 1, node.mean + self.n_ins[k][1])
+                    assert target_2 is not None
+                    ans.append(
+                        Rule(node.key, [(self.n_ins[k][0], True), (target_2.key, True)])
+                    )
+
+        for rule in ans:
+            print(rule)
+        return set(ans)
 
 
 class BooleanGraph(Graph):
