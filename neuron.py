@@ -1,5 +1,5 @@
 import bisect
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
 from copy import copy, deepcopy
 from enum import Enum
 from itertools import chain, combinations
@@ -250,7 +250,9 @@ class Dp:
         for i in range(self.n_vars + 1):
             ans.append(
                 "["
-                + ", ".join(str((round(t[1], 2), round(t[2], 2))) for t in self.data[i])
+                + ", ".join(
+                    str((t[0], round(t[1], 2), round(t[2], 2))) for t in self.data[i]
+                )
                 + "]"
             )
         return "\n".join(ans)
@@ -264,12 +266,12 @@ class BooleanNeuron(Node):
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        (self.b_val, self.min_thr, self.max_thr), self.dp = self.to_bool()
+        self.to_bool()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         return self.b_val(vars)
 
-    def to_bool(self) -> Tuple[Tuple[Bool, float, float], Dp]:
+    def to_bool(self) -> None:
         def to_bool_rec(k: int, threshold: float, dp: Dp) -> Tuple[Bool, float, float]:
             max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
             # how much one could add by setting everyr variable to 1 without chaning the formula
@@ -322,9 +324,10 @@ class BooleanNeuron(Node):
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        dp = Dp(len(self.n_ins))
-        ans = to_bool_rec(0, bias - bias_diff, dp)
-        return ans, dp
+        self.dp = Dp(len(self.n_ins))
+        (self.b_val, self.min_thr, self.max_thr) = to_bool_rec(
+            0, bias - bias_diff, self.dp
+        )
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
@@ -332,6 +335,9 @@ class BooleanNeuron(Node):
 
     def __str__(self) -> str:
         return f"{self.key} := {str(self.dp)}"
+
+    def to_rule_set(self) -> Set:
+        return set()
 
 
 class BooleanGraph(Graph):
