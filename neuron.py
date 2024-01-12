@@ -1,4 +1,5 @@
 import bisect
+import functools
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
 from copy import copy, deepcopy
 from enum import Enum
@@ -9,6 +10,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
+from numpy import ndarray
 
 from bool_formula import *
 from node import Graph, Node
@@ -192,8 +194,6 @@ class QuantizedNeuronGraph(Graph):
                 x_thr = neuron.inv_act(y_thr)
                 x_thrs = neuron.inv_act(np.array([max_0, min_1]))
 
-                # TODO: delete the node and add it's center value to the bias of the target nodes
-
                 # adjust other weights such that the new q_neuron can have y_centers [-1.0, 1.0]
                 a = y_centers[0]
                 k = y_centers[1] - y_centers[0]
@@ -250,9 +250,7 @@ class Dp:
         for i in range(self.n_vars + 1):
             ans.append(
                 "["
-                + ", ".join(
-                    str((t[0], round(t[1], 2), round(t[2], 2))) for t in self.data[i]
-                )
+                + ", ".join(str((round(t[1], 2), round(t[2], 2))) for t in self.data[i])
                 + "]"
             )
         return "\n".join(ans)
@@ -261,20 +259,39 @@ class Dp:
         return str(self)
 
 
+class Rule(Node):
+    def __init__(self, key: str, ins: list[Tuple[str, bool]]) -> None:
+        self.key = key
+        self.ins = ins
+
+    def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
+        ans = np.ones_like(vars[self.ins[0][0]], dtype=bool)
+        for name, val in self.ins:
+            ans = ans & (vars[name] if val else ~vars[name])
+        return ans
+
+
 class BooleanNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        self.to_bool()
+        self.names = self.name_gen()
+        self.rules = self.to_rule_set()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         return self.b_val(vars)
 
+    def name_gen(self):
+        idx = 0
+        while True:
+            idx += 1
+            yield f"{self.key}_{idx}"
+
     def to_bool(self) -> None:
         def to_bool_rec(k: int, threshold: float, dp: Dp) -> Tuple[Bool, float, float]:
             max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
-            # how much one could add by setting everyr variable to 1 without chaning the formula
+            # how much one could add by setting every variable to 1 without changing the formula
             found = dp.find(k, threshold)
             if isinstance(found, Tuple):
                 return found
@@ -310,7 +327,7 @@ class BooleanNeuron(Node):
 
         assert self.q_neuron.y_centers == [0.0, 1.0]
         assert self.q_neuron.x_thr == 0.0
-        bias = self.q_neuron.bias
+        self.bias = self.q_neuron.bias
 
         # sort neurons by their weight
         ins = list(self.ins.items())
@@ -322,11 +339,11 @@ class BooleanNeuron(Node):
 
         positive_weights = list(zip(self.signs, [tup[1] for tup in self.n_ins]))
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
-        bias_diff = sum(tup[1] for tup in filtered_weights)
+        self.bias_diff = sum(tup[1] for tup in filtered_weights)
 
         self.dp = Dp(len(self.n_ins))
         (self.b_val, self.min_thr, self.max_thr) = to_bool_rec(
-            0, bias - bias_diff, self.dp
+            0, self.bias - self.bias_diff, self.dp
         )
 
     @classmethod
@@ -336,7 +353,14 @@ class BooleanNeuron(Node):
     def __str__(self) -> str:
         return f"{self.key} := {str(self.dp)}"
 
-    def to_rule_set(self) -> Set:
+    def to_rule_set(self) -> Set[Rule]:
+        self.to_bool()
+        print(self)
+        print(f"{self.signs = }")
+        print(f"{self.n_ins = }")
+        print(f"{self.bias = }")
+        print(f"{self.bias_diff = }")
+
         return set()
 
 
