@@ -3,6 +3,7 @@ import functools
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
 from copy import copy, deepcopy
 from enum import Enum
+from graphlib import TopologicalSorter
 from itertools import chain, combinations
 from typing import Dict, Tuple, TypeVar
 
@@ -224,12 +225,13 @@ class Rule(Node):
         self.is_const = self.val is not None
 
     def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
+        if self.is_const:
+            return np.array(True) if self.val else np.array(False)
         ans = np.ones_like(vars[self.ins[0][0]], dtype=bool)
-        if not self.is_const:
-            for name, val in self.ins:
-                ans = ans & (vars[name] if val else ~vars[name])
-            return ans
-        return ans if self.val else np.zeros_like(vars[self.ins[0][0]], dtype=bool)
+        for name, val in self.ins:
+            temp = vars[name] if val else ~vars[name]
+            ans = ans & temp
+        return ans
 
     def __repr__(self) -> str:
         if self.is_const:
@@ -296,15 +298,23 @@ class Dp:
         return str(self)
 
 
-class BooleanNeuron(Node):
+class RuleSetNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
         self.rules = self.to_rule_set()
+        temp = [rule.key for rule in self.rules]
+        self.keys = list(dict.fromkeys(temp))
+        self.key = self.keys[0]
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
-        return self.b_val(vars)
+        vars = copy.copy(vars)
+        for key in self.order:
+            rules = [rule for rule in self.rules if rule.key == key]
+            temp = [rule(vars) for rule in rules]
+            vars[key] = functools.reduce(lambda x, y: x | y, temp)
+        return vars[self.key]
 
     def name_gen(self):
         idx = 0
@@ -331,9 +341,7 @@ class BooleanNeuron(Node):
                 dp.insert(k, ans)
                 return ans
 
-            # key = self.n_ins[k][0]
             weight = self.n_ins[k][1]
-            # positive = not self.signs[k]
 
             # set to False
             n1 = to_bool_rec(k + 1, threshold, dp)
@@ -368,31 +376,31 @@ class BooleanNeuron(Node):
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
-        return BooleanNeuron(q_neuron)
+        return RuleSetNeuron(q_neuron)
 
     def __str__(self) -> str:
         return f"{self.key} := {str(self.dp)}"
 
-    def to_rule_set(self) -> Set[Rule]:
+    def to_rule_set(self) -> list[Rule]:
         self.to_bool()
         self.names = self.name_gen()
-        ans = []
-        print(self)
-        print(f"{self.signs = }")
-        print(f"{self.n_ins = }")
-        print(f"{self.bias = }")
-        print(f"{self.bias_diff = }")
+        ans: list[Rule] = []
         # first, give every node in the directed bool graph a name
         for k in range(self.n_vars + 1):
             for node in self.dp[k]:
                 node.key = next(self.names)
-        # then create a set of rules for each node
+
+        graph_ins = {}
+        # then create 1 or 2 if-then rules for each node, depending on whether it's
+        # a constant or not
         for k in range(self.n_vars + 1):
             for node in self.dp[k]:
                 if node.min_thr == float("-inf"):
                     ans.append(Rule(node.key, [], False))
+                    graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
                     ans.append(Rule(node.key, [], True))
+                    graph_ins[node.key] = set()
                 else:
                     target_1 = self.dp.find(k + 1, node.mean)
                     assert target_1 is not None
@@ -403,21 +411,24 @@ class BooleanNeuron(Node):
                     ans.append(
                         Rule(node.key, [(self.n_ins[k][0], True), (target_2.key, True)])
                     )
+                    graph_ins[node.key] = {target_1.key, target_2.key}
 
-        for rule in ans:
-            print(rule)
-        return set(ans)
+        # find topological order of if then rules
+
+        sorter = TopologicalSorter(graph_ins)
+        self.order = list(sorter.static_order())
+        return ans
 
 
 class BooleanGraph(Graph):
-    def __init__(self, bools: Sequence[BooleanNeuron]) -> None:
+    def __init__(self, bools: Sequence[RuleSetNeuron]) -> None:
         super().__init__(bools)
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
         return BooleanGraph(
             [
-                BooleanNeuron(q_n)
+                RuleSetNeuron(q_n)
                 for key, q_n in q_ng.nodes.items()
                 if isinstance(q_n, QuantizedNeuron)
             ]

@@ -216,6 +216,22 @@ class PARITY(Bool):
         return self.literals
 
 
+class Example(Bool):
+    def __init__(self) -> None:
+        super().__init__()
+        self.literals = {"x1", "x2", "x3", "x4", "x5"}
+
+    def __call__(self, vars: Mapping[str, np.ndarray]) -> np.ndarray:
+        t1 = vars["x3"] & vars["x4"] & vars["x5"]
+        return (vars["x1"] & vars["x2"]) | (vars["x1"] & t1) | (vars["x2"] & t1)
+
+    def __str__(self) -> str:
+        return ""
+
+    def all_literals(self) -> set[str]:
+        return super().all_literals()
+
+
 if __name__ == "__main__":
     formulae: Dict[str, Bool] = {
         "a0": AND(),
