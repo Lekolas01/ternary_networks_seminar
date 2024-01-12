@@ -7,11 +7,11 @@ import torch.nn as nn
 
 from bool_formula import AND, NOT, OR, Bool, Constant, Literal
 from neuron import (
-    BooleanGraph,
     Neuron,
     NeuronGraph,
     QuantizedNeuron,
     QuantizedNeuronGraph,
+    RuleSetGraph,
     to_vars,
 )
 from node import Graph
@@ -40,7 +40,7 @@ class TestToBool(unittest.TestCase):
     def test_True(self):
         b = QuantizedNeuron("b", {"x1": 1.5, "x2": 1.4}, -1.0)
         q_ng = QuantizedNeuronGraph([b])
-        bg = BooleanGraph.from_q_neuron_graph(q_ng)
+        bg = RuleSetGraph.from_q_neuron_graph(q_ng)
         assert bg.nodes["b"].to_bool() == Constant(np.array(True))
 
     def test_False(self):

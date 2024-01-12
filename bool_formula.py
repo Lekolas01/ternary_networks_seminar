@@ -223,7 +223,7 @@ class Example(Bool):
 
     def __call__(self, vars: Mapping[str, np.ndarray]) -> np.ndarray:
         t1 = vars["x3"] & vars["x4"] & vars["x5"]
-        return (vars["x1"] & vars["x2"]) | (vars["x1"] & t1) | (vars["x2"] & t1)
+        return (~vars["x1"] & vars["x2"]) | (~vars["x1"] & t1) | (vars["x2"] & t1)
 
     def __str__(self) -> str:
         return ""

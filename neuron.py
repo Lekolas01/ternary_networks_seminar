@@ -227,7 +227,9 @@ class Rule(Node):
     def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
         if self.is_const:
             return np.array(True) if self.val else np.array(False)
-        ans = np.ones_like(vars[self.ins[0][0]], dtype=bool)
+
+        key = self.ins[0][0]
+        ans = np.ones_like(vars[key], dtype=bool)
         for name, val in self.ins:
             temp = vars[name] if val else ~vars[name]
             ans = ans & temp
@@ -260,6 +262,7 @@ class Dp:
         assert 0 <= n_vars
         self.n_vars = n_vars
         self.data: list[list[DpNode]] = [[] for _ in range(self.n_vars + 1)]
+        self.eps = 1e-10
 
     def find(self, k: int, val: float) -> DpNode | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
@@ -267,7 +270,7 @@ class Dp:
             return None
         arr = self.data[k]
         for t in arr:
-            if t.min_thr < val < t.max_thr:
+            if t.min_thr + self.eps < val < t.max_thr - self.eps:
                 return t
         return None
 
@@ -306,7 +309,7 @@ class RuleSetNeuron(Node):
         self.rules = self.to_rule_set()
         temp = [rule.key for rule in self.rules]
         self.keys = list(dict.fromkeys(temp))
-        self.key = self.keys[0]
+        temp = 0
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
@@ -317,6 +320,7 @@ class RuleSetNeuron(Node):
         return vars[self.key]
 
     def name_gen(self):
+        yield self.key
         idx = 0
         while True:
             idx += 1
@@ -379,7 +383,11 @@ class RuleSetNeuron(Node):
         return RuleSetNeuron(q_neuron)
 
     def __str__(self) -> str:
-        return f"{self.key} := {str(self.dp)}"
+        ans = "RuleSet[\n\t" + "\n\t".join(str(rule) for rule in self.rules) + "\n]"
+        return ans
+
+    def __repr__(self) -> str:
+        return str(self)
 
     def to_rule_set(self) -> list[Rule]:
         self.to_bool()
@@ -409,7 +417,13 @@ class RuleSetNeuron(Node):
                     target_2 = self.dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
                     ans.append(
-                        Rule(node.key, [(self.n_ins[k][0], True), (target_2.key, True)])
+                        Rule(
+                            node.key,
+                            [
+                                (self.n_ins[k][0], not self.signs[k]),
+                                (target_2.key, True),
+                            ],
+                        )
                     )
                     graph_ins[node.key] = {target_1.key, target_2.key}
 
@@ -419,20 +433,23 @@ class RuleSetNeuron(Node):
         self.order = list(sorter.static_order())
         return ans
 
+    def simplify(self) -> None:
+        pass
 
-class BooleanGraph(Graph):
+
+class RuleSetGraph(Graph):
     def __init__(self, bools: Sequence[RuleSetNeuron]) -> None:
         super().__init__(bools)
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
-        return BooleanGraph(
-            [
-                RuleSetNeuron(q_n)
-                for key, q_n in q_ng.nodes.items()
-                if isinstance(q_n, QuantizedNeuron)
-            ]
-        )
+        rule_neurons = [
+            RuleSetNeuron(q_n)
+            for key, q_n in q_ng.nodes.items()
+            if isinstance(q_n, QuantizedNeuron)
+        ]
+        ans = RuleSetGraph(rule_neurons)
+        return ans
 
 
 def nn_to_rule_set(
@@ -443,7 +460,7 @@ def nn_to_rule_set(
     # transform the graph to a new graph of perceptrons with quantized step functions
     q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     # transform the quantized graph to a set of if-then rules
-    bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
+    bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)
 
 
