@@ -306,14 +306,11 @@ class RuleSetNeuron(Node):
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        self.rules = self.to_rule_set()
-        temp = [rule.key for rule in self.rules]
-        self.keys = list(dict.fromkeys(temp))
-        temp = 0
+        self.to_rule_set()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
-        for key in self.order:
+        for key in self.call_order:
             rules = [rule for rule in self.rules if rule.key == key]
             temp = [rule(vars) for rule in rules]
             vars[key] = functools.reduce(lambda x, y: x | y, temp)
@@ -389,7 +386,7 @@ class RuleSetNeuron(Node):
     def __repr__(self) -> str:
         return str(self)
 
-    def to_rule_set(self) -> list[Rule]:
+    def to_rule_set(self) -> None:
         self.to_bool()
         self.names = self.name_gen()
         ans: list[Rule] = []
@@ -427,13 +424,40 @@ class RuleSetNeuron(Node):
                     )
                     graph_ins[node.key] = {target_1.key, target_2.key}
 
-        # find topological order of if then rules
+        # add properties
+        self.rules = ans
+        temp = [rule.key for rule in self.rules]
+        self.keys = list(dict.fromkeys(temp))
 
+        # simplify rules
+        self.simplify()
+
+        # find topological order of remaining rules
         sorter = TopologicalSorter(graph_ins)
-        self.order = list(sorter.static_order())
-        return ans
+        self.call_order = list(sorter.static_order())
 
     def simplify(self) -> None:
+        const_rules = [rule for rule in self.rules if rule.is_const]
+        const_keys = [rule.key for rule in self.rules if rule.is_const]
+
+        # remove constant nodes
+        rules = list(filter(lambda x: not x.is_const, self.rules))
+        keys = set(rule.key for rule in rules)
+
+        # remove all appearances of the just deleted constant nodes in the other rules
+        for i, rule in enumerate(rules):
+            new_ins = []
+            for rule_in_key, rule_in_val in rule.ins:
+                if rule_in_key not in const_keys:
+                    continue
+                temp = 0
+            new_ins = [rule_in for rule_in in rule.ins if rule_in[0] in keys]
+            rule.ins
+
+        # those removals can again create new constant rules, so repeat these two steps
+        # until the rules remain unchanged
+
+        # print(rules)
         pass
 
 

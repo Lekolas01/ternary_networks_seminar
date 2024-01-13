@@ -69,7 +69,7 @@ def main():
     n_vars = 2
     epochs = 2000
     l1 = 0.0
-    batch_size = 128
+    batch_size = 64
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
     data_path = path / (name + ".csv")
