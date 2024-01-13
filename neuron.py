@@ -301,12 +301,18 @@ class Rule(Node):
         return self.__repr__()
 
 
+class RuleSet:
+    def __init__(self):
+        pass
+
+
 class RuleSetNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
         self.q_neuron = q_neuron
         self.key = q_neuron.key
         self.ins = q_neuron.ins
-        self.to_rule_set()
+        self.dp = self.calc_dp()
+        self.rules = self.to_rule_set(self.dp)
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
@@ -323,7 +329,7 @@ class RuleSetNeuron(Node):
             idx += 1
             yield f"{self.key}_{idx}"
 
-    def to_bool(self) -> None:
+    def calc_dp(self) -> Dp:
         def to_bool_rec(k: int, threshold: float, dp: Dp) -> DpNode:
             max_sum: float = float(sum(n[1] for n in self.n_ins[k:]))
             # how much one could add by setting every variable to 1 without changing the formula
@@ -372,8 +378,15 @@ class RuleSetNeuron(Node):
         filtered_weights = list(filter(lambda tup: tup[0], positive_weights))
         self.bias_diff = sum(tup[1] for tup in filtered_weights)
 
-        self.dp = Dp(len(self.n_ins))
-        self.ans = to_bool_rec(0, self.bias - self.bias_diff, self.dp)
+        dp = Dp(len(self.n_ins))
+        self.ans = to_bool_rec(0, self.bias - self.bias_diff, dp)
+
+        # first, give every node in the directed bool graph a name
+        names = self.name_gen()
+        for k in range(self.n_vars + 1):
+            for node in dp[k]:
+                node.key = next(names)
+        return dp
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
@@ -386,16 +399,11 @@ class RuleSetNeuron(Node):
     def __repr__(self) -> str:
         return str(self)
 
-    def to_rule_set(self) -> None:
-        self.to_bool()
-        self.names = self.name_gen()
+    def to_rule_set(self, dp: Dp) -> list[Rule]:
+        self.calc_dp()
         ans: list[Rule] = []
-        # first, give every node in the directed bool graph a name
-        for k in range(self.n_vars + 1):
-            for node in self.dp[k]:
-                node.key = next(self.names)
 
-        graph_ins = {}
+        graph_ins: dict[str, set[str]] = {}
         # then create 1 or 2 if-then rules for each node, depending on whether it's
         # a constant or not
         for k in range(self.n_vars + 1):
@@ -424,17 +432,14 @@ class RuleSetNeuron(Node):
                     )
                     graph_ins[node.key] = {target_1.key, target_2.key}
 
-        # add properties
-        self.rules = ans
-        temp = [rule.key for rule in self.rules]
-        self.keys = list(dict.fromkeys(temp))
-
-        # simplify rules
-        self.simplify()
-
         # find topological order of remaining rules
         sorter = TopologicalSorter(graph_ins)
         self.call_order = list(sorter.static_order())
+        # add properties
+        return ans
+
+        # simplify rules
+        self.simplify()
 
     def simplify(self) -> None:
         const_keys = [rule.key for rule in self.rules if rule.is_const]
