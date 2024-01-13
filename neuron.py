@@ -215,37 +215,6 @@ class QuantizedNeuronGraph(Graph):
         return q_neuron_graph
 
 
-class Rule(Node):
-    def __init__(
-        self, key: str, ins: list[Tuple[str, bool]], val: bool | None = None
-    ) -> None:
-        self.key = key
-        self.ins = ins
-        self.val = val
-        self.is_const = self.val is not None
-
-    def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
-        if self.is_const:
-            return np.array(True) if self.val else np.array(False)
-
-        key = self.ins[0][0]
-        ans = np.ones_like(vars[key], dtype=bool)
-        for name, val in self.ins:
-            temp = vars[name] if val else ~vars[name]
-            ans = ans & temp
-        return ans
-
-    def __repr__(self) -> str:
-        if self.is_const:
-            return f"{self.key} := {'T' if self.val else 'F'}"
-        ans = f"{self.key} := "
-        ans += ", ".join(f"{'' if b else '!'}{key}" for key, b in self.ins)
-        return ans
-
-    def __str__(self) -> str:
-        return self.__repr__()
-
-
 class DpNode:
     def __init__(self, key: str, min_thr: float, max_thr: float) -> None:
         self.key = key
@@ -299,6 +268,37 @@ class Dp:
 
     def __repr__(self) -> str:
         return str(self)
+
+
+class Rule(Node):
+    def __init__(
+        self, key: str, ins: list[Tuple[str, bool]], val: bool | None = None
+    ) -> None:
+        self.key = key
+        self.ins = ins
+        self.val = val
+        self.is_const = self.val is not None
+
+    def __call__(self, vars: Mapping[str, ndarray]) -> ndarray:
+        if self.is_const:
+            return np.array(True) if self.val else np.array(False)
+
+        key = self.ins[0][0]
+        ans = np.ones_like(vars[key], dtype=bool)
+        for name, val in self.ins:
+            temp = vars[name] if val else ~vars[name]
+            ans = ans & temp
+        return ans
+
+    def __repr__(self) -> str:
+        if self.is_const:
+            return f"{self.key} := {'T' if self.val else 'F'}"
+        ans = f"{self.key} := "
+        ans += ", ".join(f"{'' if b else '!'}{key}" for key, b in self.ins)
+        return ans
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 class RuleSetNeuron(Node):
@@ -437,12 +437,13 @@ class RuleSetNeuron(Node):
         self.call_order = list(sorter.static_order())
 
     def simplify(self) -> None:
-        const_rules = [rule for rule in self.rules if rule.is_const]
         const_keys = [rule.key for rule in self.rules if rule.is_const]
 
         # remove constant nodes
+        const_rules = [rule for rule in self.rules if rule.is_const]
         rules = list(filter(lambda x: not x.is_const, self.rules))
         keys = set(rule.key for rule in rules)
+        print(rules)
 
         # remove all appearances of the just deleted constant nodes in the other rules
         for i, rule in enumerate(rules):
