@@ -1,5 +1,6 @@
 import bisect
 import functools
+from collections import defaultdict
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
 from copy import copy, deepcopy
 from enum import Enum
@@ -270,7 +271,7 @@ class Dp:
         return str(self)
 
 
-class Rule(Node):
+class IfThenRule(Node):
     def __init__(
         self, key: str, ins: list[Tuple[str, bool]], val: bool | None = None
     ) -> None:
@@ -302,9 +303,11 @@ class Rule(Node):
 
 
 class RuleSet:
-    def __init__(self):
+    def __init__(self, key: str, ins: list[IfThenRule]):
+        self.key = key
         pass
 
+    def __call__(self)
 
 class RuleSetNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
@@ -399,9 +402,9 @@ class RuleSetNeuron(Node):
     def __repr__(self) -> str:
         return str(self)
 
-    def to_rule_set(self, dp: Dp) -> list[Rule]:
+    def to_rule_set(self, dp: Dp) -> list[IfThenRule]:
         self.calc_dp()
-        ans: list[Rule] = []
+        rules: list[IfThenRule] = []
 
         graph_ins: dict[str, set[str]] = {}
         # then create 1 or 2 if-then rules for each node, depending on whether it's
@@ -409,20 +412,20 @@ class RuleSetNeuron(Node):
         for k in range(self.n_vars + 1):
             for node in self.dp[k]:
                 if node.min_thr == float("-inf"):
-                    ans.append(Rule(node.key, [], False))
+                    rules.append(IfThenRule(node.key, [], False))
                     graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
-                    ans.append(Rule(node.key, [], True))
+                    rules.append(IfThenRule(node.key, [], True))
                     graph_ins[node.key] = set()
                 else:
                     target_1 = self.dp.find(k + 1, node.mean)
                     assert target_1 is not None
-                    ans.append(Rule(node.key, [(target_1.key, True)], None))
+                    rules.append(IfThenRule(node.key, [(target_1.key, True)], None))
 
                     target_2 = self.dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
-                    ans.append(
-                        Rule(
+                    rules.append(
+                        IfThenRule(
                             node.key,
                             [
                                 (self.n_ins[k][0], not self.signs[k]),
@@ -436,27 +439,39 @@ class RuleSetNeuron(Node):
         sorter = TopologicalSorter(graph_ins)
         self.call_order = list(sorter.static_order())
         # add properties
-        return ans
 
         # simplify rules
-        self.simplify()
+        rules = self.simplify(rules)
+        return rules
 
-    def simplify(self) -> None:
-        const_keys = [rule.key for rule in self.rules if rule.is_const]
+    def simplify(self, rules: list[IfThenRule]) -> list[IfThenRule]:
+        keys = {rule.key for rule in rules}
+        knowledge: dict[str, bool] = {}
+        rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
+        for rule in rules:
+            rules_dict[rule.key].append(rule)
+        print(rules_dict)
 
-        # remove constant nodes
-        const_rules = [rule for rule in self.rules if rule.is_const]
-        rules = list(filter(lambda x: not x.is_const, self.rules))
-        keys = set(rule.key for rule in rules)
-        print(rules)
+        new_rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
+        changed = True
+        for key, rules in rules_dict.items():
+            for rule in rules:
+                if rule.is_const:
+                    if rule.val == True:
+                        knowledge[rule.key] = True
+                        new_rules_dict
+                if rule.
+        changed = False
 
         # remove all appearances of the just deleted constant nodes in the other rules
-        for i, rule in enumerate(rules):
+        for rule in rules:
             new_ins = []
             for rule_in_key, rule_in_val in rule.ins:
                 if rule_in_key not in const_keys:
                     continue
+                # if the constant was True, remove it from the body
                 temp = 0
+                # it the constant was False, the whle body becomes False
             new_ins = [rule_in for rule_in in rule.ins if rule_in[0] in keys]
             rule.ins
 
@@ -464,7 +479,7 @@ class RuleSetNeuron(Node):
         # until the rules remain unchanged
 
         # print(rules)
-        pass
+        return rules
 
 
 class RuleSetGraph(Graph):

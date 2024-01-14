@@ -66,9 +66,9 @@ def train_on_parity(
 
 def main():
     seed = 1
-    n_vars = 2
+    n_vars = 10
     epochs = 2000
-    l1 = 0.0
+    l1 = 2e-5
     batch_size = 64
     name = f"parity_{n_vars}_l{l1}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
