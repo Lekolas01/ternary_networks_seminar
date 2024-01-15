@@ -307,7 +307,9 @@ class RuleSet:
         self.key = key
         pass
 
-    def __call__(self)
+    def __call__(self):
+        pass
+
 
 class RuleSetNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron) -> None:
@@ -445,6 +447,7 @@ class RuleSetNeuron(Node):
         return rules
 
     def simplify(self, rules: list[IfThenRule]) -> list[IfThenRule]:
+        return rules
         keys = {rule.key for rule in rules}
         knowledge: dict[str, bool] = {}
         rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
@@ -459,8 +462,8 @@ class RuleSetNeuron(Node):
                 if rule.is_const:
                     if rule.val == True:
                         knowledge[rule.key] = True
-                        new_rules_dict
-                if rule.
+                        # new_rules_dict
+        #                if rule.
         changed = False
 
         # remove all appearances of the just deleted constant nodes in the other rules
