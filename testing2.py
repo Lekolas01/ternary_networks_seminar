@@ -1,11 +1,29 @@
 import bisect
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from neuron import QuantizedNeuron, RuleSetNeuron
 
-a = [(str(i), 20 - i + (4 if i % 2 == 0 else 0)) for i in range(1, 10)]
-print(a)
-a = sorted(a, key=lambda x: x[1])
-print(a)
+sns.set_theme(style="whitegrid")
 
-bisect.insort(a, ("12", 12), key=lambda x: x[1])
-print(a)
+# Load the example diamonds dataset
+diamonds = sns.load_dataset("diamonds")
+
+# Draw a scatter plot while assigning point colors and sizes to different
+# variables in the dataset
+f, ax = plt.subplots(figsize=(6.5, 6.5))
+sns.despine(f, left=True, bottom=True)
+clarity_ranking = ["I1", "SI2", "SI1", "VS2", "VS1", "VVS2", "VVS1", "IF"]
+sns.scatterplot(
+    x="carat",
+    y="price",
+    hue="clarity",
+    size="depth",
+    palette="ch:r=-.2,d=.3_r",
+    hue_order=clarity_ranking,
+    sizes=(1, 8),
+    linewidth=0,
+    data=diamonds,
+    ax=ax,
+)

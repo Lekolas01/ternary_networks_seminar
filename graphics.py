@@ -15,32 +15,33 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
     if data is None:
         data = possible_data(neuron.ins)
     q_ng = QuantizedNeuronGraph.from_neuron_graph(ng, data)
+
+    sums = np.array(possible_sums(neuron.ins.values())) + neuron.bias
+
+    fig, ax = plt.subplots()
+    sns.histplot(ax=ax, x=sums, kde=True, bins=16, stat="density")
+    plt.show()
+
     fig, axes = plt.subplots(
-        nrows=1, ncols=3, sharex=False, sharey=True, figsize=(15, 5)
+        nrows=1, ncols=1, sharex=False, sharey=True, figsize=(15, 5)
     )
     margin = 0.1
-    sums = np.array(possible_sums(neuron.ins.values()))
-    # print(f"{data = }")
-    # print(f"{sums = }")
-    data_y = ng(data)
+    data_y = neuron.act_fn(sums)
     x_min, x_max = min(sums), max(sums)
-    # print(f"{x_min = }")
-    # print(f"{x_max = }")
     x = np.linspace(start=x_min - margin, stop=x_max + margin, num=100)
     y = neuron.act_fn(x)
     sns.lineplot(ax=axes[1], x=x, y=y, color="r", linewidth=1.0)
-    sns.scatterplot(
-        ax=axes[1], x=sums, y=neuron.act_fn(sums), c="black", marker="X", s=50
-    )
+    sns.scatterplot(ax=axes[1], x=sums, y=data_y, c="black", marker="X", s=50)
+    # line = np.linalg.lstsq(sums, data_y)
 
     fig.suptitle(f"{str(neuron)}\n")
     axes[1].set_xlabel("s(x)")
     axes[1].set_ylabel("a(s(x))")
     axes[1].set_ylim((-1 - margin, 1 + margin))
     sns.histplot(ax=axes[0], x=sums, kde=True, bins=24, stat="density")
-    sns.histplot(ax=axes[2], y=neuron.act_fn(sums), kde=True, bins=24, stat="density")
+    sns.histplot(ax=axes[2], y=data_y, kde=True, bins=24, stat="density")
     # for now, we only allow either 1 or 2 clusters
-    ans = ckmeans(x=neuron.act_fn(sums), k=(1, 2))
+    ans = ckmeans(x=data_y, k=(1, 2))
     clusters = ans.cluster
     cl_min_max: list[tuple[float, float]] = []
     for cl in clusters:
@@ -63,16 +64,14 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
 def main():
     seed = 1
     set_seed(seed)
-    size = 10
-    scale = 2.0
-    loc = 0.5
-    weights = np.random.normal(loc, scale, size)
+    weights = [5.1, 5.0, 1.0, 1.0, 1.0, 0.9, 0.9]
+    # weights = [0.5, 0.3, -0.7, 0.2, -0.1, 0.3, 0.4]
 
     h1 = Neuron(
         "target",
         Activation.TANH,
-        {f"x{i + 1}": weights[i] for i in range(size)},
-        0.0,
+        {f"x{i + 1}": weight for i, weight in enumerate(weights)},
+        -7.5,
     )
     plot_neuron_dist(h1)
 

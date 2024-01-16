@@ -1,7 +1,7 @@
 import bisect
 import functools
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence, Set
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from copy import copy, deepcopy
 from enum import Enum
 from graphlib import TopologicalSorter
@@ -56,7 +56,7 @@ class Neuron(Node):
     def sigmoid(self, x):
         return np.where(x >= 0, 1.0 / (1.0 + np.exp(-x)), np.exp(x) / (1.0 + np.exp(x)))
 
-    def act_fn(self, x):
+    def act_fn(self, x) -> np.ndarray:
         return np.tanh(x) if self.act == Activation.TANH else self.sigmoid(x)
 
     def inv_act(self, x):
@@ -164,24 +164,26 @@ class QuantizedNeuronGraph(Graph):
         super().__init__(q_neurons)
 
     @classmethod
-    def from_neuron_graph(cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray]):
+    def from_neuron_graph(
+        cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray], verbose=False
+    ):
         new_ng = deepcopy(ng)
         q_neuron_graph = QuantizedNeuronGraph([])
-        reverse_ins = new_ng.reverse_ins()
+        graph_outs = new_ng.graph_outs()
         graph_ins = new_ng.graph_ins()
-        # print(f"{reverse_ins = }")
-        # print(f"{graph_ins = }")
         for key, neuron in new_ng.neurons.items():
             ins = graph_ins[key]
             if key not in new_ng.out_keys:  # non-output nodes
-                outs = reverse_ins[neuron.key]
+                outs = graph_outs[neuron.key]
                 data_y = neuron(data)
                 assert isinstance(data_y, np.ndarray)
                 data[key] = data_y
 
                 ck_ans = ckmeans(data_y, (2))
-                # print(f"{ck_ans.tot_withinss / len(data_y)}")
-                # print(f"{ck_ans.totss / len(data_y)}")
+                if verbose:
+                    print(neuron)
+                    print(f"{ck_ans.tot_withinss / len(data_y)}")
+                    print(f"{ck_ans.totss / len(data_y)}")
                 cluster = ck_ans.cluster
                 n_cluster = len(np.unique(ck_ans.cluster))
                 assert n_cluster == 2, NotImplementedError
@@ -194,7 +196,6 @@ class QuantizedNeuronGraph(Graph):
                 min_1 = np.min(data_y[cluster == 1])
                 y_thr = (max_0 + min_1) / 2
                 x_thr = neuron.inv_act(y_thr)
-                x_thrs = neuron.inv_act(np.array([max_0, min_1]))
 
                 # adjust other weights such that the new q_neuron can have y_centers [-1.0, 1.0]
                 a = y_centers[0]
@@ -501,12 +502,17 @@ class RuleSetGraph(Graph):
 
 
 def nn_to_rule_set(
-    model: nn.Sequential, data: MutableMapping[str, np.ndarray], vars: Sequence[str]
+    model: nn.Sequential,
+    data: MutableMapping[str, np.ndarray],
+    vars: Sequence[str],
+    verbose=False,
 ):
     # transform the trained neural network to a directed graph of full-precision neurons
     neuron_graph = NeuronGraph.from_nn(model, vars)
     # transform the graph to a new graph of perceptrons with quantized step functions
-    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(
+        neuron_graph, data, verbose=verbose
+    )
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)

@@ -1,8 +1,10 @@
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -70,10 +72,11 @@ def main():
     epochs = 3000
     l1 = 2e-5
     batch_size = 64
-    name = f"parity_{n_vars}_l{l1}_epoch{epochs}_bs{batch_size}"
+    verbose = False
+    name = f"parity_l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
-    data_path = path / (name + ".csv")
-    model_path = path / (name + ".pth")
+    data_path = path / str(n_vars) / (name + ".csv")
+    model_path = path / str(n_vars) / (name + ".pth")
 
     if not os.path.isfile(model_path) or not os.path.isfile(data_path):
         seed = set_seed(seed)
@@ -109,14 +112,14 @@ def main():
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys, verbose=verbose)
 
     print("ng = ", ng)
     print("q_ng = ", q_ng)
     print("bg = ", bg)
 
-    nn_out = model(nn_data).detach().numpy().round()
-    ng_out = ng(ng_data).round()
+    nn_out = model(nn_data).detach().numpy()
+    ng_out = ng(ng_data)
     q_ng_out = q_ng(ng_data)
     bg_out = bg(bg_data)
 
@@ -135,9 +138,10 @@ def main():
 
     print("----------------- Fidelity -----------------")
 
-    print("fidelity nn - ng:\t", np.mean(nn_out == ng_out))
-    print("fidelity nn - q_ng:\t", np.mean(nn_out == q_ng_out))
-    print("fidelity nn - b_ng:\t", np.mean(nn_out == bg_out))
+    print("fidelity nn - ng:\t", np.mean(nn_out.round() == ng_out.round()))
+    print("fidelity ng - q_ng:\t", np.mean(ng_out.round() == q_ng_out.round()))
+    print("fidelity nn - q_ng:\t", np.mean(nn_out.round() == q_ng_out.round()))
+    print("fidelity nn - b_ng:\t", np.mean(nn_out.round() == bg_out))
 
     print("----------------- Final Acc. -----------------")
 
@@ -145,6 +149,8 @@ def main():
     print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(ng_out - y)))
     print("accuracy q_ng:\t", np.array(1.0) - np.mean(np.abs(q_ng_out - y)))
     print("accuracy bg:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
+
+    sns.scatterplot()
 
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules

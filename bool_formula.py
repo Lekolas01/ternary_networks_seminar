@@ -113,7 +113,6 @@ class NOT(Bool):
 
     def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
         ans = self.child(interpretation)
-        # print(ans)
         return ~(ans)
 
     def __str__(self) -> str:

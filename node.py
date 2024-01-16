@@ -48,7 +48,7 @@ class Graph(ABC):
         """
         return {key: node.ins for key, node in self.nodes.items()}
 
-    def reverse_ins(self) -> Dict[str, Set[str]]:
+    def graph_outs(self) -> Dict[str, Set[str]]:
         """
         Same as graph_ins, except that the set contains all nodes that the node points towards.
         """

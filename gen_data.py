@@ -22,9 +22,9 @@ def gen_data(func: Bool, n: int = 0, seed: int | None = None) -> pd.DataFrame:
         If n is <= 0, the DataFrame will contain every possible sample from the input space exactly once,
         i.e. the DataFrame will have exactly 2**n data points.
         If n is an int >= 1, the DataFrame will contain n data points with each data point sampled
-        randomly from the whole input space.
+        uniform randomly from the whole input space.
     seed: int | None
-        Set the seed for the random sampling. Obviously only relevant if n >= 1.
+        Set the seed for the random sampling. Only relevant if n >= 1.
 
     Returns
     -------
