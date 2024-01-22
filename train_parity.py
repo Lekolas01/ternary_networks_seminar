@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from bool_formula import PARITY
+from bool_formula import AND, OR, PARITY
 from datasets import FileDataset
 from gen_data import gen_data
 from my_logging.loggers import LogMetrics, Tracker
@@ -56,9 +56,12 @@ def train_on_parity(
 ):
     vars = [f"x{i + 1}" for i in range(n)]
     target_func = PARITY(vars)
+    target_func = AND(OR("a", "b"), AND(OR("c", "d"), OR("e", AND("f", "g"))))
+    # target_func = OR("e", AND("f", "g"))
 
     # generate a dataset, given a logical function
-    data = gen_data(target_func, n=max(1024, int(2**n)))
+    # data = gen_data(target_func, n=max(1024, int(2**n)))
+    data = gen_data(target_func)
     data.to_csv(data_path, index=False, sep=",", mode="w")
     train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
     valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
@@ -68,24 +71,26 @@ def train_on_parity(
 
 def main():
     seed = 1
-    n_vars = 10
-    epochs = 3000
-    l1 = 2e-5
+    n_vars = 7
+    epochs = 8000
+    l1 = 3e-5
     batch_size = 64
     verbose = False
-    name = f"parity_l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
+    name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
-    data_path = path / str(n_vars) / (name + ".csv")
-    model_path = path / str(n_vars) / (name + ".pth")
+    # problem_name = f"parity/{n_vars}"
+    problem_name = "abcdefg"
+    data_path = path / problem_name / (name + ".csv")
+    model_path = path / problem_name / (name + ".pth")
 
     if not os.path.isfile(model_path) or not os.path.isfile(data_path):
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
         model = nn.Sequential(
-            nn.Linear(n_vars, n_vars),
+            nn.Linear(n_vars, 3),
             nn.Tanh(),
-            nn.Linear(n_vars, 1),
+            nn.Linear(3, 1),
             nn.Sigmoid(),
             nn.Flatten(0),
         )
@@ -146,7 +151,7 @@ def main():
     print("----------------- Final Acc. -----------------")
 
     print("accuracy nn:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y)))
-    print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(ng_out - y)))
+    print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(np.round(ng_out) - y)))
     print("accuracy q_ng:\t", np.array(1.0) - np.mean(np.abs(q_ng_out - y)))
     print("accuracy bg:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
