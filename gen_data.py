@@ -43,7 +43,10 @@ def gen_data(
     if reverse:
         vars.reverse()
     if verbose:
+        print(f"Generating dataset for the following expression: {func}...")
         print(f"Columns: {vars}")
+        final_shape = (2 ** len(vars), len(vars) + 1) if n <= 0 else (n, len(vars) + 1)
+        print(f"Data shape: {final_shape}")
     if n <= 0:
         # generate a data point for each possible point in the input space
         data = possible_data(vars)
@@ -77,21 +80,14 @@ def get_arguments() -> Namespace:
         action="store_true",
         help="If specified, will exclude the header in the file.",
     )
-    """
-    parser.add_argument(
-        "-p",
-        "--plot",
-        action="store_true",
-        help="If true, will plot the current loss at each iteration.",
-    )
-    """
     args = parser.parse_args()
     return args
 
 
 if __name__ == "__main__":
     """
-    This script creates a dataset following a logical formula.
+    This script creates a dataset following a logical formula "target_fn" and saves
+    it in a file. See argument parser for more information.
     """
     args = get_arguments()
     e = ExpressionEvaluator()
@@ -100,5 +96,6 @@ if __name__ == "__main__":
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     file_path = Path(dir_path, args.path).with_suffix(".csv")
-    data = gen_data(f, reverse=True)
+    print("Final data shape: ")
+    data = gen_data(f, verbose=True)
     data.to_csv(file_path, index=False, header=not args.no_header)
