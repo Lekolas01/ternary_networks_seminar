@@ -12,9 +12,9 @@ from neuron import possible_data
 
 
 def gen_data(
-    func: Bool, n: int = 0, seed: int | None = None, shuffle=False, verbose=False
+    func: Bool, n=0, dead_cols=0, seed: int | None = None, shuffle=False, verbose=False
 ) -> pd.DataFrame:
-    """Generate data from a boolean/logical function with k variables and save it in a pandas DataFrame.
+    """Generate data from a boolean/logical function with k unqiue variables and save it in a pandas DataFrame.
     The target variable is saved in the "target" column of the df.
     The function chooses data points either deterministically or randomly, based on parameter n.
 
@@ -24,9 +24,15 @@ def gen_data(
         The target function for which to generate a dataset.
     n : int | None
         If n is <= 0, the DataFrame will contain every possible sample from the input space exactly once,
-        i.e. the DataFrame will have exactly 2**n data points.
+        i.e. the DataFrame will contain exactly 2**k data points, where k is the number
+        of different variables in func.
         If n is an int >= 1, the DataFrame will contain n data points with each data point sampled
         uniform randomly from the whole input space.
+    dead_cols : int
+        How many irrelevant columns you want to add to the dataset, that don't have any impact on
+        the target function (default 0). This number does not count towards k, i.e. the
+        size of the dataset in the first dimension is not impacted by these columns.
+        If dead_cols <= 0, ignore it.
     seed: int | None
         Set the seed for the random sampling. Only relevant if n >= 1.
     shuffle: bool
@@ -37,32 +43,34 @@ def gen_data(
     Returns
     -------
     df : pandas.DataFrame
-        The DataFrame that contains the data, with shape (n, k + 1).
+        The DataFrame that contains the data, with shape (n, k + dead_vars + 1).
         The first k columns are named after each variable occuring in func sorted lexicographically,
-        the last column is the "target" column.
+        the last column is the "target" column, and the ones in between are the irrelevant columns.
     """
     vars = sorted(list(func.all_literals()))
-    target_col = "target"
-    df = pd.DataFrame(columns=vars + [target_col])
+    target_var = "target"
+    dead_vars = [f"dead{i + 1}" for i in range(dead_cols)]
+    df = pd.DataFrame(columns=vars + dead_vars + [target_var])
     if verbose:
         print(f"Generating dataset for the following expression: {func}...")
         print(f"Columns: {vars}")
-        final_shape = (2 ** len(vars), len(vars) + 1) if n <= 0 else (n, len(vars) + 1)
-        print(f"Data shape: {final_shape}")
     if n <= 0:
         # generate a data point for each possible point in the input space
         data = possible_data(vars, is_float=False, shuffle=shuffle)
         for datapoint in data:
             df[datapoint] = data[datapoint]
-        df[target_col] = func(data)
+        df[target_var] = func(data)
+        n = 2 ** len(vars)
 
     elif n >= 1:
         # generate n randomly selected data points from the input space
         random.seed(seed)
         for i in range(n):
             interpretation = {l: np.array(random.random() >= 0.5) for l in vars}
-            interpretation[target_col] = func(interpretation)
+            interpretation[target_var] = func(interpretation)
             df.loc[len(df)] = interpretation  # type: ignore
+    for dead_var in dead_vars:
+        df[dead_var] = np.random.choice([0, 1], size=n, p=[0.5, 0.5])
     return df.astype(int)
 
 
@@ -87,6 +95,12 @@ def get_arguments() -> Namespace:
         action="store_true",
         help="If specified, the datasamples will be shuffled.",
     )
+    parser.add_argument(
+        "--n_dead",
+        type=int,
+        default=0,
+        help="Number of dead variables to add to the dataset.",
+    )
     args = parser.parse_args()
     return args
 
@@ -104,5 +118,5 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = Path(dir_path, args.path).with_suffix(".csv")
     print("Final data shape: ")
-    data = gen_data(f, shuffle=args.shuffle, verbose=True)
+    data = gen_data(f, dead_cols=args.n_dead, shuffle=args.shuffle, verbose=True)
     data.to_csv(file_path, index=False, header=not args.no_header)
