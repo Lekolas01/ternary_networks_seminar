@@ -117,6 +117,7 @@ if __name__ == "__main__":
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     file_path = Path(dir_path, args.path).with_suffix(".csv")
-    print("Final data shape: ")
     data = gen_data(f, dead_cols=args.n_dead, shuffle=args.shuffle, verbose=True)
+    print(f"Final data shape: {data.shape}")
     data.to_csv(file_path, index=False, header=not args.no_header)
+    print(f"Saved dataset to {file_path}.")

@@ -1,5 +1,4 @@
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -9,9 +8,10 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from bool_formula import AND, OR, PARITY
+from bool_formula import PARITY
 from datasets import FileDataset
 from gen_data import gen_data
+from models.model_collection import ModelFactory
 from my_logging.loggers import LogMetrics, Tracker
 from neuron import nn_to_rule_set
 from train_model import training_loop
@@ -30,7 +30,10 @@ def train_nn(
     optim = torch.optim.Adam(model.parameters(), lr=0.002, weight_decay=1e-5)
     tracker = Tracker()
     tracker.add_logger(
-        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=20)
+        LogMetrics(
+            ["timestamp", "epoch", "train_loss", "train_acc"],
+            log_every=min(epochs / 20, 1),
+        )
     )
 
     return training_loop(
@@ -56,8 +59,6 @@ def train_on_data(
 ):
     vars = [f"x{i + 1}" for i in range(n)]
     target_func = PARITY(vars)
-    # target_func = AND(OR("a", "b"), AND(OR("c", "d"), OR("e", AND("f", "g"))))
-    # target_func = OR("e", AND("f", "g"))
 
     # generate a dataset, given a logical function
     # data = gen_data(target_func, n=max(1024, int(2**n)))
@@ -71,10 +72,11 @@ def train_on_data(
 
 def main():
     seed = 1
-    n_vars = 4
+    n_vars = 10
     epochs = 8000
-    l1 = 0.0
+    l1 = 1e-5
     batch_size = 64
+    spec_name = "abcdefg"
     verbose = False
     name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
@@ -86,13 +88,7 @@ def main():
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
-        model = nn.Sequential(
-            nn.Linear(n_vars, n_vars),
-            nn.Tanh(),
-            nn.Linear(n_vars, 1),
-            nn.Sigmoid(),
-            nn.Flatten(0),
-        )
+        model = ModelFactory.get_model(spec_name, n_vars)
         train_on_data(
             model, n_vars, data_path, epochs=epochs, l1=l1, batch_size=batch_size
         )
