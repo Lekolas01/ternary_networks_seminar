@@ -6,6 +6,7 @@ data/
 runs/
 unittests/can_delete
 testing.py
+testing2.py
 *.ipynb
 
 
