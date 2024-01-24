@@ -17,8 +17,10 @@ def overlap(left: Callable, right: Callable, data: Collection) -> float:
     return ans / len(data)
 
 
-def possible_data(keys: Collection[str], is_float=True) -> Dict[str, np.ndarray]:
-    ans = {}
+def possible_data(
+    keys: Collection[str], is_float=True, shuffle=False
+) -> Dict[str, np.ndarray]:
+    ans: dict[str, np.ndarray] = {}
     n = len(keys)
     for i, key in enumerate(keys):
         a = (
@@ -27,6 +29,10 @@ def possible_data(keys: Collection[str], is_float=True) -> Dict[str, np.ndarray]
             else np.concatenate((np.repeat(False, 2**i), np.repeat(True, 2**i)))
         )
         ans[key] = np.tile(a, 2 ** (n - i - 1))
+    if shuffle:
+        order = np.random.permutation(2**n)
+        for i, key in enumerate(keys):
+            ans[key] = ans[key][order]
     return ans
 
 

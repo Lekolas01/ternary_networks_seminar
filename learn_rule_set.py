@@ -46,7 +46,7 @@ def train_nn(
     )
 
 
-def train_on_parity(
+def train_on_data(
     model: nn.Sequential,
     n: int,
     data_path: Path,
@@ -56,12 +56,12 @@ def train_on_parity(
 ):
     vars = [f"x{i + 1}" for i in range(n)]
     target_func = PARITY(vars)
-    target_func = AND(OR("a", "b"), AND(OR("c", "d"), OR("e", AND("f", "g"))))
+    # target_func = AND(OR("a", "b"), AND(OR("c", "d"), OR("e", AND("f", "g"))))
     # target_func = OR("e", AND("f", "g"))
 
     # generate a dataset, given a logical function
     # data = gen_data(target_func, n=max(1024, int(2**n)))
-    data = gen_data(target_func)
+    data = gen_data(target_func, shuffle=True)
     data.to_csv(data_path, index=False, sep=",", mode="w")
     train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
     valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
@@ -71,15 +71,14 @@ def train_on_parity(
 
 def main():
     seed = 1
-    n_vars = 7
+    n_vars = 4
     epochs = 8000
-    l1 = 3e-5
+    l1 = 0.0
     batch_size = 64
     verbose = False
     name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
-    # problem_name = f"parity/{n_vars}"
-    problem_name = "abcdefg"
+    problem_name = f"parity/{n_vars}"
     data_path = path / problem_name / (name + ".csv")
     model_path = path / problem_name / (name + ".pth")
 
@@ -88,13 +87,13 @@ def main():
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
         model = nn.Sequential(
-            nn.Linear(n_vars, 3),
+            nn.Linear(n_vars, n_vars),
             nn.Tanh(),
-            nn.Linear(3, 1),
+            nn.Linear(n_vars, 1),
             nn.Sigmoid(),
             nn.Flatten(0),
         )
-        train_on_parity(
+        train_on_data(
             model, n_vars, data_path, epochs=epochs, l1=l1, batch_size=batch_size
         )
         try:

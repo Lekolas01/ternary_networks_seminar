@@ -12,7 +12,7 @@ from neuron import possible_data
 
 
 def gen_data(
-    func: Bool, n: int = 0, seed: int | None = None, reverse=False, verbose=False
+    func: Bool, n: int = 0, seed: int | None = None, shuffle=False, verbose=False
 ) -> pd.DataFrame:
     """Generate data from a boolean/logical function with k variables and save it in a pandas DataFrame.
     The target variable is saved in the "target" column of the df.
@@ -29,6 +29,10 @@ def gen_data(
         uniform randomly from the whole input space.
     seed: int | None
         Set the seed for the random sampling. Only relevant if n >= 1.
+    shuffle: bool
+        Whether to have the data samples be in random order. Only relevant if n <= 0.
+    verbose: bool
+        Whether or not to print additional debuggin information to stdout.
 
     Returns
     -------
@@ -40,8 +44,6 @@ def gen_data(
     vars = sorted(list(func.all_literals()))
     target_col = "target"
     df = pd.DataFrame(columns=vars + [target_col])
-    if reverse:
-        vars.reverse()
     if verbose:
         print(f"Generating dataset for the following expression: {func}...")
         print(f"Columns: {vars}")
@@ -49,7 +51,7 @@ def gen_data(
         print(f"Data shape: {final_shape}")
     if n <= 0:
         # generate a data point for each possible point in the input space
-        data = possible_data(vars)
+        data = possible_data(vars, is_float=False, shuffle=shuffle)
         for datapoint in data:
             df[datapoint] = data[datapoint]
         df[target_col] = func(data)
@@ -57,7 +59,7 @@ def gen_data(
     elif n >= 1:
         # generate n randomly selected data points from the input space
         random.seed(seed)
-        for _ in range(n):
+        for i in range(n):
             interpretation = {l: np.array(random.random() >= 0.5) for l in vars}
             interpretation[target_col] = func(interpretation)
             df.loc[len(df)] = interpretation  # type: ignore
@@ -66,7 +68,7 @@ def gen_data(
 
 def get_arguments() -> Namespace:
     parser = ArgumentParser(
-        description="Generate and save a dataset following a boolean function."
+        description="Generate and save a dataset following a boolean function. The dataset contains every point from the possible input space exactly once."
     )
     parser.add_argument(
         "target_fn", help="The target function as a boolean expression."
@@ -79,6 +81,11 @@ def get_arguments() -> Namespace:
         "--no_header",
         action="store_true",
         help="If specified, will exclude the header in the file.",
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="If specified, the datasamples will be shuffled.",
     )
     args = parser.parse_args()
     return args
@@ -97,5 +104,5 @@ if __name__ == "__main__":
         os.makedirs(dir_path)
     file_path = Path(dir_path, args.path).with_suffix(".csv")
     print("Final data shape: ")
-    data = gen_data(f, verbose=True)
+    data = gen_data(f, shuffle=args.shuffle, verbose=True)
     data.to_csv(file_path, index=False, header=not args.no_header)
