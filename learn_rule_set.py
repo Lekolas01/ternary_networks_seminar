@@ -27,13 +27,10 @@ def train_nn(
 ) -> tuple[list[float], list[float]]:
     device = "cpu"
     loss_fn = nn.BCELoss()
-    optim = torch.optim.Adam(model.parameters(), lr=0.002, weight_decay=1e-5)
+    optim = torch.optim.Adam(model.parameters(), lr=0.007, weight_decay=1e-5)
     tracker = Tracker()
     tracker.add_logger(
-        LogMetrics(
-            ["timestamp", "epoch", "train_loss", "train_acc"],
-            log_every=min(epochs / 20, 1),
-        )
+        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=20)
     )
 
     return training_loop(
@@ -61,8 +58,8 @@ def train_on_data(
     target_func = PARITY(vars)
 
     # generate a dataset, given a logical function
-    # data = gen_data(target_func, n=max(1024, int(2**n)))
-    data = gen_data(target_func, shuffle=True)
+    data = gen_data(target_func, n=max(1024, int(2**n)))
+    # data = gen_data(target_func, shuffle=True)
     data.to_csv(data_path, index=False, sep=",", mode="w")
     train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
     valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
@@ -71,12 +68,12 @@ def train_on_data(
 
 
 def main():
-    seed = 1
+    seed = 0
     n_vars = 10
-    epochs = 8000
-    l1 = 1e-5
+    epochs = 4000
+    l1 = 0.0
     batch_size = 64
-    spec_name = "abcdefg"
+    spec_name = f"parity{n_vars}"
     verbose = False
     name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
@@ -89,6 +86,14 @@ def main():
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
         model = ModelFactory.get_model(spec_name, n_vars)
+        model = nn.Sequential(
+            nn.Linear(n_vars, n_vars),
+            nn.Sigmoid(),
+            nn.Linear(n_vars, 1),
+            nn.Sigmoid(),
+            nn.Flatten(0),
+        )
+        print(model)
         train_on_data(
             model, n_vars, data_path, epochs=epochs, l1=l1, batch_size=batch_size
         )
