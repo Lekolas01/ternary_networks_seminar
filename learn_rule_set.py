@@ -74,10 +74,11 @@ def main():
     l1 = 0.0
     batch_size = 64
     spec_name = f"parity{n_vars}"
+    spec_name = "deep_parity10"
     verbose = False
     name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
     path = Path("runs")
-    problem_name = f"parity/{n_vars}"
+    problem_name = f"spec_name/{n_vars}"
     data_path = path / problem_name / (name + ".csv")
     model_path = path / problem_name / (name + ".pth")
 
