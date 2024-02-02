@@ -53,14 +53,14 @@ def main():
     l1 = 0.0
     batch_size = 64
     verbose = False
-    data_name = "abcdefg.csv"
+    data_name = "abcdefg"
     model_name = "abcdefg"
 
-    data_path = Path("data/generated") / data_name
-    problem_path = Path(f"runs/{data_name}/{model_name}")
-    model_path = problem_path / "model.pth"
+    data_path = Path("data/generated") / f"{data_name}.csv"
+    problem_path = Path(f"runs/{data_name}")
+    model_path = problem_path / f"{model_name}.pth"
 
-    if not os.path.isdir(problem_path) or not os.path.isfile(data_path):
+    if not os.path.isdir(problem_path) or not os.path.isfile(model_path):
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
@@ -71,7 +71,7 @@ def main():
         valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
         _ = train_nn(train_dl, valid_dl, model, epochs, l1)
         try:
-            torch.save(model, problem_path)
+            torch.save(model, model_path)
             print(f"Successfully saved model to {model_path}")
         except Exception as inst:
             print(f"Could not save model to {model_path}: {inst}")

@@ -360,15 +360,15 @@ class Subproblem:
         if not any(rule.simplify(knowledge) for rule in self.rules):
             return False
         # filter all constant F rules, as they will never trigger
-        rules = [r for r in self.rules if not (r.is_const and not r.val)]
+        self.rules = [r for r in self.rules if not (r.is_const and not r.val)]
 
         # if there exists a constant T rule, the whole subproblem is T
-        if any(r.is_const and r.val for r in rules):
+        if any(r.is_const and r.val for r in self.rules):
             knowledge[self.key] = True
             self.is_const, self.val = True, True
 
         # if there are no non-constant rules left, the whole subproblem is F
-        if len(rules) == 0:
+        if len(self.rules) == 0:
             knowledge[self.key] = False
             self.is_const, self.val = True, False
         """
@@ -556,7 +556,7 @@ class RuleSetNeuron(Node):
             subproblems.append(Subproblem(key, sp_rules))
 
         # simplify each node in topological order
-        
+
         for sp in subproblems:
             changed = sp.simplify(knowledge)
 
