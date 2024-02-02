@@ -16,6 +16,7 @@ from numpy import ndarray
 
 from bool_formula import *
 from node import Graph, Node
+from utilities import flatten
 
 Val = TypeVar("Val")
 
@@ -320,14 +321,21 @@ class IfThenRule(Node):
         return changed
 
     def __repr__(self) -> str:
-        if self.is_const:
-            return f"{self.key} := {'T' if self.val else 'F'}"
-        ans = f"{self.key} := "
-        ans += ", ".join(f"{'' if b else '!'}{key}" for key, b in self.ins)
-        return ans
+        return f"{self.key} := {self.body()}"
 
     def __str__(self) -> str:
         return self.__repr__()
+
+    def body(self) -> str:
+        if self.is_const:
+            assert isinstance(self.val, bool)
+            return bool_2_ch(self.val)
+        return ", ".join(f"{'' if b else '!'}{key}" for key, b in self.ins)
+
+    def children(self) -> list[str]:
+        if self.is_const:
+            return []
+        return [key for key, _ in self.ins]
 
 
 class Subproblem:
@@ -347,8 +355,8 @@ class Subproblem:
         """
         Returns a boolean that tells whether something changed
         """
-        # first, simplify each individual rule
-        # if nothing changed, just return False
+        # first, simplify each individual rule.
+        # if no rule changed, the whole subproblem did not change, -> return False.
         if not any(rule.simplify(knowledge) for rule in self.rules):
             return False
         # filter all constant F rules, as they will never trigger
@@ -364,20 +372,23 @@ class Subproblem:
             knowledge[self.key] = False
             self.is_const, self.val = True, False
         """
-        other things that one could implement here, is to look at relations between 
+        to further simplify subproblems, one should also look at relations between 
         the rules. For example, if one rule's body is a strict superset of another rule's
-        body, you can delete the bigger rule, as it will only ever trigger when the second
-        rule triggers anyways. In our use case however, such cases will never happen.
+        body, you can delete the more specific rule, as it will only ever trigger when the 
+        more general triggers anyways. In our use case however, that can not happen.
         """
         return True
 
     def __str__(self) -> str:
         if self.is_const:
             return f"SP({self.key} := {bool_2_ch(self.val)})"
-        return f"SP({self.key} := {', '.join(str(r) for r in self.rules)})"
+        return f"SP({self.key} := {' | '.join(r.body() for r in self.rules)})"
 
     def __repr__(self) -> str:
         return str(self)
+
+    def children(self) -> list[str]:
+        return flatten([rule.children() for rule in self.rules])
 
 
 class RuleSetNeuron(Node):
@@ -475,6 +486,7 @@ class RuleSetNeuron(Node):
 
     def to_rule_set(self, dp: Dp) -> list[IfThenRule]:
         rules: list[IfThenRule] = []
+        self.subproblems: list[Subproblem] = []
 
         self.graph_ins: dict[str, set[str]] = {}
         # then create 1 or 2 if-then rules for each node, depending on whether it's
@@ -483,9 +495,15 @@ class RuleSetNeuron(Node):
             for node in self.dp[k]:
                 if node.min_thr == float("-inf"):
                     rules.append(IfThenRule(node.key, [], False))
+                    self.subproblems.append(
+                        Subproblem(node.key, [IfThenRule(node.key, [], val=False)])
+                    )
                     self.graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
                     rules.append(IfThenRule(node.key, [], True))
+                    self.subproblems.append(
+                        Subproblem(node.key, [IfThenRule(node.key, [], val=True)])
+                    )
                     self.graph_ins[node.key] = set()
                 else:
                     target_1 = self.dp.find(k + 1, node.mean)
@@ -502,6 +520,17 @@ class RuleSetNeuron(Node):
                                 (target_2.key, True),
                             ],
                         )
+                    )
+                    rule1 = IfThenRule(node.key, [(target_1.key, True)])
+                    rule2 = IfThenRule(
+                        node.key,
+                        [
+                            (self.n_ins[k][0], not self.signs[k]),
+                            (target_2.key, True),
+                        ],
+                    )
+                    self.subproblems.append(
+                        Subproblem(key=node.key, rules=[rule1, rule2])
                     )
                     self.graph_ins[node.key] = {target_1.key, target_2.key}
 
@@ -521,15 +550,19 @@ class RuleSetNeuron(Node):
         for rule in rules:
             rules_dict[rule.key].append(rule)
         subproblems: list[Subproblem] = []
+
         for key in self.call_order:
             sp_rules = [r for r in rules if r.key == key]
             subproblems.append(Subproblem(key, sp_rules))
 
+        # simplify each node in topological order
+        
         for sp in subproblems:
             changed = sp.simplify(knowledge)
 
         new_rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
         print(f"{rules = }")
+
         to_delete_rules = []
         for key, subproblem in rules_dict.items():
             for rule in subproblem:

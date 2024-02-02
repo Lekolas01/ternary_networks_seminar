@@ -46,64 +46,35 @@ def train_nn(
     )
 
 
-def train_on_data(
-    model: nn.Sequential,
-    n: int,
-    data_path: Path,
-    epochs: int,
-    l1: float,
-    batch_size: int,
-):
-    vars = [f"x{i + 1}" for i in range(n)]
-    target_func = PARITY(vars)
-
-    # generate a dataset, given a logical function
-    data = gen_data(target_func, n=max(1024, int(2**n)))
-    # data = gen_data(target_func, shuffle=True)
-    data.to_csv(data_path, index=False, sep=",", mode="w")
-    train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
-    valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
-    _ = train_nn(train_dl, valid_dl, model, epochs, l1)
-    return model
-
-
 def main():
     seed = 0
     n_vars = 10
     epochs = 4000
     l1 = 0.0
     batch_size = 64
-    spec_name = f"parity{n_vars}"
-    spec_name = "deep_parity10"
     verbose = False
-    name = f"l{l1}_seed{seed}_epoch{epochs}_bs{batch_size}"
-    path = Path("runs")
-    problem_name = f"spec_name/{n_vars}"
-    data_path = path / problem_name / (name + ".csv")
-    model_path = path / problem_name / (name + ".pth")
+    data_name = "abcdefg.csv"
+    model_name = "abcdefg"
 
-    if not os.path.isfile(model_path) or not os.path.isfile(data_path):
+    data_path = Path("data/generated") / data_name
+    problem_path = Path(f"runs/{data_name}/{model_name}")
+    model_path = problem_path / "model.pth"
+
+    if not os.path.isdir(problem_path) or not os.path.isfile(data_path):
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
-        model = ModelFactory.get_model(spec_name, n_vars)
-        model = nn.Sequential(
-            nn.Linear(n_vars, n_vars),
-            nn.Sigmoid(),
-            nn.Linear(n_vars, 1),
-            nn.Sigmoid(),
-            nn.Flatten(0),
-        )
+        model = ModelFactory.get_model(model_name)
         print(model)
-        train_on_data(
-            model, n_vars, data_path, epochs=epochs, l1=l1, batch_size=batch_size
-        )
+
+        train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
+        valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
+        _ = train_nn(train_dl, valid_dl, model, epochs, l1)
         try:
-            torch.save(model, model_path)
+            torch.save(model, problem_path)
             print(f"Successfully saved model to {model_path}")
         except Exception as inst:
             print(f"Could not save model to {model_path}: {inst}")
-
     print(f"Loading trained model from {model_path}...")
     # get the last updated model
     model = torch.load(model_path)

@@ -70,7 +70,7 @@ def gen_data(
             interpretation[target_var] = func(interpretation)
             df.loc[len(df)] = interpretation  # type: ignore
     for dead_var in dead_vars:
-        df[dead_var] = np.random.choice([0, 1], size=n, p=[0.5, 0.5])
+        df[dead_var] = np.random.choice([0, 1], n, True, np.array([0.5, 0.5]))
     return df.astype(int)
 
 

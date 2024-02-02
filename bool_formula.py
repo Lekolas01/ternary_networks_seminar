@@ -62,7 +62,7 @@ class Bool(ABC):
             else self.all_literals()
         )
         data = possible_data(names, is_float=False)
-        return np.all(self(data))
+        return bool(np.all(self(data)))
 
     def __repr__(self) -> str:
         return str(self)
