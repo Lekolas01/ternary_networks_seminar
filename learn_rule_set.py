@@ -53,11 +53,10 @@ def main():
     l1 = 0.0
     batch_size = 64
     verbose = False
-    data_name = "abcdefg.csv"
     model_name = "abcdefg"
 
-    data_path = Path("data/generated") / data_name
-    problem_path = Path(f"runs/{data_name}/{model_name}")
+    data_path = Path("data/generated") / (model_name + ".csv")
+    problem_path = Path(f"runs/{model_name}")
     model_path = problem_path / "model.pth"
 
     if not os.path.isdir(problem_path) or not os.path.isfile(data_path):
