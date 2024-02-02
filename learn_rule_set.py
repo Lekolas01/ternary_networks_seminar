@@ -1,4 +1,5 @@
 import os
+from argparse import ArgumentParser, Namespace
 from pathlib import Path
 
 import numpy as np
@@ -23,14 +24,19 @@ def train_nn(
     valid_dl: DataLoader,
     model: nn.Sequential,
     epochs: int,
+    lr: float,
+    weight_decay: float,
     l1: float,
 ) -> tuple[list[float], list[float]]:
     device = "cpu"
     loss_fn = nn.BCELoss()
-    optim = torch.optim.Adam(model.parameters(), lr=0.007, weight_decay=1e-5)
+    optim = torch.optim.Adam(
+        model.parameters(), lr=0.005, betas=(0.9, 0.999), eps=1e-08, weight_decay=0
+    )
+    # optim = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     tracker = Tracker()
     tracker.add_logger(
-        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=20)
+        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=40)
     )
 
     return training_loop(
@@ -46,30 +52,54 @@ def train_nn(
     )
 
 
+def get_arguments() -> Namespace:
+    parser = ArgumentParser(
+        description="Train a neural network on a categorical dataset and then convert it to a rule set."
+    )
+    parser.add_argument(
+        "--data",
+        help="The name of the dataset (it must exist in the data/generated folder).",
+    )
+    parser.add_argument(
+        "--model",
+        help="The name of the neural net configuration - see models.model_collection.py.",
+    )
+    return parser.parse_args()
+
+
 def main():
-    seed = 0
-    n_vars = 10
-    epochs = 4000
-    l1 = 0.0
+    args = get_arguments()
+    seed = 1
+    epochs = 2000
     batch_size = 64
+    lr = 0.002
+    weight_decay = 1e-5
+    l1 = 2e-5
     verbose = False
-    data_name = "abcdefg"
-    model_name = "abcdefg"
+    data_name = args.data
+    model_name = args.model if hasattr(args, "model") else data_name
 
     data_path = Path("data/generated") / f"{data_name}.csv"
     problem_path = Path(f"runs/{data_name}")
     model_path = problem_path / f"{model_name}.pth"
 
-    if not os.path.isdir(problem_path) or not os.path.isfile(model_path):
+    if not os.path.isdir(problem_path):
+        print(f"Creating new directory at {problem_path}...")
+        os.mkdir(problem_path)
+
+    if not os.path.isfile(model_path):
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
         model = ModelFactory.get_model(model_name)
-        print(model)
 
-        train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
-        valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size)
-        _ = train_nn(train_dl, valid_dl, model, epochs, l1)
+        train_dl = DataLoader(
+            FileDataset(data_path), batch_size=batch_size, shuffle=False
+        )
+        valid_dl = DataLoader(
+            FileDataset(data_path), batch_size=batch_size, shuffle=False
+        )
+        _ = train_nn(train_dl, valid_dl, model, epochs, lr, weight_decay, l1)
         try:
             torch.save(model, model_path)
             print(f"Successfully saved model to {model_path}")
@@ -102,10 +132,10 @@ def main():
 
     print("----------------- Outputs -----------------")
 
-    print(f"{nn_out = }")
-    print(f"{ng_out = }")
-    print(f"{q_ng_out = }")
-    print(f"{bg_out = }")
+    # print(f"{nn_out = }")
+    # print(f"{ng_out = }")
+    # print(f"{q_ng_out = }")
+    # print(f"{bg_out = }")
 
     print("----------------- Mean Errors -----------------")
 

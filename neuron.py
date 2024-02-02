@@ -545,6 +545,7 @@ class RuleSetNeuron(Node):
 
     def simplify(self, rules: list[IfThenRule]) -> list[IfThenRule]:
         keys = {rule.key for rule in rules}
+        return rules
         knowledge: dict[str, bool] = {}
         rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
         for rule in rules:
