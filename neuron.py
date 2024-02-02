@@ -20,6 +20,10 @@ from node import Graph, Node
 Val = TypeVar("Val")
 
 
+def bool_2_ch(x: bool) -> str:
+    return "T" if x else "F"
+
+
 def powerset(it: Iterable[Val]) -> Iterable[Iterable[Val]]:
     s = list(it)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
@@ -330,8 +334,12 @@ class Subproblem:
     def __init__(self, key: str, rules: list[IfThenRule]):
         self.key = key
         self.rules = rules
+        self.is_const = False
+        self.val = False
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
+        if self.is_const:
+            return np.array(self.val)
         temp = [rule(vars) for rule in self.rules]
         return functools.reduce(lambda x, y: x | y, temp)
 
@@ -339,14 +347,34 @@ class Subproblem:
         """
         Returns a boolean that tells whether something changed
         """
-        changed = False
+        # first, simplify each individual rule
+        # if nothing changed, just return False
+        if not any(rule.simplify(knowledge) for rule in self.rules):
+            return False
+        # filter all constant F rules, as they will never trigger
+        rules = [r for r in self.rules if not (r.is_const and not r.val)]
 
-        
+        # if there exists a constant T rule, the whole subproblem is T
+        if any(r.is_const and r.val for r in rules):
+            knowledge[self.key] = True
+            self.is_const, self.val = True, True
 
-        return changed
+        # if there are no non-constant rules left, the whole subproblem is F
+        if len(rules) == 0:
+            knowledge[self.key] = False
+            self.is_const, self.val = True, False
+        """
+        other things that one could implement here, is to look at relations between 
+        the rules. For example, if one rule's body is a strict superset of another rule's
+        body, you can delete the bigger rule, as it will only ever trigger when the second
+        rule triggers anyways. In our use case however, such cases will never happen.
+        """
+        return True
 
     def __str__(self) -> str:
-        return "SP(" + (", ".join(str(r) for r in self.rules)) + ")"
+        if self.is_const:
+            return f"SP({self.key} := {bool_2_ch(self.val)})"
+        return f"SP({self.key} := {', '.join(str(r) for r in self.rules)})"
 
     def __repr__(self) -> str:
         return str(self)
