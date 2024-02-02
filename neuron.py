@@ -6,7 +6,7 @@ from copy import copy, deepcopy
 from enum import Enum
 from graphlib import TopologicalSorter
 from itertools import chain, combinations
-from typing import Dict, Tuple, TypeVar
+from typing import Dict, Self, Tuple, TypeVar
 
 import numpy as np
 import torch
@@ -292,6 +292,29 @@ class IfThenRule(Node):
             ans = ans & temp
         return ans
 
+    def simplify(self, knowledge: dict[str, bool]) -> bool:
+        changed = False
+        to_delete_ins = []
+        for lit, lit_val in self.ins:
+            if lit in knowledge:
+                new_lit_val = lit_val if knowledge[lit] else not lit_val
+                if new_lit_val:
+                    # delete any positive constants
+                    to_delete_ins.append(lit)
+                    changed = True
+                else:
+                    # if you have a negative constant, the whole rule is negative
+                    self.is_const = True
+                    self.val = False
+                    return True
+        self.ins = [t for t in self.ins if t[0] not in to_delete_ins]
+        # if there are no literals left, i.e. every literal is positive, the whole rule is positive
+        if len(self.ins) == 0:
+            self.is_const = True
+            self.val = True
+            return True
+        return changed
+
     def __repr__(self) -> str:
         if self.is_const:
             return f"{self.key} := {'T' if self.val else 'F'}"
@@ -303,13 +326,30 @@ class IfThenRule(Node):
         return self.__repr__()
 
 
-class RuleSet:
-    def __init__(self, key: str, ins: list[IfThenRule]):
+class Subproblem:
+    def __init__(self, key: str, rules: list[IfThenRule]):
         self.key = key
-        pass
+        self.rules = rules
 
-    def __call__(self):
-        pass
+    def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
+        temp = [rule(vars) for rule in self.rules]
+        return functools.reduce(lambda x, y: x | y, temp)
+
+    def simplify(self, knowledge: dict[str, bool]) -> bool:
+        """
+        Returns a boolean that tells whether something changed
+        """
+        changed = False
+
+        
+
+        return changed
+
+    def __str__(self) -> str:
+        return "SP(" + (", ".join(str(r) for r in self.rules)) + ")"
+
+    def __repr__(self) -> str:
+        return str(self)
 
 
 class RuleSetNeuron(Node):
@@ -406,20 +446,19 @@ class RuleSetNeuron(Node):
         return str(self)
 
     def to_rule_set(self, dp: Dp) -> list[IfThenRule]:
-        self.calc_dp()
         rules: list[IfThenRule] = []
 
-        graph_ins: dict[str, set[str]] = {}
+        self.graph_ins: dict[str, set[str]] = {}
         # then create 1 or 2 if-then rules for each node, depending on whether it's
         # a constant or not
         for k in range(self.n_vars + 1):
             for node in self.dp[k]:
                 if node.min_thr == float("-inf"):
                     rules.append(IfThenRule(node.key, [], False))
-                    graph_ins[node.key] = set()
+                    self.graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
                     rules.append(IfThenRule(node.key, [], True))
-                    graph_ins[node.key] = set()
+                    self.graph_ins[node.key] = set()
                 else:
                     target_1 = self.dp.find(k + 1, node.mean)
                     assert target_1 is not None
@@ -436,10 +475,10 @@ class RuleSetNeuron(Node):
                             ],
                         )
                     )
-                    graph_ins[node.key] = {target_1.key, target_2.key}
+                    self.graph_ins[node.key] = {target_1.key, target_2.key}
 
         # find topological order of remaining rules
-        sorter = TopologicalSorter(graph_ins)
+        sorter = TopologicalSorter(self.graph_ins)
         self.call_order = list(sorter.static_order())
         # add properties
 
@@ -448,25 +487,38 @@ class RuleSetNeuron(Node):
         return rules
 
     def simplify(self, rules: list[IfThenRule]) -> list[IfThenRule]:
-        return rules
         keys = {rule.key for rule in rules}
         knowledge: dict[str, bool] = {}
         rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
         for rule in rules:
             rules_dict[rule.key].append(rule)
-        print(rules_dict)
+        subproblems: list[Subproblem] = []
+        for key in self.call_order:
+            sp_rules = [r for r in rules if r.key == key]
+            subproblems.append(Subproblem(key, sp_rules))
+
+        for sp in subproblems:
+            changed = sp.simplify(knowledge)
 
         new_rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
-        changed = True
-        for key, rules in rules_dict.items():
-            for rule in rules:
+        print(f"{rules = }")
+        to_delete_rules = []
+        for key, subproblem in rules_dict.items():
+            for rule in subproblem:
                 if rule.is_const:
+                    assert isinstance(rule.val, bool)
                     if rule.val == True:
                         knowledge[rule.key] = True
+                        # if the rule is T, the whole subproblem is T
+                        # if the rule is F, you can omit this one rule
                         # new_rules_dict
-        #                if rule.
-        changed = False
-
+                    #                if rule.
+                    else:
+                        pass
+        print(f"{knowledge = }")
+        print(f"{rules = }")
+        rules = [r for r in rules if r.key not in to_delete_rules]
+        return rules
         # remove all appearances of the just deleted constant nodes in the other rules
         for rule in rules:
             new_ins = []
@@ -487,8 +539,8 @@ class RuleSetNeuron(Node):
 
 
 class RuleSetGraph(Graph):
-    def __init__(self, bools: Sequence[RuleSetNeuron]) -> None:
-        super().__init__(bools)
+    def __init__(self, rule_set_neurons: Sequence[RuleSetNeuron]) -> None:
+        super().__init__(rule_set_neurons)
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph):
