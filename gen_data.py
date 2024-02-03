@@ -12,7 +12,13 @@ from neuron import possible_data
 
 
 def gen_data(
-    func: Bool, n=0, dead_cols=0, seed: int | None = None, shuffle=False, verbose=False
+    func: Bool,
+    col_order: list[str] | None = None,
+    n=0,
+    dead_cols=0,
+    seed: int | None = None,
+    shuffle=False,
+    verbose=False,
 ) -> pd.DataFrame:
     """Generate data from a boolean/logical function with k unqiue variables and save it in a pandas DataFrame.
     The target variable is saved in the "target" column of the df.
@@ -22,6 +28,9 @@ def gen_data(
     ----------
     func : Bool
         The target function for which to generate a dataset.
+    col_order : list[str] | None
+        If specified, it will fix the order in which the columns get saved. Otherwise, they
+        are sorted lexicographically.
     n : int | None
         If n is <= 0, the DataFrame will contain every possible sample from the input space exactly once,
         i.e. the DataFrame will contain exactly 2**k data points, where k is the number
@@ -47,26 +56,27 @@ def gen_data(
         The first k columns are named after each variable occuring in func sorted lexicographically,
         the last column is the "target" column, and the ones in between are the irrelevant columns.
     """
-    vars = sorted(list(func.all_literals()))
+    if col_order is None:
+        col_order = list(func.all_literals())
     target_var = "target"
     dead_vars = [f"dead{i + 1}" for i in range(dead_cols)]
-    df = pd.DataFrame(columns=vars + dead_vars + [target_var])
+    df = pd.DataFrame(columns=col_order + dead_vars + [target_var])
     if verbose:
         print(f"Generating dataset for the following expression: {func}...")
         print(f"Columns: {vars}")
     if n <= 0:
         # generate a data point for each possible point in the input space
-        data = possible_data(vars, is_float=False, shuffle=shuffle)
+        data = possible_data(col_order, is_float=False, shuffle=shuffle)
         for datapoint in data:
             df[datapoint] = data[datapoint]
         df[target_var] = func(data)
-        n = 2 ** len(vars)
+        n = 2 ** len(col_order)
 
     elif n >= 1:
         # generate n randomly selected data points from the input space
         random.seed(seed)
         for i in range(n):
-            interpretation = {l: np.array(random.random() >= 0.5) for l in vars}
+            interpretation = {l: np.array(random.random() >= 0.5) for l in col_order}
             interpretation[target_var] = func(interpretation)
             df.loc[len(df)] = interpretation  # type: ignore
     for dead_var in dead_vars:

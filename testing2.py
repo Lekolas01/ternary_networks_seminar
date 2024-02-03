@@ -1,6 +1,7 @@
 import numpy as np
 
-from neuron import IfThenRule, Subproblem
+from bool_formula import possible_data
+from neuron import IfThenRule, RuleSetNeuron, Subproblem
 
 # rule = IfThenRule("y", [("x1", True), ("x2", False)])
 # knowledge = {"x2": False}
@@ -11,13 +12,12 @@ from neuron import IfThenRule, Subproblem
 # print(rule)
 #
 # print(rule({"x1": np.array([False, False]), "x2": np.array([True, True])}))
-
 rule1 = IfThenRule("y", [("y1", True)])
 rule2 = IfThenRule("y", [("x1", True), ("y2", True)])
 sp = Subproblem("y", [rule1, rule2])
 print(sp)
 # this makes the first rule T, so the whole subproblem should be T, as rule1 will always trigger
-knowledge = {"y1": True}
+knowledge = {"y2": True, "x1": False}
 print(sp.simplify(knowledge))
 print(f"{sp = }")
 print(f"{knowledge = }")
