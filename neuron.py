@@ -16,7 +16,7 @@ from numpy import ndarray
 
 from bool_formula import *
 from node import Graph, Node
-from utilities import flatten
+from utilities import flatten, invert_dict
 
 Val = TypeVar("Val")
 
@@ -298,8 +298,14 @@ class IfThenRule(Node):
         return ans
 
     def simplify(self, knowledge: dict[str, bool]) -> bool:
+        if self.is_const:
+            assert isinstance(self.val, bool)
+            ans = not self.key in knowledge
+            knowledge[self.key] = self.val
+            return ans
         changed = False
         to_delete_ins = []
+
         for lit, lit_val in self.ins:
             if lit in knowledge:
                 new_lit_val = lit_val if knowledge[lit] else not lit_val
@@ -357,8 +363,8 @@ class Subproblem:
         """
         # first, simplify each individual rule.
         # if no rule changed, the whole subproblem did not change, -> return False.
-        if not any(rule.simplify(knowledge) for rule in self.rules):
-            return False
+        changed = any(rule.simplify(knowledge) for rule in self.rules)
+
         # filter all constant F rules, as they will never trigger
         self.rules = [r for r in self.rules if not (r.is_const and not r.val)]
 
@@ -377,7 +383,7 @@ class Subproblem:
         body, you can delete the more specific rule, as it will only ever trigger when the 
         more general triggers anyways. In our use case however, that can not happen.
         """
-        return True
+        return changed
 
     def __str__(self) -> str:
         if self.is_const:
@@ -397,14 +403,13 @@ class RuleSetNeuron(Node):
         self.key = q_neuron.key
         self.ins = q_neuron.ins
         self.dp = self.calc_dp()
-        self.rules = self.to_rule_set(self.dp)
+        self.subproblems = self.to_rule_set(self.dp)
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
         for key in self.call_order:
-            rules = [rule for rule in self.rules if rule.key == key]
-            temp = [rule(vars) for rule in rules]
-            vars[key] = functools.reduce(lambda x, y: x | y, temp)
+            sp = self.subproblems[key]
+            vars[key] = sp(vars)
         return vars[self.key]
 
     def name_gen(self):
@@ -478,49 +483,39 @@ class RuleSetNeuron(Node):
         return RuleSetNeuron(q_neuron)
 
     def __str__(self) -> str:
-        ans = "RuleSet[\n\t" + "\n\t".join(str(rule) for rule in self.rules) + "\n]"
+        ans = (
+            "RuleSet[\n\t"
+            + "\n\t".join(str(sp) for sp in self.subproblems.values())
+            + "\n]"
+        )
         return ans
 
     def __repr__(self) -> str:
         return str(self)
 
-    def to_rule_set(self, dp: Dp) -> list[IfThenRule]:
-        rules: list[IfThenRule] = []
-        self.subproblems: list[Subproblem] = []
-
+    def to_rule_set(self, dp: Dp) -> dict[str, Subproblem]:
+        ans: dict[str, Subproblem] = {}
         self.graph_ins: dict[str, set[str]] = {}
         # then create 1 or 2 if-then rules for each node, depending on whether it's
         # a constant or not
         for k in range(self.n_vars + 1):
             for node in self.dp[k]:
                 if node.min_thr == float("-inf"):
-                    rules.append(IfThenRule(node.key, [], False))
-                    self.subproblems.append(
-                        Subproblem(node.key, [IfThenRule(node.key, [], val=False)])
+                    ans[node.key] = Subproblem(
+                        node.key, [IfThenRule(node.key, [], val=False)]
                     )
                     self.graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
-                    rules.append(IfThenRule(node.key, [], True))
-                    self.subproblems.append(
-                        Subproblem(node.key, [IfThenRule(node.key, [], val=True)])
+                    ans[node.key] = Subproblem(
+                        node.key, [IfThenRule(node.key, [], val=True)]
                     )
                     self.graph_ins[node.key] = set()
                 else:
                     target_1 = self.dp.find(k + 1, node.mean)
                     assert target_1 is not None
-                    rules.append(IfThenRule(node.key, [(target_1.key, True)], None))
 
                     target_2 = self.dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
-                    rules.append(
-                        IfThenRule(
-                            node.key,
-                            [
-                                (self.n_ins[k][0], not self.signs[k]),
-                                (target_2.key, True),
-                            ],
-                        )
-                    )
                     rule1 = IfThenRule(node.key, [(target_1.key, True)])
                     rule2 = IfThenRule(
                         node.key,
@@ -529,9 +524,7 @@ class RuleSetNeuron(Node):
                             (target_2.key, True),
                         ],
                     )
-                    self.subproblems.append(
-                        Subproblem(key=node.key, rules=[rule1, rule2])
-                    )
+                    ans[node.key] = Subproblem(key=node.key, rules=[rule1, rule2])
                     self.graph_ins[node.key] = {target_1.key, target_2.key}
 
         # find topological order of remaining rules
@@ -540,29 +533,40 @@ class RuleSetNeuron(Node):
         # add properties
 
         # simplify rules
-        rules = self.simplify(rules)
-        return rules
+        ans = self.simplify(ans)
+        return ans
 
-    def simplify(self, rules: list[IfThenRule]) -> list[IfThenRule]:
-        keys = {rule.key for rule in rules}
-        return rules
+    def simplify(self, subproblems: dict[str, Subproblem]) -> dict[str, Subproblem]:
+        keys = {key for key in subproblems}
         knowledge: dict[str, bool] = {}
-        rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
-        for rule in rules:
-            rules_dict[rule.key].append(rule)
-        subproblems: list[Subproblem] = []
 
-        for key in self.call_order:
-            sp_rules = [r for r in rules if r.key == key]
-            subproblems.append(Subproblem(key, sp_rules))
+        children = {key: sp.children() for key, sp in subproblems.items()}
+        parents = invert_dict(children)
 
+        # changed = any(subproblems[key].simplify(knowledge) for key in self.call_order)
+
+        # subproblems = [key: sp for key, sp in subproblems if not (sp.is_const and sp.val)]
         # simplify each node in topological order
+        for key in self.call_order:
+            sp = subproblems[key]
 
-        for sp in subproblems:
-            changed = sp.simplify(knowledge)
+            sp.simplify(knowledge)
+            if sp.key in knowledge:
+                continue
 
+            continue
+            for rule in sp.rules:
+                rules
+                if rule.is_const:
+                    # assert isinstance(rule.val, bool)
+                    if rule.val:
+                        knowledge[sp.key] = True
+                    else:
+                        pass
+        print(f"{knowledge = }")
+        return subproblems
         new_rules_dict: defaultdict[str, list[IfThenRule]] = defaultdict(list)
-        print(f"{rules = }")
+        print(f"{subproblems = }")
 
         to_delete_rules = []
         for key, subproblem in rules_dict.items():
@@ -578,11 +582,11 @@ class RuleSetNeuron(Node):
                     else:
                         pass
         print(f"{knowledge = }")
-        print(f"{rules = }")
-        rules = [r for r in rules if r.key not in to_delete_rules]
-        return rules
+        print(f"{subproblems = }")
+        subproblems = [r for r in subproblems if r.key not in to_delete_rules]
+        return subproblems
         # remove all appearances of the just deleted constant nodes in the other rules
-        for rule in rules:
+        for rule in subproblems:
             new_ins = []
             for rule_in_key, rule_in_val in rule.ins:
                 if rule_in_key not in const_keys:
@@ -597,7 +601,7 @@ class RuleSetNeuron(Node):
         # until the rules remain unchanged
 
         # print(rules)
-        return rules
+        return subproblems
 
 
 class RuleSetGraph(Graph):

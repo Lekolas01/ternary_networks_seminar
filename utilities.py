@@ -81,3 +81,11 @@ def set_seed(seed: int | None) -> int:
 
 def flatten(l: list[list]) -> list:
     return [x for row in l for x in row]
+
+
+def invert_dict(d: dict) -> dict:
+    ans = {}
+    for k, v in d.items():
+        for x in v:
+            ans.setdefault(x, []).append(k)
+    return ans
