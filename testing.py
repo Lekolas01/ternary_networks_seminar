@@ -1,10 +1,10 @@
-from bool_formula import Example
+from bool_formula import AND, OR, Constant, Example, Literal, possible_data
 from neuron import *
 
 q_ng = QuantizedNeuronGraph(
     [
         QuantizedNeuron(
-            "y",
+            "target",
             {
                 "x1": 5.0,
                 "x2": 5.0,
@@ -19,12 +19,12 @@ q_ng = QuantizedNeuronGraph(
     ]
 )
 
-bg = RuleSetGraph.from_q_neuron_graph(q_ng)
+bg = RuleSetGraph.from_q_neuron_graph(q_ng, simplify=False)
+simple_bg = RuleSetGraph.from_q_neuron_graph(q_ng, simplify=True)
 print(bg)
-
-a = OR(Constant(np.array(False)), Constant(np.array(False)), Literal("x1"))
-print(a)
-print(a.simplified())
-y = AND("x1", "x2")
-
-print(y)
+print(simple_bg)
+exit()
+data = possible_data([f"x{i + 1}" for i in range(7)], is_float=False)
+f_data = possible_data([f"x{i + 1}" for i in range(7)], is_float=True)
+print(f"{f_data = }")
+print(f"{bg(data) = }")
