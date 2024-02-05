@@ -412,7 +412,9 @@ class RuleSetNeuron(Node):
         self.knowledge = {}
         if simplify:
             # simplify rules
-            self.subproblems = self.simplify(self.subproblems)
+            self.subproblems, self.knowledge = self.simplify(
+                self.subproblems, self.knowledge
+            )
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy(vars)
@@ -511,7 +513,7 @@ class RuleSetNeuron(Node):
         # then create 1 or 2 if-then rules for each node, depending on whether it's
         # a constant or not
         for k in range(self.n_vars + 1):
-            for node in self.dp[k]:
+            for node in dp[k]:
                 if node.min_thr == float("-inf"):
                     ans[node.key] = Subproblem(
                         node.key, [IfThenRule(node.key, [], val=False)]
@@ -523,10 +525,10 @@ class RuleSetNeuron(Node):
                     )
                     self.graph_ins[node.key] = set()
                 else:
-                    target_1 = self.dp.find(k + 1, node.mean)
+                    target_1 = dp.find(k + 1, node.mean)
                     assert target_1 is not None
 
-                    target_2 = self.dp.find(k + 1, node.mean + self.n_ins[k][1])
+                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
                     rule1 = IfThenRule(node.key, [(target_1.key, True)])
                     rule2 = IfThenRule(
@@ -538,9 +540,6 @@ class RuleSetNeuron(Node):
                     )
                     ans[node.key] = Subproblem(key=node.key, rules=[rule1, rule2])
                     self.graph_ins[node.key] = {target_1.key, target_2.key}
-
-        self.subproblems = ans
-        # find topological order of remaining rules
 
         return ans
 
@@ -554,27 +553,17 @@ class RuleSetNeuron(Node):
         sorter = TopologicalSorter(graph_ins)
         return list(sorter.static_order())
 
-    def simplify(self, subproblems: dict[str, Subproblem]) -> dict[str, Subproblem]:
-        print(self)
-        keys = {key for key in subproblems}
-        self.knowledge: dict[str, bool] = {}
+    def simplify(
+        self, subproblems: dict[str, Subproblem], knowledge: dict[str, bool]
+    ) -> tuple[dict[str, Subproblem], dict[str, bool]]:
 
-        children = {key: sp.children() for key, sp in subproblems.items()}
-        parents = invert_dict(children)
-
-        # changed = any(subproblems[key].simplify(knowledge) for key in self.call_order)
-
-        # subproblems = [key: sp for key, sp in subproblems if not (sp.is_const and sp.val)]
-        # simplify each node in topological order
+        # simplify each subproblem in topological order
         changed = any(
-            [subproblems[key].simplify(self.knowledge) for key in self.call_order()]
+            [subproblems[key].simplify(knowledge) for key in self.call_order()]
         )
-
-        # filter all constant F subproblems, as they will never trigger
+        # filter constant subproblems, as they are part of the knowledge
         subproblems = {key: sp for key, sp in subproblems.items() if not sp.is_const}
-
-        print(f"{self.knowledge = }")
-        return subproblems
+        return (subproblems, knowledge)
 
 
 class RuleSetGraph(Graph):
