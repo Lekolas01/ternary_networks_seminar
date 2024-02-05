@@ -1,8 +1,9 @@
 import bisect
+import copy
 import functools
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
-from copy import copy, deepcopy
+from copy import deepcopy
 from enum import Enum
 from graphlib import TopologicalSorter
 from itertools import chain, combinations
@@ -417,7 +418,7 @@ class RuleSetNeuron(Node):
             )
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
-        vars = copy(vars)
+        vars = copy.copy(vars)
         for k in self.knowledge:
             vars[k] = np.array(self.knowledge[k])
         for key in self.call_order():

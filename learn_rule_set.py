@@ -31,7 +31,7 @@ def train_nn(
     device = "cpu"
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(
-        model.parameters(), lr=0.005, betas=(0.9, 0.999), eps=1e-08, weight_decay=0
+        model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0
     )
     # optim = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     tracker = Tracker()
@@ -152,10 +152,18 @@ def main():
 
     print("----------------- Final Acc. -----------------")
 
-    print("accuracy nn:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y)))
-    print("accuracy ng:\t", np.array(1.0) - np.mean(np.abs(np.round(ng_out) - y)))
-    print("accuracy q_ng:\t", np.array(1.0) - np.mean(np.abs(q_ng_out - y)))
-    print("accuracy bg:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
+    print(
+        "accuracy neural net:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y))
+    )
+    print(
+        "accuracy neuron graph:\t",
+        np.array(1.0) - np.mean(np.abs(np.round(ng_out) - y)),
+    )
+    print(
+        "accuracy quantized neuron graph:\t",
+        np.array(1.0) - np.mean(np.abs(q_ng_out - y)),
+    )
+    print("accuracy boolean graph:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
     sns.scatterplot()
 

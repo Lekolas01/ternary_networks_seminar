@@ -6,9 +6,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from bool_formula import Bool
+from bool_formula import Bool, possible_data
 from bool_parse import ExpressionEvaluator
-from neuron import possible_data
 
 
 def gen_data(
