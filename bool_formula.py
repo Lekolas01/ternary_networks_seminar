@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping, MutableMapping
 from functools import reduce
+from graphlib import TopologicalSorter
 from typing import Callable, Dict
 
 import numpy as np
+
+Interpretation = MutableMapping[str, np.ndarray]
 
 
 def overlap(left: Callable, right: Callable, data: Collection) -> float:
@@ -52,7 +55,7 @@ class Bool(ABC):
     def negated(self) -> Bool:
         return NOT(copy.copy(self))
 
-    def simplified(self) -> Bool:
+    def simplified(self, knowledge: Knowledge = {}) -> Bool:
         return self
 
     def __eq__(self, other: Bool | bool) -> bool:
@@ -66,6 +69,9 @@ class Bool(ABC):
 
     def __repr__(self) -> str:
         return str(self)
+
+
+Knowledge = dict[str, Bool]
 
 
 class Constant(Bool):
@@ -133,7 +139,7 @@ class NOT(Bool):
         # if you negate a NOT(...), you can just cancel the NOT() and return the child
         return copy.copy(self.child)
 
-    def simplified(self) -> Bool:
+    def simplified(self, knowledge={}) -> Bool:
         # move the NOT() inside
         if isinstance(self.child, Literal):
             return copy.copy(self)
@@ -165,9 +171,9 @@ class Quantifier(Bool):
             [c.negated().simplified() for c in self.children], not self.is_all
         )
 
-    def simplified(self) -> Bool:
+    def simplified(self, knowledge: Knowledge = {}) -> Bool:
         # simplify children first
-        children = [c.simplified() for c in self.children]
+        children = [c.simplified(knowledge) for c in self.children]
         # if one term is np.array(False), the whole conjunction is np.array(False)
         if any(child == (not self.is_all) for child in children):
             return Constant(np.array(not self.is_all))
@@ -191,11 +197,6 @@ class Quantifier(Bool):
 
         # otherwise return the rest of the relevant children
         return Quantifier(new_children, self.is_all)
-
-    def skolemized(self) -> Bool:
-        ans = self.simplified()
-
-        return ans
 
 
 class AND(Quantifier):
@@ -239,6 +240,37 @@ class Example(Bool):
         return super().all_literals()
 
 
+class BED:
+    def __init__(self, nodes: dict[str, Bool]):
+        self.nodes = nodes
+
+    def topological_order(self) -> list[str]:
+        graph_ins = {key: node.all_literals() for key, node in self.nodes.items()}
+        # TODO: remove constants and literals??
+        sorter = TopologicalSorter(graph_ins)
+        return list(sorter.static_order())
+
+    def __call__(self, vars: Interpretation) -> np.ndarray:
+        for key in self.topological_order():
+            node = self.nodes[key]
+            vars[key] = node(vars)
+        return vars[self.target_key()]
+
+    def target_key(self):
+        return self.topological_order()[-1]
+
+    def __str__(self) -> str:
+        return "\n".join(f"{key} := {str(node)}" for key, node in self.nodes.items())
+
+    def simplify(self) -> None:
+        knowledge = {}
+        temp = self.nodes[self.target_key()]
+        easy_root = temp.simplified(knowledge)
+        print(knowledge)
+        print(easy_root)
+        temp = 0
+
+
 if __name__ == "__main__":
     formulae: Dict[str, Bool] = {
         "a0": AND(),
@@ -268,4 +300,11 @@ if __name__ == "__main__":
     for key in formulae:
         b = formulae[key]
         ans = b.simplified()
-        print(f"{key:>6} | {b.__str__():>15} -> {ans.__str__():>5}")
+        # print(f"{key:>6} | {b.__str__():>15} -> {ans.__str__():>5}")
+
+    y1 = AND(Constant(True), "x1")
+    y2 = AND(Constant(True), y1)
+    y3 = OR(y1, "x2")
+    y = OR(y2, y3)
+    print(y)
+    print(y.simplified())

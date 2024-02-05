@@ -15,12 +15,22 @@ import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 from numpy import ndarray
 
-from bool_formula import NOT, PARITY, Bool, Constant, Literal, possible_data
+from bool_formula import (
+    AND,
+    BED,
+    NOT,
+    OR,
+    PARITY,
+    Bool,
+    Constant,
+    Knowledge,
+    Literal,
+    possible_data,
+)
 from node import Graph, Node
 from utilities import flatten, invert_dict
 
 Val = TypeVar("Val")
-Knowledge = dict[str, Bool]
 
 
 def bool_2_ch(x: bool) -> str:
@@ -278,6 +288,9 @@ class Dp:
     def __repr__(self) -> str:
         return str(self)
 
+    def __len__(self):
+        return len(self.data)
+
 
 class IfThenRule(Node):
     def __init__(
@@ -311,18 +324,21 @@ class IfThenRule(Node):
         changed = False
         to_delete_ins = []
 
-        for lit, lit_val in self.ins:
+        for idx, (lit, lit_val) in enumerate(self.ins):
             if lit in knowledge:
-                new_lit_val = lit_val if knowledge[lit]() else not lit_val
-                if new_lit_val:
-                    # delete any positive constants
-                    to_delete_ins.append(lit)
-                    changed = True
-                else:
-                    # if you have a negative constant, the whole rule is negative
-                    self.is_const = True
-                    self.val = False
-                    return True
+                if isinstance(knowledge[lit], Constant):
+                    new_lit_val = lit_val if knowledge[lit]() else not lit_val
+                    if new_lit_val:
+                        # delete any positive constants
+                        to_delete_ins.append(lit)
+                        changed = True
+                    else:
+                        # if you have a negative constant, the whole rule is negative
+                        self.is_const = True
+                        self.val = False
+                        return True
+                elif isinstance(knowledge[lit], Literal):
+                    self.ins[idx] = (str(knowledge[lit]), lit_val)
         self.ins = [t for t in self.ins if t[0] not in to_delete_ins]
         # if there are no literals left, i.e. every literal is positive, the whole rule is positive
         if len(self.ins) == 0:
@@ -389,14 +405,11 @@ class Subproblem:
         # if the subproblem only has one rule left with exactly one value,
         # add the value to the knowledge and delete the subproblem
         if len(self.rules) == 1 and len(self.rules[0].ins) == 1:
-            """
             t = self.rules[0].ins[0]
             v = Literal(t[0])
             if not t[1]:
                 v = NOT(v)
             knowledge[self.key] = v
-            """
-            pass
 
         """
         to further simplify subproblems, one should also look at relations between 
@@ -524,6 +537,7 @@ class RuleSetNeuron(Node):
 
     def to_subproblems(self, dp: Dp) -> dict[str, Subproblem]:
         ans: dict[str, Subproblem] = {}
+        vertices = {}
         self.graph_ins: dict[str, set[str]] = {}
         # Operator()
         # then create 1 or 2 if-then rules for each node, depending on whether it's
@@ -534,11 +548,13 @@ class RuleSetNeuron(Node):
                     ans[node.key] = Subproblem(
                         node.key, [IfThenRule(node.key, [], val=False)]
                     )
+                    vertices[node.key] = Constant(False)
                     self.graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
                     ans[node.key] = Subproblem(
                         node.key, [IfThenRule(node.key, [], val=True)]
                     )
+                    vertices[node.key] = Constant(True)
                     self.graph_ins[node.key] = set()
                 else:
                     target_1 = dp.find(k + 1, node.mean)
@@ -555,8 +571,15 @@ class RuleSetNeuron(Node):
                         ],
                     )
                     ans[node.key] = Subproblem(key=node.key, rules=[rule1, rule2])
+                    v1 = AND(self.n_ins[k][0], target_2.key)
+                    v1_key = f"{node.key}_T"
+                    v2 = OR(target_1.key, v1)
+                    vertices[node.key] = v2
+                    vertices[v1_key] = v1
                     self.graph_ins[node.key] = {target_1.key, target_2.key}
-
+        # self.bed = BED(vertices)
+        # print(self.bed)
+        # self.bed.simplify()
         return ans
 
     def call_order(self) -> list[str]:
