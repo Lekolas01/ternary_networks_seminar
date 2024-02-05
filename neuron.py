@@ -15,10 +15,12 @@ import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 from numpy import ndarray
 
+from bool_formula import NOT, PARITY, Bool, Constant, Literal, possible_data
 from node import Graph, Node
 from utilities import flatten, invert_dict
 
 Val = TypeVar("Val")
+Knowledge = dict[str, Bool]
 
 
 def bool_2_ch(x: bool) -> str:
@@ -300,18 +302,18 @@ class IfThenRule(Node):
                 temp = 0
         return ans
 
-    def simplify(self, knowledge: dict[str, bool]) -> bool:
+    def simplify(self, knowledge: Knowledge) -> bool:
         if self.is_const:
             assert isinstance(self.val, bool)
-            ans = not self.key in knowledge
-            knowledge[self.key] = self.val
+            ans = not (self.key in knowledge)
+            knowledge[self.key] = Constant(self.val)
             return ans
         changed = False
         to_delete_ins = []
 
         for lit, lit_val in self.ins:
             if lit in knowledge:
-                new_lit_val = lit_val if knowledge[lit] else not lit_val
+                new_lit_val = lit_val if knowledge[lit]() else not lit_val
                 if new_lit_val:
                     # delete any positive constants
                     to_delete_ins.append(lit)
@@ -360,7 +362,7 @@ class Subproblem:
         temp = [rule(vars) for rule in self.rules]
         return functools.reduce(lambda x, y: x | y, temp)
 
-    def simplify(self, knowledge: dict[str, bool]) -> bool:
+    def simplify(self, knowledge: Knowledge) -> bool:
         """
         Returns a boolean that tells whether something changed
         """
@@ -376,13 +378,26 @@ class Subproblem:
 
         # if there exists a constant T rule, the whole subproblem is T
         if any(r.is_const and r.val for r in self.rules):
-            knowledge[self.key] = True
+            knowledge[self.key] = Constant(True)
             self.is_const, self.val = True, True
 
         # if there are no non-constant rules left, the whole subproblem is F
         if len(self.rules) == 0:
-            knowledge[self.key] = False
+            knowledge[self.key] = Constant(False)
             self.is_const, self.val = True, False
+
+        # if the subproblem only has one rule left with exactly one value,
+        # add the value to the knowledge and delete the subproblem
+        if len(self.rules) == 1 and len(self.rules[0].ins) == 1:
+            """
+            t = self.rules[0].ins[0]
+            v = Literal(t[0])
+            if not t[1]:
+                v = NOT(v)
+            knowledge[self.key] = v
+            """
+            pass
+
         """
         to further simplify subproblems, one should also look at relations between 
         the rules. For example, if one rule's body is a strict superset of another rule's
@@ -494,7 +509,7 @@ class RuleSetNeuron(Node):
 
     @classmethod
     def from_q_neuron(cls, q_neuron: QuantizedNeuron):
-        return RuleSetNeuron(q_neuron)
+        return RuleSetNeuron(q_neuron, True)
 
     def __str__(self) -> str:
         ans = (
@@ -555,8 +570,8 @@ class RuleSetNeuron(Node):
         return list(sorter.static_order())
 
     def simplify(
-        self, subproblems: dict[str, Subproblem], knowledge: dict[str, bool]
-    ) -> tuple[dict[str, Subproblem], dict[str, bool]]:
+        self, subproblems: dict[str, Subproblem], knowledge: Knowledge
+    ) -> tuple[dict[str, Subproblem], Knowledge]:
 
         # simplify each subproblem in topological order
         changed = any(
@@ -564,6 +579,8 @@ class RuleSetNeuron(Node):
         )
         # filter constant subproblems, as they are part of the knowledge
         subproblems = {key: sp for key, sp in subproblems.items() if not sp.is_const}
+        print(subproblems)
+        print(knowledge)
         return (subproblems, knowledge)
 
 

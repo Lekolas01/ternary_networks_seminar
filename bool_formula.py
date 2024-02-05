@@ -38,7 +38,7 @@ def possible_data(
 
 class Bool(ABC):
     @abstractmethod
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
@@ -74,7 +74,7 @@ class Constant(Bool):
             val = np.array(val)
         self.val = val
 
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         return self.val
 
     def __str__(self) -> str:
@@ -99,7 +99,7 @@ class Literal(Bool):
         assert name is not None
         self.name = name
 
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         ans = interpretation[self.name]
         return ans
 
@@ -119,7 +119,7 @@ class NOT(Bool):
             child = Literal(child)
         self.child = child
 
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         ans = self.child(interpretation)
         return ~(ans)
 
@@ -147,7 +147,7 @@ class Quantifier(Bool):
         self.op = np.all if self.is_all else np.any
         self.opstr = " & " if is_all else " | "
 
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         answers = np.stack([c(interpretation) for c in self.children], axis=1)
         return self.op(answers, axis=1)
 
@@ -213,7 +213,7 @@ class PARITY(Bool):
         super().__init__()
         self.literals = set(literals)
 
-    def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         return reduce(lambda x, y: x ^ y, (interpretation[l] for l in self.literals))
 
     def __str__(self) -> str:
@@ -228,7 +228,7 @@ class Example(Bool):
         super().__init__()
         self.literals = {"x1", "x2", "x3", "x4", "x5"}
 
-    def __call__(self, vars: Mapping[str, np.ndarray]) -> np.ndarray:
+    def __call__(self, vars: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         t1 = vars["x3"] & vars["x4"] & vars["x5"]
         return (~vars["x1"] & vars["x2"]) | (~vars["x1"] & t1) | (vars["x2"] & t1)
 

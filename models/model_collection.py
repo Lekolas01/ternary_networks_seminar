@@ -11,6 +11,7 @@ class ModelFactory:
     specifications: dict[str, NNSpec] = {
         "lin_db": [(1, 1, Activation.SIGMOID)],
         "abcdefg": [(7, 3, Activation.TANH), (3, 1, Activation.SIGMOID)],
+        "abcdefg_small": [(7, 2, Activation.TANH), (2, 1, Activation.SIGMOID)],
         "parity2": [(2, 2, Activation.SIGMOID), (2, 1, Activation.SIGMOID)],
         "parity5": [(5, 5, Activation.SIGMOID), (5, 1, Activation.SIGMOID)],
         "parity9": [(9, 9, Activation.SIGMOID), (9, 1, Activation.SIGMOID)],
