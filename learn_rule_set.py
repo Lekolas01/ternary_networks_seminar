@@ -19,39 +19,6 @@ from train_model import training_loop
 from utilities import set_seed
 
 
-def train_nn(
-    train_dl: DataLoader,
-    valid_dl: DataLoader,
-    model: nn.Sequential,
-    epochs: int,
-    lr: float,
-    weight_decay: float,
-    l1: float,
-) -> tuple[list[float], list[float]]:
-    device = "cpu"
-    loss_fn = nn.BCELoss()
-    optim = torch.optim.Adam(
-        model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0
-    )
-    # optim = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-    tracker = Tracker()
-    tracker.add_logger(
-        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=40)
-    )
-
-    return training_loop(
-        model,
-        loss_fn,
-        optim,
-        train_dl,
-        valid_dl,
-        epochs=epochs,
-        lambda1=l1,
-        tracker=tracker,
-        device=device,
-    )
-
-
 def get_arguments() -> Namespace:
     parser = ArgumentParser(
         description="Train a neural network on a categorical dataset and then convert it to a rule set."
@@ -64,16 +31,21 @@ def get_arguments() -> Namespace:
         "--model",
         help="The name of the neural net configuration - see models.model_collection.py.",
     )
+    parser.add_argument(
+        "--new",
+        action="store_true",
+        help="If specified, the model will be retrained, even if it is already saved.",
+    )
     return parser.parse_args()
 
 
 def main():
     args = get_arguments()
     seed = 1
-    epochs = 2000
+    epochs = 4500
     batch_size = 64
     lr = 0.002
-    weight_decay = 1e-5
+    weight_decay = 0.0
     l1 = 2e-5
     verbose = False
     data_name = args.data
@@ -87,7 +59,7 @@ def main():
         print(f"Creating new directory at {problem_path}...")
         os.mkdir(problem_path)
 
-    if not os.path.isfile(model_path):
+    if args.new or not os.path.isfile(model_path):
         seed = set_seed(seed)
         print(f"{seed = }")
         print(f"No pre-trained model found. Starting training...")
@@ -99,7 +71,32 @@ def main():
         valid_dl = DataLoader(
             FileDataset(data_path), batch_size=batch_size, shuffle=False
         )
-        _ = train_nn(train_dl, valid_dl, model, epochs, lr, weight_decay, l1)
+        loss_fn = nn.BCELoss()
+        optim = torch.optim.Adam(
+            model.parameters(),
+            lr=lr,
+            betas=(0.9, 0.999),
+            eps=1e-08,
+            weight_decay=weight_decay,
+        )
+        # optim = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+        tracker = Tracker()
+        tracker.add_logger(
+            LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
+        )
+
+        losses = training_loop(
+            model,
+            loss_fn,
+            optim,
+            train_dl,
+            valid_dl,
+            epochs=epochs,
+            lambda1=l1,
+            tracker=tracker,
+            device="cpu",
+        )
+
         try:
             torch.save(model, model_path)
             print(f"Successfully saved model to {model_path}")

@@ -69,7 +69,9 @@ class Bool(ABC):
 
 
 class Constant(Bool):
-    def __init__(self, val: np.ndarray) -> None:
+    def __init__(self, val: np.ndarray | bool) -> None:
+        if isinstance(val, bool):
+            val = np.array(val)
         self.val = val
 
     def __call__(self, interpretation: Mapping[str, np.ndarray]) -> np.ndarray:
