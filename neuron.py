@@ -365,7 +365,10 @@ class Subproblem:
         """
         # first, simplify each individual rule.
         # if no rule changed, the whole subproblem did not change, -> return False.
-        changed = any(rule.simplify(knowledge) for rule in self.rules)
+        changed = False
+        for rule in self.rules:
+            temp = rule.simplify(knowledge)
+            changed = changed or temp
 
         # filter all constant F rules, as they will never trigger
         self.rules = [r for r in self.rules if not (r.is_const and not r.val)]
@@ -406,6 +409,7 @@ class RuleSetNeuron(Node):
         self.ins = q_neuron.ins
         self.dp = self.calc_dp()
         self.subproblems = self.to_subproblems(self.dp)
+        self.knowledge = {}
         if simplify:
             # simplify rules
             self.subproblems = self.simplify(self.subproblems)
