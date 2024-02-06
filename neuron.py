@@ -1,7 +1,6 @@
 import bisect
 import copy
 import functools
-from collections import defaultdict
 from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from copy import deepcopy
 from enum import Enum
@@ -15,20 +14,9 @@ import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 from numpy import ndarray
 
-from bool_formula import (
-    AND,
-    BED,
-    NOT,
-    OR,
-    PARITY,
-    Bool,
-    Constant,
-    Knowledge,
-    Literal,
-    possible_data,
-)
+from bool_formula import *
 from node import Graph, Node
-from utilities import flatten, invert_dict
+from utilities import flatten
 
 Val = TypeVar("Val")
 
@@ -339,6 +327,12 @@ class IfThenRule(Node):
                         return True
                 elif isinstance(knowledge[lit], Literal):
                     self.ins[idx] = (str(knowledge[lit]), lit_val)
+                elif isinstance(knowledge[lit], NOT):
+                    c = knowledge[lit].child # type: ignore
+                    self.ins[idx] = (str(c), not lit_val)
+                    
+                # elif isinstance(knowledge[lit], NOT):
+                # self.ins[idx] = (str(knowledge[lit]), lit_val)
         self.ins = [t for t in self.ins if t[0] not in to_delete_ins]
         # if there are no literals left, i.e. every literal is positive, the whole rule is positive
         if len(self.ins) == 0:
@@ -438,12 +432,11 @@ class RuleSetNeuron(Node):
         self.ins = q_neuron.ins
         self.dp = self.calc_dp()
         self.subproblems = self.to_subproblems(self.dp)
+        self.target_node = self.call_order()[-1]
         self.knowledge = {}
         if simplify:
             # simplify rules
-            self.subproblems, self.knowledge = self.simplify(
-                self.subproblems, self.knowledge
-            )
+            self.simplify()
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
@@ -537,8 +530,6 @@ class RuleSetNeuron(Node):
 
     def to_subproblems(self, dp: Dp) -> dict[str, Subproblem]:
         ans: dict[str, Subproblem] = {}
-        vertices = {}
-        self.graph_ins: dict[str, set[str]] = {}
         # Operator()
         # then create 1 or 2 if-then rules for each node, depending on whether it's
         # a constant or not
@@ -548,14 +539,10 @@ class RuleSetNeuron(Node):
                     ans[node.key] = Subproblem(
                         node.key, [IfThenRule(node.key, [], val=False)]
                     )
-                    vertices[node.key] = Constant(False)
-                    self.graph_ins[node.key] = set()
                 elif node.max_thr == float("inf"):
                     ans[node.key] = Subproblem(
                         node.key, [IfThenRule(node.key, [], val=True)]
                     )
-                    vertices[node.key] = Constant(True)
-                    self.graph_ins[node.key] = set()
                 else:
                     target_1 = dp.find(k + 1, node.mean)
                     assert target_1 is not None
@@ -571,47 +558,45 @@ class RuleSetNeuron(Node):
                         ],
                     )
                     ans[node.key] = Subproblem(key=node.key, rules=[rule1, rule2])
-                    v1 = AND(self.n_ins[k][0], target_2.key)
-                    v1_key = f"{node.key}_T"
-                    v2 = OR(target_1.key, v1)
-                    vertices[node.key] = v2
-                    vertices[v1_key] = v1
-                    self.graph_ins[node.key] = {target_1.key, target_2.key}
-        # self.bed = BED(vertices)
-        # print(self.bed)
-        # self.bed.simplify()
         return ans
 
-    def call_order(self) -> list[str]:
-        # get graph_ins from self.subproblems
-        # update the call order, as the constant subproblems are now part of the knowledge
+    def graph_ins(self) -> dict[str, set[str]]:
         graph_ins = {}
         keys = {key for key in self.subproblems}
         for key, sp in self.subproblems.items():
             graph_ins[key] = list(filter(lambda k: k in keys, sp.children()))
-        sorter = TopologicalSorter(graph_ins)
+        return graph_ins
+
+    def call_order(self) -> list[str]:
+        sorter = TopologicalSorter(self.graph_ins())
         return list(sorter.static_order())
 
-    def simplify(
-        self, subproblems: dict[str, Subproblem], knowledge: Knowledge
-    ) -> tuple[dict[str, Subproblem], Knowledge]:
-
+    def simplify(self) -> None:
+        changed = True
         # simplify each subproblem in topological order
-        changed = any(
-            [subproblems[key].simplify(knowledge) for key in self.call_order()]
-        )
-        # filter constant subproblems, as they are part of the knowledge
-        subproblems = {key: sp for key, sp in subproblems.items() if not sp.is_const}
-        print(subproblems)
-        print(knowledge)
-        return (subproblems, knowledge)
+        while changed:
+            changed = False
+            for key in self.call_order():
+                temp = self.subproblems[key].simplify(self.knowledge)
+                changed = changed or temp
+            # filter constant subproblems
+            self.subproblems = {
+                key: sp for key, sp in self.subproblems.items() if not sp.is_const
+            }
+            # filter subproblems that are not in use anymore
+            all_children = set(
+                flatten(sp.children() for sp in self.subproblems.values())
+            )
+            all_children.add(self.target_node)
+            self.subproblems = {
+                key: sp for key, sp in self.subproblems.items() if key in all_children
+            }
+            temp = 0
 
 
 class RuleSetGraph(Graph):
     def __init__(self, rule_set_neurons: Sequence[RuleSetNeuron]) -> None:
         super().__init__(rule_set_neurons)
-        # self.knowledge = {rn.knowledge for rn in self.nodes.values()}
-        # TODO: key error beseitigen in testing.py
 
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph, simplify=True):
@@ -637,7 +622,10 @@ def nn_to_rule_set(
         neuron_graph, data, verbose=verbose
     )
     # transform the quantized graph to a set of if-then rules
+    other_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph, simplify=False)
+    print(other_graph)
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
+    print(bool_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)
 
 

@@ -162,8 +162,6 @@ def main():
     )
     print("accuracy boolean graph:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
-    sns.scatterplot()
-
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples

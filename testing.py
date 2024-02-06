@@ -25,4 +25,6 @@ print(bg)
 simple_bg = RuleSetGraph.from_q_neuron_graph(q_ng, simplify=True)
 print(simple_bg)
 data = possible_data([f"x{i + 1}" for i in range(7)], is_float=False)
-print(bg(data) == simple_bg(data))
+assert all(
+    bg(data) == simple_bg(data)
+), "Simplification changed something abt. the behavior of the function."

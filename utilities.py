@@ -1,4 +1,6 @@
 import random
+from collections.abc import Iterable
+from typing import TypeVar
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -79,7 +81,10 @@ def set_seed(seed: int | None) -> int:
     return seed
 
 
-def flatten(l: list[list]) -> list:
+T = TypeVar("T")
+
+
+def flatten(l: Iterable[Iterable[T]]) -> list[T]:
     return [x for row in l for x in row]
 
 
