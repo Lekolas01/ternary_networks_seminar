@@ -1,5 +1,7 @@
+import math
 import random
 from collections.abc import Iterable
+from time import sleep
 from typing import TypeVar
 
 import matplotlib.pyplot as plt
@@ -9,6 +11,7 @@ import torch
 import torch.nn as nn
 from torch.types import Device
 from torch.utils.data.dataloader import DataLoader
+from tqdm import tqdm
 
 
 def plot_nn_dist(model: nn.Sequential):
@@ -94,3 +97,18 @@ def invert_dict(d: dict) -> dict:
         for x in v:
             ans.setdefault(x, []).append(k)
     return ans
+
+
+def progress_bar(progress, total):
+    percent = 100 * (progress / float(total))
+    bar = "█" * int(percent) + "-" * (100 - int(percent))
+    print(f"\r||{bar}| {percent:.2f}%", end="\r")
+
+
+def main():
+    for i in tqdm(range(200), desc="Loading...", ascii=False):
+        sleep(0.05)
+
+
+if __name__ == "__main__":
+    main()

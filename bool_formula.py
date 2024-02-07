@@ -119,11 +119,17 @@ class Literal(Bool):
         return NOT(copy.copy(self))
 
 
+def val_2_Bool(val: Bool | str | bool) -> Bool:
+    if isinstance(val, Bool):
+        return val
+    if isinstance(val, str):
+        return Literal(val)
+    return Constant(val)
+
+
 class NOT(Bool):
-    def __init__(self, child: Bool | str) -> None:
-        if isinstance(child, str):
-            child = Literal(child)
-        self.child = child
+    def __init__(self, child: Bool | str | bool) -> None:
+        self.child = val_2_Bool(child)
 
     def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
         ans = self.child(interpretation)
@@ -136,19 +142,18 @@ class NOT(Bool):
         return self.child.all_literals()
 
     def negated(self) -> Bool:
-        # if you negate a NOT(...), you can just cancel the NOT() and return the child
         return copy.copy(self.child)
 
     def simplified(self, knowledge={}) -> Bool:
-        # move the NOT() inside
-        if isinstance(self.child, Literal):
-            return copy.copy(self)
-        return self.child.negated().simplified()
+        c = self.child.simplified()
+        if not isinstance(c, Quantifier):
+            return c.negated()
+        return c.negated()
 
 
 class Quantifier(Bool):
-    def __init__(self, children: Collection[Bool | str], is_all: bool) -> None:
-        self.children = [c if isinstance(c, Bool) else Literal(c) for c in children]
+    def __init__(self, children: Collection[Bool | str | bool], is_all: bool) -> None:
+        self.children = [val_2_Bool(c) for c in children]
         self.is_all = is_all
         self.op = np.all if self.is_all else np.any
         self.opstr = " & " if is_all else " | "
@@ -176,12 +181,12 @@ class Quantifier(Bool):
         children = [c.simplified(knowledge) for c in self.children]
         # if one term is np.array(False), the whole conjunction is np.array(False)
         if any(child == (not self.is_all) for child in children):
-            return Constant(np.array(not self.is_all))
+            return Constant(not self.is_all)
         # True constants can be removed
         children = list(filter(lambda c: c != self.is_all, children))
         # if now the list is empty, we can return True
         if len(children) == 0:
-            return Constant(np.array(self.is_all))
+            return Constant(self.is_all)
         if len(children) == 1:
             return children[0]
 
@@ -200,12 +205,12 @@ class Quantifier(Bool):
 
 
 class AND(Quantifier):
-    def __init__(self, *children: Bool | str) -> None:
+    def __init__(self, *children: Bool | str | bool) -> None:
         super().__init__(list(children), True)
 
 
 class OR(Quantifier):
-    def __init__(self, *children: Bool | str) -> None:
+    def __init__(self, *children: Bool | str | bool) -> None:
         super().__init__(list(children), False)
 
 
@@ -302,9 +307,14 @@ if __name__ == "__main__":
         ans = b.simplified()
         # print(f"{key:>6} | {b.__str__():>15} -> {ans.__str__():>5}")
 
-    y1 = AND(Constant(True), "x1")
-    y2 = AND(Constant(True), y1)
-    y3 = OR(y1, "x2")
-    y = OR(y2, y3)
+    y = NOT(True)
     print(y)
-    print(y.simplified())
+    print(y.simplified(), "\n")
+
+    y = NOT("x1")
+    print(y)
+    print(y.simplified(), "\n")
+
+    y = NOT(NOT("x1"))
+    print(y)
+    print(y.simplified(), "\n")

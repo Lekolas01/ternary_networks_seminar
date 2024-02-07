@@ -328,9 +328,9 @@ class IfThenRule(Node):
                 elif isinstance(knowledge[lit], Literal):
                     self.ins[idx] = (str(knowledge[lit]), lit_val)
                 elif isinstance(knowledge[lit], NOT):
-                    c = knowledge[lit].child # type: ignore
+                    c = knowledge[lit].child  # type: ignore
                     self.ins[idx] = (str(c), not lit_val)
-                    
+
                 # elif isinstance(knowledge[lit], NOT):
                 # self.ins[idx] = (str(knowledge[lit]), lit_val)
         self.ins = [t for t in self.ins if t[0] not in to_delete_ins]
@@ -574,6 +574,7 @@ class RuleSetNeuron(Node):
     def simplify(self) -> None:
         changed = True
         # simplify each subproblem in topological order
+
         while changed:
             changed = False
             for key in self.call_order():
@@ -588,10 +589,10 @@ class RuleSetNeuron(Node):
                 flatten(sp.children() for sp in self.subproblems.values())
             )
             all_children.add(self.target_node)
+            old_len = len(self.subproblems)
             self.subproblems = {
                 key: sp for key, sp in self.subproblems.items() if key in all_children
             }
-            temp = 0
 
 
 class RuleSetGraph(Graph):
@@ -622,10 +623,7 @@ def nn_to_rule_set(
         neuron_graph, data, verbose=verbose
     )
     # transform the quantized graph to a set of if-then rules
-    other_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph, simplify=False)
-    print(other_graph)
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
-    print(bool_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)
 
 

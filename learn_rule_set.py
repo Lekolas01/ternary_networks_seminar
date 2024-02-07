@@ -42,11 +42,11 @@ def get_arguments() -> Namespace:
 def main():
     args = get_arguments()
     seed = 1
-    epochs = 4500
+    epochs = 6000
     batch_size = 64
     lr = 0.002
     weight_decay = 0.0
-    l1 = 2e-5
+    l1 = 4e-5
     verbose = False
     data_name = args.data
     model_name = args.model if hasattr(args, "model") else data_name
@@ -79,7 +79,6 @@ def main():
             eps=1e-08,
             weight_decay=weight_decay,
         )
-        # optim = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         tracker = Tracker()
         tracker.add_logger(
             LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
