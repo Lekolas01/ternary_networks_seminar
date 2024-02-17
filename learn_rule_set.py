@@ -42,11 +42,11 @@ def get_arguments() -> Namespace:
 def main():
     args = get_arguments()
     seed = 1
-    epochs = 6000
+    epochs = 3000
     batch_size = 64
-    lr = 0.002
+    lr = 0.006
     weight_decay = 0.0
-    l1 = 4e-5
+    l1 = 2e-6
     verbose = False
     data_name = args.data
     model_name = args.model if hasattr(args, "model") else data_name
@@ -66,10 +66,10 @@ def main():
         model = ModelFactory.get_model(model_name)
 
         train_dl = DataLoader(
-            FileDataset(data_path), batch_size=batch_size, shuffle=False
+            FileDataset(data_path), batch_size=batch_size, shuffle=True
         )
         valid_dl = DataLoader(
-            FileDataset(data_path), batch_size=batch_size, shuffle=False
+            FileDataset(data_path), batch_size=batch_size, shuffle=True
         )
         loss_fn = nn.BCELoss()
         optim = torch.optim.Adam(
@@ -125,6 +125,7 @@ def main():
     ng_out = ng(ng_data)
     q_ng_out = q_ng(ng_data)
     bg_out = bg(bg_data)
+    bg_out = np.where(bg_out == True, 1.0, 0.0)
 
     print("----------------- Outputs -----------------")
 
@@ -137,7 +138,10 @@ def main():
 
     print("mean error nn - ng: ", np.mean(np.abs(nn_out - ng_out)))
     print("mean error nn - q_ng: ", np.mean(np.abs(nn_out - q_ng_out)))
-    print("mean error nn - b_ng: ", np.mean(np.abs(nn_out - bg_out)))
+    print(
+        "mean error nn - b_ng: ",
+        np.mean(np.abs(nn_out - bg_out)),
+    )
 
     print("----------------- Fidelity -----------------")
 

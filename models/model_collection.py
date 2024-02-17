@@ -14,7 +14,16 @@ class ModelFactory:
         "abcdefg_2_dead": [(9, 3, Activation.TANH), (3, 1, Activation.SIGMOID)],
         "abcdefg_small": [(7, 2, Activation.TANH), (2, 1, Activation.SIGMOID)],
         "parity2": [(2, 2, Activation.SIGMOID), (2, 1, Activation.SIGMOID)],
-        "parity5": [(5, 5, Activation.SIGMOID), (5, 1, Activation.SIGMOID)],
+        "parity3": [
+            (3, 3, Activation.SIGMOID),
+            (3, 3, Activation.TANH),
+            (3, 1, Activation.SIGMOID),
+        ],
+        "parity5": [
+            (5, 4, Activation.TANH),
+            (4, 3, Activation.TANH),
+            (3, 1, Activation.SIGMOID),
+        ],
         "parity9": [(9, 9, Activation.SIGMOID), (9, 1, Activation.SIGMOID)],
         "parity10": [(10, 10, Activation.TANH), (10, 1, Activation.SIGMOID)],
         "deep_parity10": [
