@@ -1,23 +1,16 @@
-import numpy as np
+import graphviz
+import graphviz.dot as d
+from pyeda.boolalg.bdd import _NODES
+from pyeda.inter import *
 
-from bool_formula import possible_data
-from neuron import IfThenRule, RuleSetNeuron, Subproblem
+print(len(_NODES))
+x1, x2, x3, x4, x5 = map(bddvar, (f"x{i + 1}" for i in range(5)))
+print(len(_NODES))
+f = expr("x1 & x2 | x1 & x3 & x4 & x5 | x2 & x3 & x4 & x5")
+print(f)
+f = expr2bdd(f)
+print(f)
+dot = f.to_dot()
 
-# rule = IfThenRule("y", [("x1", True), ("x2", False)])
-# knowledge = {"x2": False}
-
-# print(rule)
-# print(rule.simplify(knowledge))
-# print(knowledge)
-# print(rule)
-#
-# print(rule({"x1": np.array([False, False]), "x2": np.array([True, True])}))
-rule1 = IfThenRule("y", [("y1", True)])
-rule2 = IfThenRule("y", [("x1", True), ("y2", True)])
-sp = Subproblem("y", [rule1, rule2])
-print(sp)
-# this makes the first rule T, so the whole subproblem should be T, as rule1 will always trigger
-knowledge = {"y2": True, "x1": False}
-print(sp.simplify(knowledge))
-print(f"{sp = }")
-print(f"{knowledge = }")
+with open("Output.txt", "w") as f:
+    f.write(dot)
