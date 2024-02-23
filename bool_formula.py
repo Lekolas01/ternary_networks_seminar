@@ -3,11 +3,18 @@ from __future__ import annotations
 import copy
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterable, Mapping, MutableMapping
+from enum import Enum
 from functools import reduce
 from graphlib import TopologicalSorter
 from typing import Callable, Dict
 
 import numpy as np
+
+
+class Activation(Enum):
+    SIGMOID = 1
+    TANH = 2
+
 
 Interpretation = MutableMapping[str, np.ndarray]
 
@@ -77,7 +84,7 @@ Knowledge = dict[str, Bool]
 class Constant(Bool):
     def __init__(self, val: np.ndarray | bool) -> None:
         if isinstance(val, bool):
-            val = np.array(val)
+            val = np.array(val, dtype=bool)
         self.val = val
 
     def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:

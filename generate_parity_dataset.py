@@ -37,3 +37,4 @@ dir_path = Path("./data", "generated")
 file_path = Path(dir_path, f"parity{n_vars}").with_suffix(".csv")
 
 df.to_csv(file_path, index=False)
+print(f"Saved datasaet to {file_path}")

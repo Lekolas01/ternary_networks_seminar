@@ -42,18 +42,21 @@ class Graph(ABC):
         ans = "Graph[\n\t" + "\n\t".join(str(self.nodes[key]) for key in order) + "\n]"
         return ans
 
-    def graph_ins(self) -> Dict[str, Set[str]]:
+    def __getitem__(self, key: str) -> Node:
+        return self.nodes[key]
+
+    def ins(self) -> Dict[str, Set[str]]:
         """
         A Mapping of nodes to a set of all nodes that point to the node
         """
         return {key: node.ins for key, node in self.nodes.items()}
 
-    def graph_outs(self) -> Dict[str, Set[str]]:
+    def outs(self) -> Dict[str, Set[str]]:
         """
         Same as graph_ins, except that the set contains all nodes that the node points towards.
         """
         inverse = {}
-        graph_ins = self.graph_ins()
+        graph_ins = self.ins()
         for k, v in graph_ins.items():
             for x in v:
                 inverse.setdefault(x, {})[k] = x
@@ -61,7 +64,7 @@ class Graph(ABC):
 
     def topological_order(self) -> list[str]:
         # sort nodes by order of execution
-        sorter = TopologicalSorter(self.graph_ins())
+        sorter = TopologicalSorter(self.ins())
         order = sorter.static_order()
         order = filter(lambda key: key not in self.in_keys, order)
         return list(order)

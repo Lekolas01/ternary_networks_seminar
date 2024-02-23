@@ -24,6 +24,12 @@ class ModelFactory:
             (4, 3, Activation.TANH),
             (3, 1, Activation.SIGMOID),
         ],
+        "parity6": [
+            (6, 3, Activation.TANH),
+            (3, 3, Activation.TANH),
+            (3, 2, Activation.TANH),
+            (2, 1, Activation.SIGMOID),
+        ],
         "parity9": [(9, 9, Activation.SIGMOID), (9, 1, Activation.SIGMOID)],
         "parity10": [(10, 10, Activation.TANH), (10, 1, Activation.SIGMOID)],
         "deep_parity10": [

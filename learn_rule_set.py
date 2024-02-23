@@ -1,5 +1,6 @@
 import os
 from argparse import ArgumentParser, Namespace
+from collections.abc import MutableMapping, Sequence
 from pathlib import Path
 
 import numpy as np
@@ -14,7 +15,9 @@ from datasets import FileDataset
 from gen_data import gen_data
 from models.model_collection import ModelFactory
 from my_logging.loggers import LogMetrics, Tracker
-from neuron import nn_to_rule_set
+from neuron import NeuronGraph
+from q_neuron import QuantizedNeuronGraph, QuantizedNeuronGraph2
+from rule_set import RuleSetGraph
 from train_model import training_loop
 from utilities import set_seed
 
@@ -37,6 +40,25 @@ def get_arguments() -> Namespace:
         help="If specified, the model will be retrained, even if it is already saved.",
     )
     return parser.parse_args()
+
+
+def nn_to_rule_set(
+    model: nn.Sequential,
+    data: MutableMapping[str, np.ndarray],
+    vars: Sequence[str],
+    verbose=False,
+):
+    # transform the trained neural network to a directed graph of full-precision neurons
+    neuron_graph = NeuronGraph.from_nn(model, vars)
+    # transform the graph to a new graph of perceptrons with quantized step functions
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(
+        neuron_graph, data, verbose=verbose
+    )
+    norm_q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+
+    # transform the quantized graph to a set of if-then rules
+    bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
+    return (neuron_graph, q_neuron_graph, norm_q_neuron_graph, bool_graph)
 
 
 def main():
@@ -108,38 +130,81 @@ def main():
     df = pd.read_csv(data_path, dtype=float)
     keys = list(df.columns)
     keys.pop()  # remove target column
-    y = df["target"]
+    y = np.array(df["target"])
     ng_data = {key: np.array(df[key], dtype=float) for key in keys}
     nn_data = np.stack([ng_data[key] for key in keys], axis=1)
     nn_data = torch.Tensor(nn_data)
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys, verbose=verbose)
+    ng, q_ng, norm_q_ng, bg = nn_to_rule_set(model, ng_data, keys, verbose=verbose)
 
-    print("ng = ", ng)
-    print("q_ng = ", q_ng)
-    print("bg = ", bg)
+    np.set_printoptions(precision=3)
+    np.set_printoptions(suppress=True)
 
+    head_len = 4
+    print(f"Target vector y: {y[:head_len]}")
+
+    print("----------------- MLP -----------------")
+    print(f"{model = }")
     nn_out = model(nn_data).detach().numpy()
+    nn_pred = np.round(nn_out)
+    print(f"outs: {nn_out[:head_len]}")
+    print(f"preds: {nn_pred[:head_len]}")
+    print("mean absolute error: ", np.mean(np.abs(nn_out - y)))
+    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(nn_pred - y)))
+
+    print("----------------- Neuron Graph -----------------")
+    print(f"{ng = }")
     ng_out = ng(ng_data)
+    ng_pred = np.round(ng_out)
+
+    print(f"outs: {ng_out[:head_len]}")
+    print(f"preds: {ng_pred[:head_len]}")
+    print("mean absolute error: ", np.mean(np.abs(ng_out - y)))
+    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(ng_pred - y)))
+
+    print("------------- Quantized NG -------------")
+
+    print(f"{q_ng = }")
     q_ng_out = q_ng(ng_data)
-    bg_out = bg(bg_data)
-    bg_out = np.where(bg_out == True, 1.0, 0.0)
+    q_ng_pred = np.round(q_ng_out)
 
-    print("----------------- Outputs -----------------")
+    print(f"outs: {q_ng_out[:head_len]}")
+    print(f"preds: {q_ng_pred[:head_len]}")
+    print("mean absolute error: ", np.mean(np.abs(q_ng_out - y)))
+    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(q_ng_pred - y)))
 
-    # print(f"{nn_out = }")
-    # print(f"{ng_out = }")
-    # print(f"{q_ng_out = }")
-    # print(f"{bg_out = }")
+    print("------------- Normalized QNG -------------")
+
+    print(f"{norm_q_ng = }")
+    norm_q_ng_out = norm_q_ng(ng_data)
+    norm_q_ng_pred = np.round(norm_q_ng_out)
+
+    print(f"outs: {norm_q_ng_out[:head_len] = }")
+    print(f"preds: {norm_q_ng_pred[:head_len] = }")
+    print("mean absolute error: ", np.mean(np.abs(norm_q_ng_out - y)))
+    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(norm_q_ng_pred - y)))
+
+    print("----------------- Rule Set Graph -----------------")
+
+    print(f"{bg = }")
+    bg_pred = bg(bg_data)
+    bg_out = np.where(bg_pred == True, 1.0, 0.0)
+
+    # print(f"outs: {bg_out[:head_len] = }")
+    print(f"outs: {bg_out = }")
+    # print(f"preds: {bg_pred[:head_len] = }")
+    print(f"preds: {bg_pred = }")
+    print("mean absolute error: ", np.mean(np.abs(bg_out - y)))
+    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
     print("----------------- Mean Errors -----------------")
 
     print("mean error nn - ng: ", np.mean(np.abs(nn_out - ng_out)))
-    print("mean error nn - q_ng: ", np.mean(np.abs(nn_out - q_ng_out)))
+    print("mean error ng - q_ng: ", np.mean(np.abs(ng_out - q_ng_out)))
     print(
-        "mean error nn - b_ng: ",
+        "mean error q_ng - norm_: ",
         np.mean(np.abs(nn_out - bg_out)),
     )
 
@@ -152,9 +217,6 @@ def main():
 
     print("----------------- Final Acc. -----------------")
 
-    print(
-        "accuracy neural net:\t", np.array(1.0) - np.mean(np.abs(np.round(nn_out) - y))
-    )
     print(
         "accuracy neuron graph:\t",
         np.array(1.0) - np.mean(np.abs(np.round(ng_out) - y)),
