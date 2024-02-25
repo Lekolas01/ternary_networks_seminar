@@ -1,59 +1,23 @@
-import os
 from argparse import ArgumentParser, Namespace
 from collections.abc import MutableMapping, Sequence
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
 
-from bool_formula import PARITY
-from datasets import FileDataset
-from gen_data import gen_data
-from models.model_collection import ModelFactory
-from my_logging.loggers import LogMetrics, Tracker
 from neuron import NeuronGraph
 from q_neuron import QuantizedNeuronGraph, QuantizedNeuronGraph2
 from rule_set import RuleSetGraph
-from train_model import training_loop
-from utilities import set_seed
-
-
-def get_arguments() -> Namespace:
-    parser = ArgumentParser(
-        description="Train a neural network on a categorical dataset and then convert it to a rule set."
-    )
-    parser.add_argument(
-        "--data",
-        help="The name of the dataset (it must exist in the data/generated folder).",
-    )
-    parser.add_argument(
-        "--model",
-        help="The name of the neural net configuration - see models.model_collection.py.",
-    )
-    parser.add_argument(
-        "--new",
-        action="store_true",
-        help="If specified, the model will be retrained, even if it is already saved.",
-    )
-    return parser.parse_args()
 
 
 def nn_to_rule_set(
-    model: nn.Sequential,
-    data: MutableMapping[str, np.ndarray],
-    vars: Sequence[str],
-    verbose=False,
+    model: nn.Sequential, data: MutableMapping[str, np.ndarray], vars: Sequence[str]
 ):
     # transform the trained neural network to a directed graph of full-precision neurons
     neuron_graph = NeuronGraph.from_nn(model, vars)
     # transform the graph to a new graph of perceptrons with quantized step functions
-    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(
-        neuron_graph, data, verbose=verbose
-    )
+    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     norm_q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
 
     # transform the quantized graph to a set of if-then rules
@@ -61,68 +25,7 @@ def nn_to_rule_set(
     return (neuron_graph, q_neuron_graph, norm_q_neuron_graph, bool_graph)
 
 
-def main():
-    args = get_arguments()
-    seed = 1
-    epochs = 3000
-    batch_size = 64
-    lr = 0.006
-    weight_decay = 0.0
-    l1 = 2e-6
-    verbose = False
-    data_name = args.data
-    model_name = args.model if hasattr(args, "model") else data_name
-
-    data_path = Path("data/generated") / f"{data_name}.csv"
-    problem_path = Path(f"runs/{data_name}")
-    model_path = problem_path / f"{model_name}.pth"
-
-    if not os.path.isdir(problem_path):
-        print(f"Creating new directory at {problem_path}...")
-        os.mkdir(problem_path)
-
-    if args.new or not os.path.isfile(model_path):
-        seed = set_seed(seed)
-        print(f"{seed = }")
-        print(f"No pre-trained model found. Starting training...")
-        model = ModelFactory.get_model(model_name)
-
-        train_dl = DataLoader(
-            FileDataset(data_path), batch_size=batch_size, shuffle=True
-        )
-        valid_dl = DataLoader(
-            FileDataset(data_path), batch_size=batch_size, shuffle=True
-        )
-        loss_fn = nn.BCELoss()
-        optim = torch.optim.Adam(
-            model.parameters(),
-            lr=lr,
-            betas=(0.9, 0.999),
-            eps=1e-08,
-            weight_decay=weight_decay,
-        )
-        tracker = Tracker()
-        tracker.add_logger(
-            LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
-        )
-
-        losses = training_loop(
-            model,
-            loss_fn,
-            optim,
-            train_dl,
-            valid_dl,
-            epochs=epochs,
-            lambda1=l1,
-            tracker=tracker,
-            device="cpu",
-        )
-
-        try:
-            torch.save(model, model_path)
-            print(f"Successfully saved model to {model_path}")
-        except Exception as inst:
-            print(f"Could not save model to {model_path}: {inst}")
+def main(model_path: str, data_path: str):
     print(f"Loading trained model from {model_path}...")
     # get the last updated model
     model = torch.load(model_path)
@@ -137,7 +40,7 @@ def main():
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, norm_q_ng, bg = nn_to_rule_set(model, ng_data, keys, verbose=verbose)
+    ng, q_ng, norm_q_ng, bg = nn_to_rule_set(model, ng_data, keys)
 
     np.set_printoptions(precision=3)
     np.set_printoptions(suppress=True)
@@ -192,10 +95,10 @@ def main():
     bg_pred = bg(bg_data)
     bg_out = np.where(bg_pred == True, 1.0, 0.0)
 
-    # print(f"outs: {bg_out[:head_len] = }")
-    print(f"outs: {bg_out = }")
-    # print(f"preds: {bg_pred[:head_len] = }")
-    print(f"preds: {bg_pred = }")
+    print(f"outs: {bg_out[:head_len] = }")
+    # print(f"outs: {bg_out = }")
+    print(f"preds: {bg_pred[:head_len] = }")
+    # print(f"preds: {bg_pred = }")
     print("mean absolute error: ", np.mean(np.abs(bg_out - y)))
     print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
@@ -227,11 +130,60 @@ def main():
     )
     print("accuracy boolean graph:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
+    print("All Errors:")
+    models = [model, ng, norm_q_ng, q_ng, bg]
+    outs = [nn_out, ng_out, norm_q_ng_out, q_ng_out, bg_out]
+    preds = [nn_pred, ng_pred, norm_q_ng_pred, q_ng_pred, bg_pred]
+    n = len(outs)
+    errors = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            errors[i, j] = np.mean(np.abs(outs[i] - outs[j]))
+    print("nn\tng\tq_ng\tn_ng\tbg")
+    print(errors)
+
+    fidelities = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            fidelities[i, j] = np.mean(preds[i] == preds[j])
+    print("nn\tng\tq_ng\tn_ng\tbg")
+    print(fidelities)
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
     # Accuracy: the percentage of test examples that are correctly classified by the rules
     # Consistency: is given if the rules extracted under different training sessions produce the same classifications of test examples
     # Comprehensibility: is determined by measuring the number of rules and the number of antecedents per rule
+    pass
+
+
+def get_arguments() -> Namespace:
+    parser = ArgumentParser(
+        description="Generate and save a dataset for a parity function. The dataset contains every point from the possible input space exactly once."
+    )
+    parser.add_argument(
+        "--n",
+        type=int,
+        default=0,
+        help="Number of samples you want to create. If not specified, it will create every sample exactly once.",
+    )
+    parser.add_argument(
+        "--k",
+        type=int,
+        help="What parity function you want.",
+    )
+    parser.add_argument(
+        "--no_header",
+        action="store_true",
+        help="If specified, will exclude the header in the file.",
+    )
+    parser.add_argument(
+        "--shuffle",
+        action="store_true",
+        help="If specified, the datasamples will be shuffled.",
+    )
+    args = parser.parse_args()
+    return args
 
 
 if __name__ == "__main__":
-    main()
+    args = get_arguments()
+    main(args.model_path, args.data_path)

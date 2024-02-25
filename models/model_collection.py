@@ -21,8 +21,9 @@ class ModelFactory:
         ],
         "parity5": [
             (5, 4, Activation.TANH),
-            (4, 3, Activation.TANH),
-            (3, 1, Activation.SIGMOID),
+            (4, 4, Activation.TANH),
+            (4, 2, Activation.TANH),
+            (2, 1, Activation.SIGMOID),
         ],
         "parity6": [
             (6, 3, Activation.TANH),
