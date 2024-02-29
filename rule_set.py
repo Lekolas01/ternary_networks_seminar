@@ -147,6 +147,9 @@ class IfThenRule(Node):
             return []
         return [key for key, _ in self.ins]
 
+    def complexity(self) -> int:
+        return 1 if self.is_const else 1 + len(self.ins)
+
 
 class Subproblem:
     def __init__(self, key: str, rules: list[IfThenRule]):
@@ -216,6 +219,9 @@ class Subproblem:
     def children(self) -> list[str]:
         return flatten([rule.children() for rule in self.rules if not rule.is_const])
 
+    def complexity(self) -> int:
+        return sum(rule.complexity() for rule in self.rules)
+
 
 class RuleSetNeuron(Node):
     def __init__(self, q_neuron: QuantizedNeuron, simplify: bool) -> None:
@@ -233,7 +239,7 @@ class RuleSetNeuron(Node):
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         vars = copy.copy(vars)
         for k in self.knowledge:
-            #print(f"Set {self.knowledge[k]} to {k}.")
+            # print(f"Set {self.knowledge[k]} to {k}.")
             if isinstance(self.knowledge[k], Constant):
                 vars[k] = np.array(self.knowledge[k]())
             else:
@@ -389,6 +395,9 @@ class RuleSetNeuron(Node):
                 key: sp for key, sp in self.subproblems.items() if key in all_children
             }
 
+    def complexity(self) -> int:
+        return sum(sp.complexity() for sp in self.subproblems.values())
+
 
 class RuleSetGraph(Graph):
     def __init__(self, rule_set_neurons: Sequence[RuleSetNeuron]) -> None:
@@ -406,3 +415,10 @@ class RuleSetGraph(Graph):
 
     def __repr__(self):
         return str(self)
+
+    def complexity(self) -> int:
+        return sum(
+            node.complexity()
+            for node in self.nodes.values()
+            if isinstance(node, RuleSetNeuron)
+        )

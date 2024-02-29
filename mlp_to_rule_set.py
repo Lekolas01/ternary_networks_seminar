@@ -92,6 +92,7 @@ def main(model_path: str, data_path: str):
     print("----------------- Rule Set Graph -----------------")
 
     print(f"{bg = }")
+    print(f"{bg.complexity() = }")
     bg_pred = bg(bg_data)
     bg_out = np.where(bg_pred == True, 1.0, 0.0)
 
@@ -160,25 +161,12 @@ def get_arguments() -> Namespace:
         description="Generate and save a dataset for a parity function. The dataset contains every point from the possible input space exactly once."
     )
     parser.add_argument(
-        "--n",
-        type=int,
-        default=0,
-        help="Number of samples you want to create. If not specified, it will create every sample exactly once.",
+        "data_path",
+        help="The name of the dataset (the file must exist in the data/generated folder).",
     )
     parser.add_argument(
-        "--k",
-        type=int,
-        help="What parity function you want.",
-    )
-    parser.add_argument(
-        "--no_header",
-        action="store_true",
-        help="If specified, will exclude the header in the file.",
-    )
-    parser.add_argument(
-        "--shuffle",
-        action="store_true",
-        help="If specified, the datasamples will be shuffled.",
+        "model_path",
+        help="The name of the neural net configuration - see models.model_collection.py.",
     )
     args = parser.parse_args()
     return args

@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sympy import fu
 
 from bool_formula import Bool, possible_data
 from bool_parse import ExpressionEvaluator
@@ -17,7 +18,6 @@ def gen_data(
     dead_cols=0,
     seed: int | None = None,
     shuffle=False,
-    verbose=False,
 ) -> pd.DataFrame:
     """Generate data from a boolean/logical function with k unqiue variables and save it in a pandas DataFrame.
     The target variable is saved in the "target" column of the df.
@@ -45,8 +45,6 @@ def gen_data(
         Set the seed for the random sampling. Only relevant if n >= 1.
     shuffle: bool
         Whether to have the data samples be in random order. Only relevant if n <= 0.
-    verbose: bool
-        Whether or not to print additional debuggin information to stdout.
 
     Returns
     -------
@@ -60,27 +58,19 @@ def gen_data(
     target_var = "target"
     dead_vars = [f"dead{i + 1}" for i in range(dead_cols)]
     df = pd.DataFrame(columns=col_order + dead_vars + [target_var])
-    if verbose:
-        print(f"Generating dataset for the following expression: {func}...")
-        print(f"Columns: {vars}")
-    if n <= 0:
-        # generate a data point for each possible point in the input space
-        data = possible_data(col_order, is_float=False, shuffle=shuffle)
-        for datapoint in data:
-            df[datapoint] = data[datapoint]
-        df[target_var] = func(data)
-        n = 2 ** len(col_order)
-
-    elif n >= 1:
-        # generate n randomly selected data points from the input space
+    data: dict[str, np.ndarray] = (
+        possible_data(col_order, is_float=True, shuffle=shuffle)
+        if n <= 0
+        else {l: np.random.binomial(1, 0.5, n) for l in col_order}
+    )
+    if seed:
         random.seed(seed)
-        for i in range(n):
-            interpretation = {l: np.array(random.random() >= 0.5) for l in col_order}
-            interpretation[target_var] = func(interpretation)
-            df.loc[len(df)] = interpretation  # type: ignore
+    data[target_var] = func(data)
     for dead_var in dead_vars:
-        df[dead_var] = np.random.choice([0, 1], n, True, np.array([0.5, 0.5]))
-    return df.astype(int)
+        data[dead_var] = np.random.choice([0, 1], n, True, np.array([0.5, 0.5]))
+    for datapoint in data:
+        df[datapoint] = data[datapoint]
+    return df
 
 
 def get_arguments() -> Namespace:
@@ -89,6 +79,12 @@ def get_arguments() -> Namespace:
     )
     parser.add_argument(
         "target_fn", help="The target function as a boolean expression."
+    )
+    parser.add_argument(
+        "-n",
+        type=int,
+        default=0,
+        help="Number of samples you want to create. If not specified, it will create every sample from the feature space exactly once.",
     )
     parser.add_argument(
         "path",
@@ -126,7 +122,7 @@ if __name__ == "__main__":
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
     file_path = Path(dir_path, args.path).with_suffix(".csv")
-    data = gen_data(f, dead_cols=args.n_dead, shuffle=args.shuffle, verbose=True)
+    data = gen_data(f, n=args.n, dead_cols=args.n_dead, shuffle=args.shuffle)
     print(f"Final data shape: {data.shape}")
     data.to_csv(file_path, index=False, header=not args.no_header)
     print(f"Saved dataset to {file_path}.")

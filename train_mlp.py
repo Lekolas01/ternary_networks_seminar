@@ -15,11 +15,11 @@ from utilities import set_seed
 
 def get_arguments() -> Namespace:
     seed = 1
-    epochs = 3000
+    epochs = 1000
     batch_size = 64
     lr = 0.006
     weight_decay = 0.0
-    l1 = 2e-6
+    l1 = 0.0
 
     parser = ArgumentParser(
         description="Train an MLP on a binary classification task with an ADAM optimizer."
