@@ -5,9 +5,8 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sympy import fu
 
-from bool_formula import Bool, possible_data
+from bool_formula import Bool, all_data
 from bool_parse import ExpressionEvaluator
 
 
@@ -28,8 +27,8 @@ def gen_data(
     func : Bool
         The target function for which to generate a dataset.
     col_order : list[str] | None
-        If specified, it will fix the order in which the columns get saved. Otherwise, they
-        are sorted lexicographically.
+        If specified, it will fix the order in which the columns get saved.
+        Otherwise, they are sorted lexicographically.
     n : int | None
         If n is <= 0, the DataFrame will contain every possible sample from the input space exactly once,
         i.e. the DataFrame will contain exactly 2**k data points, where k is the number
@@ -54,22 +53,30 @@ def gen_data(
         the last column is the "target" column, and the ones in between are the irrelevant columns.
     """
     if col_order is None:
-        col_order = list(func.all_literals())
+        col_order = sorted(list(func.all_literals()))
     target_var = "target"
     dead_vars = [f"dead{i + 1}" for i in range(dead_cols)]
     df = pd.DataFrame(columns=col_order + dead_vars + [target_var])
     data: dict[str, np.ndarray] = (
-        possible_data(col_order, is_float=True, shuffle=shuffle)
+        all_data(col_order, 0, 1, shuffle=shuffle)
         if n <= 0
-        else {l: np.random.binomial(1, 0.5, n) for l in col_order}
+        else {
+            l: np.random.choice([0, 1], size=n, replace=True, p=np.array([0.5, 0.5]))
+            for l in col_order
+        }
     )
     if seed:
         random.seed(seed)
-    data[target_var] = func(data)
-    for dead_var in dead_vars:
-        data[dead_var] = np.random.choice([0, 1], n, True, np.array([0.5, 0.5]))
+    if n <= 0:
+        n = 2 ** len(col_order)
+    # fill independent variables
     for datapoint in data:
         df[datapoint] = data[datapoint]
+    # fill dead variables
+    for dead_var in dead_vars:
+        df[dead_var] = np.random.choice([0, 1], n, True, np.array([0.5, 0.5]))
+    # fill target variable
+    df[target_var] = func(data)
     return df
 
 

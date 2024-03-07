@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterable, Mapping, MutableMapping
 from enum import Enum
@@ -38,6 +39,19 @@ def possible_data(
             if is_float
             else np.concatenate((np.repeat(False, 2**i), np.repeat(True, 2**i)))
         )
+        ans[key] = np.tile(a, 2 ** (n - i - 1))
+    if shuffle:
+        order = np.random.permutation(2**n)
+        for i, key in enumerate(keys):
+            ans[key] = ans[key][order]
+    return ans
+
+
+def all_data(keys: Collection[str], low, high, shuffle=False) -> Dict[str, np.ndarray]:
+    ans: dict[str, np.ndarray] = {}
+    n = len(keys)
+    for i, key in enumerate(keys):
+        a = np.concatenate((np.repeat(low, 2**i), np.repeat(high, 2**i)))
         ans[key] = np.tile(a, 2 ** (n - i - 1))
     if shuffle:
         order = np.random.permutation(2**n)
@@ -166,8 +180,8 @@ class Quantifier(Bool):
         self.opstr = " & " if is_all else " | "
 
     def __call__(self, interpretation: Mapping[str, np.ndarray] = {}) -> np.ndarray:
-        answers = np.stack([c(interpretation) for c in self.children], axis=1)
-        return self.op(answers, axis=1)
+        answers = [c(interpretation) for c in self.children]
+        return functools.reduce(lambda x, y: (x & y if self.is_all else x | y), answers)
 
     def __str__(self) -> str:
         if len(self.children) == 0:

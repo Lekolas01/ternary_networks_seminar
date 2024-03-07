@@ -74,48 +74,50 @@ def main():
         print(f"Creating new directory at {problem_path}...")
         os.mkdir(problem_path)
 
-    if args.new or not os.path.isfile(model_path):
-        seed = set_seed(args.seed)
-        print(f"{seed = }")
-        print(f"No pre-trained model found. Starting training...")
-        model = ModelFactory.get_model(model_name)
+    if not args.new and os.path.isfile(model_path):
+        print("Model has been trained already. Training procedure cancelled.")
+        return
+    seed = set_seed(args.seed)
+    print(f"{seed = }")
+    print(f"No pre-trained model found. Starting training...")
+    model = ModelFactory.get_model(model_name)
 
-        train_dl = DataLoader(
-            FileDataset(data_path), batch_size=args.batch_size, shuffle=True
-        )
-        valid_dl = DataLoader(
-            FileDataset(data_path), batch_size=args.batch_size, shuffle=True
-        )
-        loss_fn = nn.BCELoss()
-        optim = torch.optim.Adam(
-            model.parameters(),
-            lr=args.lr,
-            betas=(0.9, 0.999),
-            eps=1e-08,
-            weight_decay=args.wd,
-        )
-        tracker = Tracker()
-        tracker.add_logger(
-            LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
-        )
+    train_dl = DataLoader(
+        FileDataset(data_path), batch_size=args.batch_size, shuffle=True
+    )
+    valid_dl = DataLoader(
+        FileDataset(data_path), batch_size=args.batch_size, shuffle=True
+    )
+    loss_fn = nn.BCELoss()
+    optim = torch.optim.Adam(
+        model.parameters(),
+        lr=args.lr,
+        betas=(0.9, 0.999),
+        eps=1e-08,
+        weight_decay=args.wd,
+    )
+    tracker = Tracker()
+    tracker.add_logger(
+        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
+    )
 
-        losses = training_loop(
-            model,
-            loss_fn,
-            optim,
-            train_dl,
-            valid_dl,
-            epochs=args.epochs,
-            lambda1=args.l1,
-            tracker=tracker,
-            device="cpu",
-        )
+    losses = training_loop(
+        model,
+        loss_fn,
+        optim,
+        train_dl,
+        valid_dl,
+        epochs=args.epochs,
+        lambda1=args.l1,
+        tracker=tracker,
+        device="cpu",
+    )
 
-        try:
-            torch.save(model, model_path)
-            print(f"Successfully saved model to {model_path}")
-        except Exception as inst:
-            print(f"Could not save model to {model_path}: {inst}")
+    try:
+        torch.save(model, model_path)
+        print(f"Successfully saved model to {model_path}")
+    except Exception as inst:
+        print(f"Could not save model to {model_path}: {inst}")
 
 
 if __name__ == "__main__":

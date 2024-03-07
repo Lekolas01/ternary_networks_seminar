@@ -38,8 +38,8 @@ class ModelFactory:
             (6, 6, Activation.TANH),
             (6, 1, Activation.SIGMOID),
         ],
-        "hallo_model": [
-            (7, 3, Activation.SIGMOID),
+        "test_model": [
+            (9, 3, Activation.SIGMOID),
             (3, 1, Activation.SIGMOID),
         ],
     }
