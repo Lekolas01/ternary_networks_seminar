@@ -1,16 +1,34 @@
-import graphviz
-import graphviz.dot as d
-from pyeda.boolalg.bdd import _NODES
-from pyeda.inter import *
+import itertools
 
-print(len(_NODES))
-x1, x2, x3, x4, x5 = map(bddvar, (f"x{i + 1}" for i in range(5)))
-print(len(_NODES))
-f = expr("x1 & x2 | x1 & x3 & x4 & x5 | x2 & x3 & x4 & x5")
-print(f)
-f = expr2bdd(f)
-print(f)
-dot = f.to_dot()
+import numpy as np
 
-with open("Output.txt", "w") as f:
-    f.write(dot)
+
+def h2(n, k) -> float:
+    if k > n or k < 2:
+        return 0
+    return k * (k - 1) / n / (n - 1)
+
+
+def p(n, k, m) -> float:
+    return 1 - np.power((1 - h2(n, k)), m)
+
+
+def find_smallest_k(n_inputs: int, n_outputs: int, thr: float) -> int:
+    if n_inputs <= 2:
+        return n_inputs
+    k = n_inputs
+    while p(n_inputs, k, n_outputs) >= thr:
+        k -= 1
+    return k + 1
+
+
+def main():
+    thr = 0.6
+    ans = np.zeros((10, 10), dtype=int)
+    for i, j in itertools.product(range(ans.shape[0]), range(ans.shape[1])):
+        ans[i, j] = find_smallest_k(i + 1, j + 1, thr)
+    print(ans)
+
+
+if __name__ == "__main__":
+    main()
