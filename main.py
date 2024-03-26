@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from config import Configuration, Grid, read_grid
-from datasets import get_datasets
+from datasets import get_dataset
 from models.factory import ModelFactory
 from my_logging.checkpoints import Checkpoints
 from my_logging.loggers import Plotter, Tracker
@@ -25,7 +25,7 @@ def run(
         str(conf.data), bool(conf.ternary), float(str(conf.a)), float(str(conf.b))
     ).to(device)
 
-    train_ds, valid_ds = get_datasets(str(conf.data))
+    train_ds, valid_ds = get_dataset(str(conf.data))
     assert isinstance(conf.batch_size, int)
     train_loader = DataLoader(train_ds, batch_size=int(conf.batch_size), shuffle=True)
     valid_loader = DataLoader(valid_ds, batch_size=int(conf.batch_size), shuffle=True)

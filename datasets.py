@@ -1,10 +1,11 @@
+import os
 from pathlib import Path
+
 import pandas as pd
 import torch
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
 from torchvision import transforms
-import os
 
 
 class FileDataset(Dataset):
@@ -86,68 +87,62 @@ class FileDataset(Dataset):
         return self.x[idx], self.y[idx]
 
 
-def get_datasets(ds: str) -> tuple[FileDataset, FileDataset]:
+def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
     """
     For obtaining two FileDatasets (one train, one validation) based on dataset name.
     """
     datasets = []
+    match ds:
+        case "adult":
+            path = Path("data/adult/adult.csv")
+            split = 2 / 3
+            datasets.append(
+                FileDataset(path=str(path), range=(0, split), normalize=True)
+            )
+            datasets.append(
+                FileDataset(path=str(path), range=(split, 1), normalize=True)
+            )
 
-    if ds == "mnist":
-        raise NotImplementedError()
-        transform = transforms.Compose(
-            [transforms.Resize((32, 32)), transforms.ToTensor()]
-        )
-        train_ds = datasets.MNIST(
-            root="data/", train=train, transform=transform, download=True
-        )
-        return datasets
-
-    elif ds == "adult":
-        path = Path("data/adult/adult.csv")
-        split = 2 / 3
-        datasets.append(FileDataset(path=str(path), range=(0, split), normalize=True))
-        datasets.append(FileDataset(path=str(path), range=(split, 1), normalize=True))
-
-    elif ds == "mushroom":
-        path = Path("data", "mushroom", "agaricus-lepiota.data")
-        names = [
-            "edible",
-            "cap-shape",
-            "cap-surface",
-            "cap-color",
-            "bruises",
-            "odor",
-            "gill-attachment",
-            "gill-spacing",
-            "gill-size",
-            "gill-color",
-            "stalk-shape",
-            "stalk-root",
-            "stalk-surface-above-ring",
-            "stalk-surface-below-ring",
-            "stalk-color-above-ring",
-            "stalk-color-below-ring",
-            "veil-type",
-            "veil-color",
-            "ring-number",
-            "ring-type",
-            "spore-print-color",
-            "population",
-            "habitat",
-        ]
-        datasets.append(FileDataset(path=path, target="edible"))
-        datasets.append(FileDataset(path=path, target="edible"))
-    elif ds == "logical_AND":
-        path = Path("data", "generated", ds, "data.csv")
-        datasets.append(FileDataset(path=path))
-        datasets.append(FileDataset(path=path))
-    else:
-        raise ValueError("Non-existing dataset: {d}".format(d=ds))
+        case "mushroom":
+            path = Path("data", "mushroom", "agaricus-lepiota.data")
+            names = [
+                "edible",
+                "cap-shape",
+                "cap-surface",
+                "cap-color",
+                "bruises",
+                "odor",
+                "gill-attachment",
+                "gill-spacing",
+                "gill-size",
+                "gill-color",
+                "stalk-shape",
+                "stalk-root",
+                "stalk-surface-above-ring",
+                "stalk-surface-below-ring",
+                "stalk-color-above-ring",
+                "stalk-color-below-ring",
+                "veil-type",
+                "veil-color",
+                "ring-number",
+                "ring-type",
+                "spore-print-color",
+                "population",
+                "habitat",
+            ]
+            datasets.append(FileDataset(path=path, target="edible"))
+            datasets.append(FileDataset(path=path, target="edible"))
+        case "logical_AND":
+            path = Path("data", "generated", ds, "data.csv")
+            datasets.append(FileDataset(path=path))
+            datasets.append(FileDataset(path=path))
+        case _:
+            raise ValueError("Non-existing dataset: {d}".format(d=ds))
     return datasets[0], datasets[1]
 
 
 if __name__ == "__main__":
-    train_dataset, test_dataset = get_datasets(ds="adult")
+    train_dataset, test_dataset = get_dataset(ds="adult")
     print(f"{len(train_dataset) = }")
     x, y = next(iter(train_dataset))
     print(f"x.shape: {x.shape}")

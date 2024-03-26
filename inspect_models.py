@@ -1,12 +1,15 @@
-import pandas as pd
+import glob
+import os
 from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-import glob, os
+import pandas as pd
 import torch
 import torch.nn as nn
+
 import utilities
-from datasets import get_datasets
+from datasets import get_dataset
 
 
 def get_indices_epochs(base_model_paths):
@@ -42,7 +45,7 @@ def inspect(dir_path):
     plt.ylabel("Accuracy")
     plt.title(os.path.basename(dir_path))
     plt.show()
-    valid_loader = get_datasets(
+    valid_loader = get_dataset(
         ds="mushroom"  # , train=False, shuffle=True, batch_size=128
     )
     valid_loader = torch.Dat

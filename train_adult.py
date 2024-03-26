@@ -4,13 +4,12 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.utils.data.sampler
-from torch.utils.data import DataLoader
 from adult import Adult
+from torch.utils.data import DataLoader
 
-from datasets import get_datasets
+from datasets import get_dataset
 from my_logging.loggers import LogMetrics, Tracker
 from train_model import training_loop
-
 
 # ------------------- my dataset --------------
 if __name__ == "__main__":
