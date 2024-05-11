@@ -12,3 +12,5 @@ Another goal would be to try and think about how transform Ternary weight networ
 
 Currently the script main.py contains the full pipeline of loading the data, then training the model to saving the trained model parameters.
 
+This rule learning suite contains the following callable python scripts:
+* 

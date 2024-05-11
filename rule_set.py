@@ -10,7 +10,7 @@ import numpy as np
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import QuantizedNeuron, QuantizedNeuronGraph
+from q_neuron import QuantizedNeuron, QuantizedNeuronGraph, QuantizedNeuronGraph2
 from utilities import flatten
 
 
@@ -288,6 +288,7 @@ class RuleSetNeuron(Node):
             dp.insert(k, ans)
             return ans
 
+        print(f"{self.q_neuron.y_centers = }")
         assert self.q_neuron.y_centers == [0.0, 1.0]
         assert self.q_neuron.x_thr == 0.0
         self.bias = self.q_neuron.bias
@@ -404,7 +405,7 @@ class RuleSetGraph(Graph):
         super().__init__(rule_set_neurons)
 
     @classmethod
-    def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph, simplify=True):
+    def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
         rule_neurons = [
             RuleSetNeuron(q_n, simplify)
             for key, q_n in q_ng.nodes.items()

@@ -17,17 +17,18 @@ def nn_to_rule_set(
     # transform the trained neural network to a directed graph of full-precision neurons
     neuron_graph = NeuronGraph.from_nn(model, vars)
     # transform the graph to a new graph of perceptrons with quantized step functions
-    q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
-    norm_q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+    # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
+    q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
 
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
-    return (neuron_graph, q_neuron_graph, norm_q_neuron_graph, bool_graph)
+    return (neuron_graph, q_neuron_graph, bool_graph)
 
 
 def main(model_path: str, data_path: str):
     print(f"Loading trained model from {model_path}...")
     # get the last updated model
+    print(f"{model_path = }")
     model = torch.load(model_path)
 
     df = pd.read_csv(data_path, dtype=float)
@@ -40,20 +41,17 @@ def main(model_path: str, data_path: str):
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, norm_q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
 
     np.set_printoptions(precision=3)
     np.set_printoptions(suppress=True)
 
     head_len = 4
-    print(f"Target vector y: {y[:head_len]}")
 
     print("----------------- MLP -----------------")
     print(f"{model = }")
     nn_out = model(nn_data).detach().numpy()
     nn_pred = np.round(nn_out)
-    print(f"outs: {nn_out[:head_len]}")
-    print(f"preds: {nn_pred[:head_len]}")
     print("mean absolute error: ", np.mean(np.abs(nn_out - y)))
     print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(nn_pred - y)))
 
@@ -62,8 +60,6 @@ def main(model_path: str, data_path: str):
     ng_out = ng(ng_data)
     ng_pred = np.round(ng_out)
 
-    print(f"outs: {ng_out[:head_len]}")
-    print(f"preds: {ng_pred[:head_len]}")
     print("mean absolute error: ", np.mean(np.abs(ng_out - y)))
     print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(ng_pred - y)))
 
@@ -73,21 +69,8 @@ def main(model_path: str, data_path: str):
     q_ng_out = q_ng(ng_data)
     q_ng_pred = np.round(q_ng_out)
 
-    print(f"outs: {q_ng_out[:head_len]}")
-    print(f"preds: {q_ng_pred[:head_len]}")
     print("mean absolute error: ", np.mean(np.abs(q_ng_out - y)))
     print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(q_ng_pred - y)))
-
-    print("------------- Normalized QNG -------------")
-
-    print(f"{norm_q_ng = }")
-    norm_q_ng_out = norm_q_ng(ng_data)
-    norm_q_ng_pred = np.round(norm_q_ng_out)
-
-    print(f"outs: {norm_q_ng_out[:head_len] = }")
-    print(f"preds: {norm_q_ng_pred[:head_len] = }")
-    print("mean absolute error: ", np.mean(np.abs(norm_q_ng_out - y)))
-    print("prediction accuracy:\t", np.array(1.0) - np.mean(np.abs(norm_q_ng_pred - y)))
 
     print("----------------- Rule Set Graph -----------------")
 
@@ -132,14 +115,16 @@ def main(model_path: str, data_path: str):
     print("accuracy boolean graph:\t", np.array(1.0) - np.mean(np.abs(bg_out - y)))
 
     print("All Errors:")
-    models = [model, ng, norm_q_ng, q_ng, bg]
-    outs = [nn_out, ng_out, norm_q_ng_out, q_ng_out, bg_out]
-    preds = [nn_pred, ng_pred, norm_q_ng_pred, q_ng_pred, bg_pred]
+    models = [model, ng, q_ng, bg]
+    outs = [nn_out, ng_out, q_ng_out, bg_out]
+    preds = [nn_pred, ng_pred, q_ng_pred, bg_pred]
     n = len(outs)
     errors = np.zeros((n, n))
     for i in range(n):
         for j in range(n):
             errors[i, j] = np.mean(np.abs(outs[i] - outs[j]))
+
+    print("Errors:")
     print("nn\tng\tq_ng\tn_ng\tbg")
     print(errors)
 
@@ -147,6 +132,7 @@ def main(model_path: str, data_path: str):
     for i in range(n):
         for j in range(n):
             fidelities[i, j] = np.mean(preds[i] == preds[j])
+    print("Fidelities:")
     print("nn\tng\tq_ng\tn_ng\tbg")
     print(fidelities)
     # Fidelity: the percentage of test examples for which the classification made by the rules agrees with the neural network counterpart
@@ -158,15 +144,15 @@ def main(model_path: str, data_path: str):
 
 def get_arguments() -> Namespace:
     parser = ArgumentParser(
-        description="Generate and save a dataset for a parity function. The dataset contains every point from the possible input space exactly once."
+        description="Given an already trained MLP and the dataset it was trained on, extract a set of if-then rules with similar behavior as the MLP."
     )
     parser.add_argument(
         "data_path",
-        help="The name of the dataset (the file must exist in the data/generated folder).",
+        help="Relative path to the dataset file, starting from root folder.",
     )
     parser.add_argument(
         "model_path",
-        help="The name of the neural net configuration - see models.model_collection.py.",
+        help="Relative path to the .pth file, starting from root folder.",
     )
     args = parser.parse_args()
     return args

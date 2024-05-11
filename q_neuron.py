@@ -131,8 +131,11 @@ class QuantizedNeuronGraph2(Graph):
     @classmethod
     def from_neuron_graph(cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray]):
         q_neuron_graph = QuantizedNeuronGraph2([])
+        out_key = next(iter(ng.out_keys))
         for key, neuron in ng.neurons.items():
             data[key], q_neuron = from_neuron(neuron, data)
+            if q_neuron.key == out_key:
+                q_neuron.y_centers = [0.0, 1.0]
             q_neuron_graph.add(q_neuron)
         return q_neuron_graph
 
@@ -142,7 +145,7 @@ class QuantizedNeuronGraph2(Graph):
 
 def normalized(q_ng: QuantizedNeuronGraph2) -> QuantizedNeuronGraph2:
     """Normalize the nodes in the Quantized Neuron graph.
-    This does not change the output of the graph for the whole feature space."""
+    This does not change the output of the graph."""
     ans = QuantizedNeuronGraph2([])
     order = q_ng.topological_order()
     for key in order:
