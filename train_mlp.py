@@ -63,9 +63,30 @@ def get_arguments() -> Namespace:
 
 def main():
     args = get_arguments()
-    data_name = args.data
-    model_name = args.model
+    return train_mlp(
+        args.data,
+        args.model,
+        args.new,
+        args.seed,
+        args.batch_size,
+        args.lr,
+        args.epochs,
+        args.l1,
+        args.wd,
+    )
 
+
+def train_mlp(
+    data_name: str,
+    model_name: str,
+    new: bool,
+    seed: int,
+    batch_size: int,
+    lr: float,
+    epochs: int,
+    l1: float,
+    wd: float,
+):
     data_path = Path("data/generated") / f"{data_name}.csv"
     problem_path = Path(f"runs/{data_name}")
     model_path = problem_path / f"{model_name}.pth"
@@ -74,27 +95,23 @@ def main():
         print(f"Creating new directory at {problem_path}...")
         os.mkdir(problem_path)
 
-    if not args.new and os.path.isfile(model_path):
+    if not new and os.path.isfile(model_path):
         print("Model has been trained already. Training procedure cancelled.")
         return
-    seed = set_seed(args.seed)
+    seed = set_seed(seed)
     print(f"{seed = }")
     print(f"No pre-trained model found. Starting training...")
     model = ModelFactory.get_model(model_name)
 
-    train_dl = DataLoader(
-        FileDataset(data_path), batch_size=args.batch_size, shuffle=True
-    )
-    valid_dl = DataLoader(
-        FileDataset(data_path), batch_size=args.batch_size, shuffle=True
-    )
+    train_dl = DataLoader(FileDataset(data_path), batch_size=batch_size, shuffle=True)
+    valid_dl = DataLoader(FileDataset(data_path), batch_size=batch_size, shuffle=True)
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(
         model.parameters(),
-        lr=args.lr,
+        lr=lr,
         betas=(0.9, 0.999),
         eps=1e-08,
-        weight_decay=args.wd,
+        weight_decay=wd,
     )
     tracker = Tracker()
     tracker.add_logger(
@@ -107,8 +124,8 @@ def main():
         optim,
         train_dl,
         valid_dl,
-        epochs=args.epochs,
-        lambda1=args.l1,
+        epochs=epochs,
+        lambda1=l1,
         tracker=tracker,
         device="cpu",
     )
