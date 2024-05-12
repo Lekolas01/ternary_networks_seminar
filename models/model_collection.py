@@ -1,5 +1,3 @@
-from dataclasses import dataclass
-
 import torch.nn as nn
 
 from neuron import Activation
@@ -20,10 +18,9 @@ class ModelFactory:
             (3, 1, Activation.SIGMOID),
         ],
         "parity5": [
-            (5, 4, Activation.TANH),
-            (4, 4, Activation.TANH),
-            (4, 2, Activation.TANH),
-            (2, 1, Activation.SIGMOID),
+            (5, 5, Activation.TANH),
+            (5, 5, Activation.TANH),
+            (5, 1, Activation.SIGMOID),
         ],
         "parity6": [
             (6, 3, Activation.TANH),
@@ -45,8 +42,12 @@ class ModelFactory:
     }
 
     @classmethod
-    def get_model(cls, spec_name: str) -> nn.Sequential:
+    def get_model_by_name(cls, spec_name: str) -> nn.Sequential:
         nn_spec = cls.specifications[spec_name]
+        return cls.get_model_by_spec(nn_spec)
+
+    @classmethod
+    def get_model_by_spec(cls, nn_spec: NNSpec):
         ans = nn.Sequential()
         for idx, layer_spec in enumerate(nn_spec):
             ans.add_module(f"lin{idx}", nn.Linear(layer_spec[0], layer_spec[1]))

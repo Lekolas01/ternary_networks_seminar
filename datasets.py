@@ -1,11 +1,8 @@
-import os
 from pathlib import Path
 
 import pandas as pd
 import torch
-from torch.utils.data.dataloader import DataLoader
 from torch.utils.data.dataset import Dataset
-from torchvision import transforms
 
 
 class FileDataset(Dataset):
@@ -19,7 +16,7 @@ class FileDataset(Dataset):
 
     def __init__(
         self,
-        path: str | Path,
+        df: pd.DataFrame,
         range: tuple[float, float] = (0, 1),
         target="target",
         normalize=False,
@@ -38,15 +35,6 @@ class FileDataset(Dataset):
         normalize: bool
             Whether or not to normalize the numerical columns to mean = 0 and std = 1.
         """
-        assert os.path.isfile(
-            path
-        ), f"Path must point to an existing file. Instead got {path}."
-        assert (
-            len(range) == 2
-        ), f"range must be a tuple of length 2. Instead got {range}."
-        assert 0 <= range[0] <= range[1] <= 1, f"Invalid range values: {range}"
-
-        df = pd.read_csv(path, skipinitialspace=True)
         assert (
             target in df.columns
         ), f"Target column '{target}' must exist in column names {df.columns}."
