@@ -1,5 +1,6 @@
 from typing import Optional
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.nn import Module
@@ -82,7 +83,7 @@ def training_loop(
     device: Device = "cpu",
     tracker: Tracker = Tracker(),
     scheduler: Optional[MultiStepLR] = None,
-) -> tuple[list[float], list[float]]:
+) -> pd.DataFrame:
     tracker.training_start(model, train_loader, valid_loader, criterion)
     # Train model
     for epoch in range(epochs):

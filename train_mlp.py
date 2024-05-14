@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from datasets import FileDataset
-from my_logging.loggers import LogMetrics, Tracker
+from my_logging.loggers import LogMetrics, SaveModel, Tracker
 from train_model import training_loop
 from utilities import set_seed
 
@@ -87,9 +87,12 @@ def train_mlp(
         eps=1e-08,
         weight_decay=wd,
     )
-    tracker = Tracker()
+    n_logs = 10
+    tracker = Tracker(epochs=epochs)
     tracker.add_logger(
-        LogMetrics(["timestamp", "epoch", "train_loss", "train_acc"], log_every=50)
+        LogMetrics(
+            ["timestamp", "epoch", "train_loss", "train_acc"],
+        )
     )
 
     return (

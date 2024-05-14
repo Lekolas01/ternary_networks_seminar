@@ -56,7 +56,8 @@ def gen_data(
         col_order = sorted(list(func.all_literals()))
     target_var = "target"
     dead_vars = [f"dead{i + 1}" for i in range(dead_cols)]
-    df = pd.DataFrame(columns=col_order + dead_vars + [target_var])
+    cols = col_order + dead_vars + [target_var]
+    df = pd.DataFrame(columns=cols)
     data: dict[str, np.ndarray] = (
         all_data(col_order, 0, 1, shuffle=shuffle)
         if n <= 0

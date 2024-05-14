@@ -1,3 +1,4 @@
+import time
 from abc import ABC
 from datetime import datetime
 from pathlib import Path
@@ -5,6 +6,7 @@ from re import M
 from statistics import mean
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data.dataloader import DataLoader
@@ -56,17 +58,26 @@ class LogMetrics(Logger):
         self.metrics = metrics
 
     def epoch_end(self):
-        self.m_format = {
+        self.write_stuff()
+
+    def write_stuff(self):
+        temp = len(str(self.t.epochs))
+        m_format = {
             "timestamp": f"{datetime.now().time().replace(microsecond=0)} ----",
-            "epoch": f"Epoch: {self.t.epoch}",
-            "train_loss": f"Loss: {self.t.mean_train_loss[-1]:.4f}",
-            "train_acc": f"Train: {(self.t.train_acc * 100):.2f}%",
-            "valid_acc": f"Valid: {(self.t.valid_acc * 100):.2f}%",
+            "epoch": f"Epoch: {str(self.t.epoch).rjust(temp)}\t",
+            "train_loss": f"Loss: {self.t.mean_train_loss[-1]:.4f}\t",
+            "train_acc": f"Train: {(self.t.train_acc[-1] * 100):.2f}%\t",
+            "valid_acc": f"Valid: {(self.t.valid_acc[-1] * 100):.2f}%",
         }
 
+        bar = utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
         for metric in self.metrics:
-            print(f"{self.m_format[metric]}", end="\t")
-        print()
+            bar += f"{m_format[metric]}\t"
+        end = "\r" if self.t.epoch < self.t.epochs else "\n"
+        print(bar, end=end)
+
+    def training_start(self):
+        print(f"{datetime.now().time().replace(microsecond=0)} ---- Run start")
 
 
 class Plotter(Logger):
@@ -128,13 +139,14 @@ class LogModel(Logger):
 class Tracker:
     """Tracks useful information on the current epoch."""
 
-    def __init__(self, *loggers: Logger):
+    def __init__(self, epochs: int = 0, *loggers: Logger):
         """
         Parameters
         ----------
         logger0, logger1, ... loggerN : Logger
             List of loggers used for logging training information.
         """
+        self.epochs = epochs
         self.loggers = []
         for logger in loggers:
             self.add_logger(logger)
@@ -156,10 +168,8 @@ class Tracker:
 
         self.device = next(self.model.parameters()).device
         self.epoch = 0
-        self.mean_train_loss, self.mean_valid_loss = (
-            [],
-            [],
-        )  # the mean of every epochs training loss
+        self.mean_train_loss, self.mean_valid_loss = [], []
+        self.train_acc, self.valid_acc = [], []
 
         for logger in self.loggers:
             logger.training_start()
@@ -180,8 +190,8 @@ class Tracker:
         # train- and test accuracy
         self.mean_train_loss.append(mean(train_losses))
         self.mean_valid_loss.append(mean(valid_losses))
-        self.train_acc = utilities.acc(self.model, self.train_dl, self.device)
-        self.valid_acc = utilities.acc(self.model, self.valid_dl, self.device)
+        self.train_acc.append(utilities.acc(self.model, self.train_dl, self.device))
+        self.valid_acc.append(utilities.acc(self.model, self.valid_dl, self.device))
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
@@ -206,10 +216,17 @@ class Tracker:
                 # pass on the calculated metrics to all subclasses, so they can print it or whatever they want to do with it.
                 logger.epoch_end()
 
-    def training_end(self) -> tuple[list[float], list[float]]:
+    def training_end(self) -> pd.DataFrame:
         for logger in self.loggers:
             logger.training_end()
-        return self.mean_train_loss, self.mean_valid_loss
+        ans = pd.DataFrame(
+            columns=["train_loss", "valid_loss", "train_acc", "valid_acc"]
+        )
+        ans["train_loss"] = self.mean_train_loss
+        ans["valid_loss"] = self.mean_valid_loss
+        ans["train_acc"] = self.train_acc
+        ans["valid_acc"] = self.valid_acc
+        return ans
 
 
 class SaveModel(Logger):

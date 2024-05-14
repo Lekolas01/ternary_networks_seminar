@@ -20,6 +20,9 @@ def nn_to_rule_set(
     # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
 
+    print(neuron_graph)
+    print(q_neuron_graph)
+
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)

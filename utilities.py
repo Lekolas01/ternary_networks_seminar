@@ -99,15 +99,34 @@ def invert_dict(d: dict) -> dict:
     return ans
 
 
-def progress_bar(progress, total):
-    percent = 100 * (progress / float(total))
-    bar = "█" * int(percent) + "-" * (100 - int(percent))
-    print(f"\r||{bar}| {percent:.2f}%", end="\r")
+def progress_bar(progress: int, total: int, width=40) -> str:
+    bars = ["0x2588"]
+    rel_progress = progress / float(total)
+    rel_width = width * rel_progress
+    left_bars = int(rel_width)
+    last_eights = int(8 * (rel_width % 1))
+    val = 9615 - last_eights
+    last_bar = chr(val)  # TODO
+    bar = chr(9608) * left_bars + last_bar + "-" * (width - int(rel_width))
+    written_progress = f"{str(progress).rjust(len(str(total)))} / {total}"
+    return f"\r|{bar}|{written_progress}"
 
 
 def main():
-    for i in tqdm(range(200), desc="Loading...", ascii=False):
-        sleep(0.05)
+    # for i in tqdm(range(100), desc="Loading...", ascii=False):
+    #     sleep(0.05)
+    # print()
+    for i in range(101):
+        print(progress_bar(i, 100), end="\r")
+        sleep(0.02)
+    print()
+    print("\u2713")
+    print("\u2500")
+    print("\u2587")
+    print("\u2588")
+    print("\u2589")
+    print("\u2590")
+    print("\u2591")
 
 
 if __name__ == "__main__":
