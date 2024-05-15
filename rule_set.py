@@ -6,11 +6,12 @@ from graphlib import TopologicalSorter
 from typing import Tuple
 
 import numpy as np
+from torch import isin
 
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import QuantizedNeuron, QuantizedNeuronGraph, QuantizedNeuronGraph2
+from q_neuron import Perceptron, QuantizedNeuronGraph, QuantizedNeuronGraph2
 from utilities import flatten
 
 
@@ -224,8 +225,11 @@ class Subproblem:
 
 
 class RuleSetNeuron(Node):
-    def __init__(self, q_neuron: QuantizedNeuron, simplify: bool) -> None:
+    def __init__(
+        self, q_neuron: Perceptron, q_ng: QuantizedNeuronGraph2, simplify: bool
+    ) -> None:
         self.q_neuron = q_neuron
+        self.q_ng = q_ng
         self.key = q_neuron.key
         self.ins = q_neuron.ins
         self.dp = self.calc_dp()
@@ -289,12 +293,26 @@ class RuleSetNeuron(Node):
             return ans
 
         print(f"{self.q_neuron.y_centers = }")
-        assert self.q_neuron.y_centers == [0.0, 1.0]
-        assert self.q_neuron.x_thr == 0.0
         self.bias = self.q_neuron.bias
 
+        # adjust the weights given the y_centers of the previous layer
+        # ins = list(self.ins.items())
+        ins = copy.copy(self.ins)
+        for key in ins:
+            w = ins[key]
+            if key in self.q_ng.in_keys:
+                continue
+            print(f"adjust {self.key}")
+            in_node = self.q_ng[key]
+            assert isinstance(in_node, Perceptron)
+            y_centers = in_node.y_centers
+            a = y_centers[0]
+            k = y_centers[1] - y_centers[0]
+            self.bias += a * w  # update bias
+            ins[key] *= k  # update weight
+
         # sort neurons by their weight
-        ins = list(self.ins.items())
+        ins = list(ins.items())
         ins = sorted(ins, key=lambda x: abs(x[1]), reverse=True)
 
         # remember which weights are negative and then invert all of them (needed for negative numbers)
@@ -317,7 +335,7 @@ class RuleSetNeuron(Node):
         return dp
 
     @classmethod
-    def from_q_neuron(cls, q_neuron: QuantizedNeuron):
+    def from_q_neuron(cls, q_neuron: Perceptron):
         return RuleSetNeuron(q_neuron, True)
 
     def __str__(self) -> str:
@@ -407,9 +425,9 @@ class RuleSetGraph(Graph):
     @classmethod
     def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
         rule_neurons = [
-            RuleSetNeuron(q_n, simplify)
+            RuleSetNeuron(q_n, q_ng, simplify)
             for key, q_n in q_ng.nodes.items()
-            if isinstance(q_n, QuantizedNeuron)
+            if isinstance(q_n, Perceptron)
         ]
         ans = RuleSetGraph(rule_neurons)
         return ans

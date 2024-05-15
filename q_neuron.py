@@ -10,31 +10,29 @@ from neuron import Neuron, NeuronGraph
 from node import Graph, Node
 
 
-class QuantizedNeuron(Node):
-    """A neuron that was quantized to a step function with 1 step."""
+class Perceptron(Node):
+    """A neuron with two-interval step function as activation."""
 
     def __init__(
         self,
         key: str,
-        ins: Mapping[str, float],
+        ins: MutableMapping[str, float],
         bias: float,
-        x_thr=0.0,
         y_centers: list[float] = [0.0, 1.0],
     ) -> None:
         self.key = key
         self.bias = bias
         self.ins = ins
-        self.x_thr = x_thr
         self.y_centers = y_centers
 
     def __call__(self, vars: Mapping[str, float | np.ndarray]) -> float | np.ndarray:
         ans = self.bias + sum(vars[n_key] * self.ins[n_key] for n_key in self.ins)
-        return np.where(ans >= self.x_thr, self.y_centers[1], self.y_centers[0])
+        return np.where(ans >= 0, self.y_centers[1], self.y_centers[0])
 
     def __str__(self):
         params = [f"{self.ins[key]:.3f} * {key}" for key in self.ins]
         cond = str.join("\t+ ", params)
-        cond += f"\t+ {self.bias:.3f} >= {self.x_thr:.3f}"
+        cond += f"\t+ {self.bias:.3f} >= 0"
         ans = (
             f"{self.key} := "
             + f"[ {self.y_centers[1]:.3f} ] IF [ "
@@ -46,7 +44,7 @@ class QuantizedNeuron(Node):
 
 def from_neuron(
     neuron: Neuron, data: MutableMapping[str, np.ndarray]
-) -> tuple[np.ndarray, QuantizedNeuron]:
+) -> tuple[np.ndarray, Perceptron]:
     y = neuron(data)  # calculate distribution of node output on training data
     assert isinstance(y, np.ndarray), "y is not a np array"
 
@@ -65,12 +63,12 @@ def from_neuron(
     y_thr = (max_0 + min_1) / 2
     x_thr = neuron.inv_act(y_thr)
 
-    q_neuron = QuantizedNeuron(neuron.key, neuron.ins, neuron.bias, x_thr, y_centers)
+    q_neuron = Perceptron(neuron.key, neuron.ins, neuron.bias - x_thr, y_centers)
     return (y, q_neuron)
 
 
 class QuantizedNeuronGraph(Graph):
-    def __init__(self, q_neurons: list[QuantizedNeuron]) -> None:
+    def __init__(self, q_neurons: list[Perceptron]) -> None:
         super().__init__(q_neurons)
 
     @classmethod
@@ -112,10 +110,10 @@ class QuantizedNeuronGraph(Graph):
                     out_neuron.bias += a * w  # update bias
                     out_neuron.ins[neuron.key] = w * k  # update weight
 
-                q_neuron = QuantizedNeuron(neuron.key, neuron.ins, neuron.bias - x_thr)
+                q_neuron = Perceptron(neuron.key, neuron.ins, neuron.bias - x_thr)
                 q_neuron_graph.add(q_neuron)
             else:  # output nodes
-                q_neuron = QuantizedNeuron(neuron.key, neuron.ins, neuron.bias)
+                q_neuron = Perceptron(neuron.key, neuron.ins, neuron.bias)
                 q_neuron_graph.add(q_neuron)
 
         return q_neuron_graph
@@ -125,7 +123,7 @@ class QuantizedNeuronGraph(Graph):
 
 
 class QuantizedNeuronGraph2(Graph):
-    def __init__(self, q_neurons: list[QuantizedNeuron]) -> None:
+    def __init__(self, q_neurons: list[Perceptron]) -> None:
         super().__init__(q_neurons)
 
     @classmethod

@@ -1,1 +1,1 @@
-from q_neuron import QuantizedNeuron, QuantizedNeuronGraph
+from q_neuron import Perceptron, QuantizedNeuronGraph

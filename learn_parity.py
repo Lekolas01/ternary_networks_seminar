@@ -100,4 +100,4 @@ def get_arguments() -> Namespace:
 
 if __name__ == "__main__":
     args = get_arguments()
-    main(args.k, args.new)
+    main(args.k)

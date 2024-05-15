@@ -43,6 +43,7 @@ class Graph(ABC):
         return ans
 
     def __getitem__(self, key: str) -> Node:
+
         return self.nodes[key]
 
     def ins(self) -> Dict[str, Set[str]]:

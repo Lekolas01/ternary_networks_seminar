@@ -1,14 +1,20 @@
+import os
 from argparse import ArgumentParser, Namespace
 from collections.abc import MutableMapping, Sequence
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
 import torch.nn as nn
+from matplotlib import pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from neuron import NeuronGraph
 from q_neuron import QuantizedNeuronGraph, QuantizedNeuronGraph2
 from rule_set import RuleSetGraph
+from utilities import acc
 
 
 def nn_to_rule_set(
@@ -28,13 +34,13 @@ def nn_to_rule_set(
     return (neuron_graph, q_neuron_graph, bool_graph)
 
 
-def main(model_path: str, data_path: str):
-    print(f"Loading trained model from {model_path}...")
+def inspect_model(f_model: str, f_data: str):
+    print(f"Loading trained model from {f_model}...")
     # get the last updated model
-    print(f"{model_path = }")
-    model = torch.load(model_path)
+    model = torch.load(f_model)
 
-    df = pd.read_csv(data_path, dtype=float)
+    print(f"Loading dataset from {f_data}...")
+    df = pd.read_csv(f_data, dtype=float)
     keys = list(df.columns)
     keys.pop()  # remove target column
     y = np.array(df["target"])
@@ -145,9 +151,58 @@ def main(model_path: str, data_path: str):
     pass
 
 
+def inspect_many_models(f_models: str, f_data: str):
+    df = pd.read_csv(f_data, dtype=float)
+    keys = list(df.columns)
+    keys.pop()  # remove target column
+    y = np.array(df["target"])
+    ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+    nn_data = np.stack([ng_data[key] for key in keys], axis=1)
+    nn_data = torch.Tensor(nn_data)
+    bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
+
+    files = [Path(f_models, f) for f in os.listdir(f_models) if f.endswith(".pth")]
+    accs = np.empty((len(files), 3))
+    for idx, f_model in enumerate(files):
+        model = torch.load(f_model)
+        ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+
+        nn_out = model(nn_data).detach().numpy()
+        nn_pred = np.round(nn_out)
+        nn_acc = float(1.0 - np.mean(np.abs(nn_pred - y)))
+
+        q_ng_out = q_ng(ng_data)
+        q_ng_pred = np.round(q_ng_out)
+        q_ng_acc = float(1.0 - np.mean(np.abs(q_ng_pred - y)))
+
+        bg_out = bg(bg_data)
+        bg_pred = np.where(bg_out == True, 1.0, 0.0)
+        bg_acc = float(1.0 - np.mean(np.abs(bg_out - y)))
+        accs[idx] = np.array([nn_acc, q_ng_acc, bg_acc])
+
+    acc_df = pd.DataFrame(accs, columns=["nn_acc", "q_ng_acc", "bg_acc"])
+    print(acc_df.head())
+    print(acc_df.shape)
+
+    fig = plt.figure(figsize=(6, 6))
+    # ax = Axes3D(fig)  # Method 1
+    ax = fig.add_subplot(111, projection="3d")
+    ax.scatter(
+        acc_df["nn_acc"],
+        acc_df["q_ng_acc"],
+        acc_df["bg_acc"],
+        c=acc_df["nn_acc"],
+        marker="o",
+    )
+    ax.set_xlabel("NN Accuracy")
+    ax.set_ylabel("Quantized NN Accuracy")
+    ax.set_zlabel("Rule Set Accuracy")
+    plt.show()
+
+
 def get_arguments() -> Namespace:
     parser = ArgumentParser(
-        description="Given an already trained MLP and the dataset it was trained on, extract a set of if-then rules with similar behavior as the MLP."
+        description="Given multiple trained MLPs and the dataset they were trained on, extract a set of if-then rules with similar behavior as the MLP."
     )
     parser.add_argument(
         "data_path",
@@ -163,4 +218,4 @@ def get_arguments() -> Namespace:
 
 if __name__ == "__main__":
     args = get_arguments()
-    main(args.model_path, args.data_path)
+    inspect_many_models(args.model_path, args.data_path)
