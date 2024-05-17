@@ -45,6 +45,7 @@ def train(
         losses.append(loss.item())
         loss.backward()
         optim.step()
+
         tracker.batch_end()
 
     return losses

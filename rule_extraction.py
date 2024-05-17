@@ -26,9 +26,6 @@ def nn_to_rule_set(
     # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
 
-    print(neuron_graph)
-    print(q_neuron_graph)
-
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
     return (neuron_graph, q_neuron_graph, bool_graph)
@@ -151,7 +148,7 @@ def inspect_model(f_model: str, f_data: str):
     pass
 
 
-def inspect_many_models(f_models: str, f_data: str):
+def rule_extraction_grid(f_models: str, f_data: str):
     df = pd.read_csv(f_data, dtype=float)
     keys = list(df.columns)
     keys.pop()  # remove target column
@@ -162,7 +159,8 @@ def inspect_many_models(f_models: str, f_data: str):
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     files = [Path(f_models, f) for f in os.listdir(f_models) if f.endswith(".pth")]
-    accs = np.empty((len(files), 3))
+    accs = np.empty((len(files), 4))
+    bgs = []
     for idx, f_model in enumerate(files):
         model = torch.load(f_model)
         ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
@@ -177,12 +175,18 @@ def inspect_many_models(f_models: str, f_data: str):
 
         bg_out = bg(bg_data)
         bg_pred = np.where(bg_out == True, 1.0, 0.0)
-        bg_acc = float(1.0 - np.mean(np.abs(bg_out - y)))
-        accs[idx] = np.array([nn_acc, q_ng_acc, bg_acc])
+        bg_acc = float(1.0 - np.mean(np.abs(bg_pred - y)))
+        accs[idx] = np.array([nn_acc, q_ng_acc, bg_acc, bg.complexity()])
+        bgs.append(bg)
 
-    acc_df = pd.DataFrame(accs, columns=["nn_acc", "q_ng_acc", "bg_acc"])
-    print(acc_df.head())
-    print(acc_df.shape)
+    acc_df = pd.DataFrame(
+        accs, columns=["nn_acc", "q_ng_acc", "bg_acc", "bg_complexity"]
+    )
+    return acc_df, bgs
+
+
+def inspect_many_models(f_models: str, f_data: str):
+    acc_df, _ = rule_extraction_grid(f_models, f_data)
 
     fig = plt.figure(figsize=(6, 6))
     # ax = Axes3D(fig)  # Method 1
@@ -196,7 +200,7 @@ def inspect_many_models(f_models: str, f_data: str):
     )
     ax.set_xlabel("NN Accuracy")
     ax.set_ylabel("Quantized NN Accuracy")
-    ax.set_zlabel("Rule Set Accuracy")
+    ax.set_zlabel("Rule Set Accuracy")  # type: ignore
     plt.show()
 
 
@@ -218,4 +222,31 @@ def get_arguments() -> Namespace:
 
 if __name__ == "__main__":
     args = get_arguments()
-    inspect_many_models(args.model_path, args.data_path)
+
+    acc_df, bgs = rule_extraction_grid(args.model_path, args.data_path)
+
+    # ---------- plot 3D accuracies ----------
+    fig = plt.figure(figsize=(6, 6))
+    # ax = Axes3D(fig)  # Method 1
+    ax = fig.add_subplot(111, projection="3d")
+
+    ax.scatter(
+        acc_df["nn_acc"],
+        acc_df["q_ng_acc"],
+        acc_df["bg_acc"],
+        c=acc_df["nn_acc"],
+        marker="o",
+    )
+    ax.set_xlabel("NN Accuracy")
+    ax.set_ylabel("Quantized NN Accuracy")
+    ax.set_zlabel("Rule Set Accuracy")  # type: ignore
+    plt.show()
+
+    # ---------- plot bg models with complexity ----------
+    sns.scatterplot(acc_df, x="bg_complexity", y="bg_acc")
+    plt.show()
+
+    min_idx = np.argmin(acc_df["bg_complexity"])
+    print(min_idx)
+    print(bgs[min_idx])
+    print(bgs[min_idx].complexity())

@@ -1,30 +1,48 @@
-from bool_formula import AND, OR, Constant, Example, Literal, possible_data
-from neuron import *
+"""
+===================================================================
+Decision Tree Regression
+===================================================================
 
-q_ng = QuantizedNeuronGraph(
-    [
-        QuantizedNeuron(
-            "target",
-            {
-                "x1": 5.0,
-                "x2": 5.0,
-                "x3": 1.0,
-                "x4": 1.0,
-                "x5": 1.0,
-                "x6": 1.0,
-                "x7": 1.0,
-            },
-            -9.5,
-        )
-    ]
-)
+A 1D regression with decision tree.
 
+The :ref:`decision trees <tree>` is
+used to fit a sine curve with addition noisy observation. As a result, it
+learns local linear regressions approximating the sine curve.
 
-bg = RuleSetGraph.from_q_neuron_graph(q_ng, simplify=False)
-print(bg)
-simple_bg = RuleSetGraph.from_q_neuron_graph(q_ng, simplify=True)
-print(simple_bg)
-data = possible_data([f"x{i + 1}" for i in range(7)], is_float=False)
-assert all(
-    bg(data) == simple_bg(data)
-), "Simplification changed something abt. the behavior of the function."
+We can see that if the maximum depth of the tree (controlled by the
+`max_depth` parameter) is set too high, the decision trees learn too fine
+details of the training data and learn from the noise, i.e. they overfit.
+"""
+
+# Import the necessary modules and libraries
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.tree import DecisionTreeRegressor
+
+# Create a random dataset
+rng = np.random.RandomState(1)
+X = np.sort(5 * rng.rand(80, 1), axis=0)
+y = np.sin(X).ravel()
+y[::5] += 3 * (0.5 - rng.rand(16))
+
+# Fit regression model
+regr_1 = DecisionTreeRegressor(max_depth=2)
+regr_2 = DecisionTreeRegressor(max_depth=5)
+regr_1.fit(X, y)
+regr_2.fit(X, y)
+
+# Predict
+X_test = np.arange(0.0, 5.0, 0.01)[:, np.newaxis]
+y_1 = regr_1.predict(X_test)
+y_2 = regr_2.predict(X_test)
+
+# Plot the results
+plt.figure()
+plt.scatter(X, y, s=20, edgecolor="black", c="darkorange", label="data")
+plt.plot(X_test, y_1, color="cornflowerblue", label="max_depth=2", linewidth=2)
+plt.plot(X_test, y_2, color="yellowgreen", label="max_depth=5", linewidth=2)
+plt.xlabel("data")
+plt.ylabel("target")
+plt.title("Decision Tree Regression")
+plt.legend()
+plt.show()

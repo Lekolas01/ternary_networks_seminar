@@ -76,9 +76,6 @@ class LogMetrics(Logger):
         end = "\r" if self.t.epoch < self.t.epochs else "\n"
         print(bar, end=end)
 
-    def training_start(self):
-        print(f"{datetime.now().time().replace(microsecond=0)} ---- Run start")
-
 
 class Plotter(Logger):
     "Dynamically updates a loss plot after every epoch."

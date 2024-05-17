@@ -11,6 +11,8 @@ import torch
 from genericpath import isfile
 
 from bool_formula import Activation
+from bool_parse import ExpressionEvaluator
+from gen_data import gen_data
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
 from rule_extraction import nn_to_rule_set
@@ -43,22 +45,24 @@ def main(k: int):
     df.to_csv(f_data, index=False)
 
     # Do a single NN training run on this dataset
-    epochs = 1500
-    l1 = 0.0
+    epochs = 100
     bs = 32
     wd = 0.0
 
     lrs = [3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
+    l1s = [0.0, 1e-5, 1e-4]
     n_layers = [1, 2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
-    for idx, (lr, n_layer) in enumerate(itertools.product(lrs, n_layers)):
-        model_name = f"runs/parity{k}/models/{idx}.pth"
+    for idx, (lr, n_layer, l1) in enumerate(itertools.product(lrs, n_layers, l1s)):
+        print(f"{epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
+        model_name = f"{f_models}/{idx}.pth"
         spec: NNSpec = [(k, k, Activation.TANH) for _ in range(n_layer)]
         spec.append(((k, 1, Activation.SIGMOID)))
 
         model = ModelFactory.get_model_by_spec(spec)
+
         metrics, dl = train_mlp(df, model, seed, bs, lr, epochs, l1, wd)
 
         # add run to runs file
@@ -79,7 +83,6 @@ def main(k: int):
         y = np.array(df["target"])
         ng_data = {key: np.array(df[key], dtype=float) for key in keys}
         ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
-        print(f"{bg.complexity() = }")
 
     # TODO für morgen:
     #   Regeln lernen und miteinander vergleichen können
@@ -100,4 +103,4 @@ def get_arguments() -> Namespace:
 
 if __name__ == "__main__":
     args = get_arguments()
-    main(args.k)
+    main(int(args.k))

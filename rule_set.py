@@ -292,7 +292,6 @@ class RuleSetNeuron(Node):
             dp.insert(k, ans)
             return ans
 
-        print(f"{self.q_neuron.y_centers = }")
         self.bias = self.q_neuron.bias
 
         # adjust the weights given the y_centers of the previous layer
@@ -302,7 +301,6 @@ class RuleSetNeuron(Node):
             w = ins[key]
             if key in self.q_ng.in_keys:
                 continue
-            print(f"adjust {self.key}")
             in_node = self.q_ng[key]
             assert isinstance(in_node, Perceptron)
             y_centers = in_node.y_centers

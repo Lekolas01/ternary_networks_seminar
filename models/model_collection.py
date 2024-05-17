@@ -8,7 +8,7 @@ NNSpec = list[tuple[int, int, Activation]]
 class ModelFactory:
     specifications: dict[str, NNSpec] = {
         "lin_db": [(1, 1, Activation.SIGMOID)],
-        "abcdefg": [(7, 3, Activation.TANH), (3, 1, Activation.SIGMOID)],
+        "abcdefg": [(7, 7, Activation.TANH), (7, 1, Activation.SIGMOID)],
         "abcdefg_2_dead": [(9, 3, Activation.TANH), (3, 1, Activation.SIGMOID)],
         "abcdefg_small": [(7, 2, Activation.TANH), (2, 1, Activation.SIGMOID)],
         "parity2": [(2, 2, Activation.SIGMOID), (2, 1, Activation.SIGMOID)],
