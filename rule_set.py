@@ -91,6 +91,7 @@ class IfThenRule(Node):
         for name, val in self.ins:
             temp = vars[name] if val else ~vars[name]
             ans = ans & temp
+
         return ans
 
     def simplify(self, knowledge: Knowledge) -> bool:
@@ -162,10 +163,7 @@ class Subproblem:
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         if self.is_const:
             return np.array(self.val)
-        try:
-            temp = [rule(vars) for rule in self.rules]
-        except:
-            print("This should NEVER happen!")
+        temp = [rule(vars) for rule in self.rules]
         return functools.reduce(lambda x, y: x | y, temp)
 
     def simplify(self, knowledge: Knowledge) -> bool:
@@ -364,6 +362,10 @@ class RuleSetNeuron(Node):
                     )
                 else:
                     target_1 = dp.find(k + 1, node.mean)
+                    if target_1 is None:
+                        print(f"{dp = }")
+                        print(f"{k + 1 = }")
+                        print(f"{node.mean = }")
                     assert target_1 is not None
 
                     target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1])

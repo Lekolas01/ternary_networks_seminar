@@ -87,7 +87,7 @@ def training_loop(
 ) -> pd.DataFrame:
     tracker.training_start(model, train_loader, valid_loader, criterion)
     # Train model
-    for epoch in range(epochs):
+    while not tracker.stop_condition():
         tracker.epoch_start()
         # training
         train_loss = train(
@@ -102,5 +102,4 @@ def training_loop(
             scheduler.step()
 
         tracker.epoch_end(train_loss, valid_loss)
-
     return tracker.training_end()

@@ -5,14 +5,21 @@ from sklearn.datasets import load_iris
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, plot_tree
+from torch.utils.data import DataLoader
+from ucimlrepo import fetch_ucirepo
 
-# Load the Iris dataset
-iris = load_iris()
-X = iris.data
-y = iris.target
+from datasets import FileDataset
 
+# fetch dataset
+car_evaluation = fetch_ucirepo(id=19)
 
-X_train, X_test, y_train, y_test = train_test_split(
+# data (as pandas dataframes)
+X = car_evaluation.data.features
+y = car_evaluation.data.targets
+
+# dl = DataLoader(FileDataset(data), batch_size=batch_size, shuffle=True)
+
+cX_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
@@ -35,7 +42,7 @@ plot_tree(
     label="all",
     rounded=True,
     impurity=False,
-    feature_names=iris.feature_names,
-    class_names=iris.target_names,
+    feature_names=car_evaluation.feature_names,
+    class_names=car_evaluation.target_names,
 )
 plt.show()

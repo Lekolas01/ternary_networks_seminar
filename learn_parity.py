@@ -5,8 +5,10 @@ import shutil
 import sys
 from argparse import ArgumentParser, Namespace
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch
 from genericpath import isfile
 
@@ -27,7 +29,7 @@ from utilities import acc, set_seed
 
 
 def main(k: int):
-    seed = 0
+    seed = 1
     set_seed(seed)
     # Generate dataframe for parity
     f_root = f"runs/parity{k}"
@@ -35,57 +37,72 @@ def main(k: int):
     f_models = f"{f_root}/models"
     f_runs = f"{f_root}/runs.csv"
     f_losses = f"{f_root}/losses.csv"
-    if os.path.exists(f_root):
-        shutil.rmtree(f"{f_root}")
 
     os.makedirs(f_models, exist_ok=True)
-    df = parity_df(k=k, shuffle=True, n=1000)
-
+    df = parity_df(k=k, shuffle=False, n=1024)
     # write dataset to data.csv
     df.to_csv(f_data, index=False)
+    df = pd.read_csv(f_data)
+    print(f"Generated dataset with shape {df.shape}")
 
     # Do a single NN training run on this dataset
-    epochs = 100
-    bs = 32
+    max_epochs = 6000
+    bs = 64
     wd = 0.0
 
-    lrs = [3e-4, 1e-3, 3e-3, 1e-2, 3e-2]
+    lrs = [1e-3, 3e-3, 1e-2, 3e-2]
     l1s = [0.0, 1e-5, 1e-4]
     n_layers = [1, 2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
-    for idx, (lr, n_layer, l1) in enumerate(itertools.product(lrs, n_layers, l1s)):
-        print(f"{epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
-        model_name = f"{f_models}/{idx}.pth"
+    n_runs = len(l1s) * len(lrs) * len(n_layers)
+    for idx, (l1, lr, n_layer) in enumerate(itertools.product(l1s, lrs, n_layers)):
+        print(f"{max_epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
+        model_path = f"{f_models}/{idx}.pth"
+        if os.path.isfile(model_path):
+            print("Model already trained. Skipping this training session...")
+            continue
         spec: NNSpec = [(k, k, Activation.TANH) for _ in range(n_layer)]
         spec.append(((k, 1, Activation.SIGMOID)))
 
         model = ModelFactory.get_model_by_spec(spec)
 
-        metrics, dl = train_mlp(df, model, seed, bs, lr, epochs, l1, wd)
+        metrics, dl = train_mlp(df, model, seed, bs, lr, max_epochs, l1, wd)
 
         # add run to runs file
-        cols = [idx, lr, n_layer, seed, epochs, bs, l1, wd]
+        cols = [idx, lr, n_layer, seed, max_epochs, bs, l1, wd]
         runs.loc[idx] = [str(val) for val in cols]
         runs.to_csv(f_runs, mode="w", header=True, index=False)
+        n_epochs = len(metrics["train_loss"])
 
         # save trained model
-        torch.save(model, model_name)
+        torch.save(model, model_path)
 
         # append losses to losses.csv
         metrics.insert(loc=0, column="idx", value=idx)
-        metrics.insert(loc=1, column="epoch", value=[i + 1 for i in range(epochs)])
+        metrics.insert(loc=1, column="epoch", value=[i + 1 for i in range(n_epochs)])
         metrics.to_csv(f_losses, mode="a", index=False, header=(idx == 0))
 
+    complexities = []
+    accs = []
+    for idx in range(n_runs):
+        model_path = f"{f_models}/{idx}.pth"
+        model = torch.load(model_path)
         keys = list(df.columns)
         keys.pop()
         y = np.array(df["target"])
         ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+        _, _, bg = nn_to_rule_set(model, ng_data, keys)
+        bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
+        pred = bg(bg_data)
+        complexities.append(bg.complexity())
+        accs.append(1 - sum(abs(pred - y)) / len(pred))
 
     # TODO für morgen:
     #   Regeln lernen und miteinander vergleichen können
+    sns.scatterplot(x=complexities, y=accs)
+    plt.show()
 
 
 def get_arguments() -> Namespace:

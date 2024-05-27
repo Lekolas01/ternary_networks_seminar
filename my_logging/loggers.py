@@ -73,8 +73,12 @@ class LogMetrics(Logger):
         bar = utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
         for metric in self.metrics:
             bar += f"{m_format[metric]}\t"
-        end = "\r" if self.t.epoch < self.t.epochs else "\n"
+        end = "\n" if self.t.stop_condition() else "\r"
         print(bar, end=end)
+        if self.t.stop_condition():
+            print(
+                "Early stopping condition reached. Continue training with next run..."
+            )
 
 
 class Plotter(Logger):
@@ -165,6 +169,7 @@ class Tracker:
 
         self.device = next(self.model.parameters()).device
         self.epoch = 0
+        self.stop_training = False
         self.mean_train_loss, self.mean_valid_loss = [], []
         self.train_acc, self.valid_acc = [], []
 
@@ -208,6 +213,20 @@ class Tracker:
         self.epoch += 1
         self._compute_metrics(train_losses, valid_losses)
 
+        # update stopping criteria
+        # if we reach the final epoch
+        if self.epoch == self.epochs:
+            self.stop_training = True
+        # stop early if validation error hasn't decreased for a decent amount of time
+        valid_stop_delay = 300
+        eps = 1e-3
+        if (
+            len(self.mean_train_loss) >= valid_stop_delay
+            and self.mean_valid_loss[-valid_stop_delay]
+            <= mean(self.mean_valid_loss[-valid_stop_delay:-1]) + eps
+        ):
+            self.stop_training = True
+
         for logger in self.loggers:
             if self.epoch % logger.log_every == 0:
                 # pass on the calculated metrics to all subclasses, so they can print it or whatever they want to do with it.
@@ -224,6 +243,9 @@ class Tracker:
         ans["train_acc"] = self.train_acc
         ans["valid_acc"] = self.valid_acc
         return ans
+
+    def stop_condition(self) -> bool:
+        return self.stop_training
 
 
 class SaveModel(Logger):

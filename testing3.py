@@ -84,3 +84,10 @@ clf = DecisionTreeClassifier().fit(iris.data, iris.target)
 plot_tree(clf, filled=True)
 plt.title("Decision tree trained on all the iris features")
 plt.show()
+
+# %%
+a = [1, 2, 3, 4, 5, 6, 7]
+l = len(a)
+a[-len(a)]
+
+# %%

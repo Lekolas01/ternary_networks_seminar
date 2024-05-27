@@ -43,6 +43,8 @@ def main(file_path: Path, k: int, shuffle: bool, n=0) -> pd.DataFrame:
         val = input()
 
     if not os.path.isfile(file_path) or val in ["y", "Y"]:
+        print(file_path)
+        print(file_path.parent)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         df.to_csv(file_path, index=False)
         print(f"Saved parity dataset to {file_path}.")
@@ -51,7 +53,7 @@ def main(file_path: Path, k: int, shuffle: bool, n=0) -> pd.DataFrame:
     return df
 
 
-def parity_df(k, shuffle, n):
+def parity_df(k, shuffle, n=0):
     keys = [f"x{i + 1}" for i in range(k)]
     parity = PARITY(keys)
     df = gen_data(parity, col_order=keys, shuffle=shuffle, n=n)
@@ -60,4 +62,4 @@ def parity_df(k, shuffle, n):
 
 if __name__ == "__main__":
     args = get_arguments()
-    main(args.path, args.k, args.shuffle, args.n)
+    main(Path(args.path), args.k, args.shuffle, args.n)
