@@ -87,7 +87,6 @@ def train_mlp(
         eps=1e-08,
         weight_decay=wd,
     )
-    n_logs = 10
     tracker = Tracker(epochs=epochs)
     tracker.add_logger(
         LogMetrics(

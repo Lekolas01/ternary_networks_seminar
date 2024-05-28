@@ -51,7 +51,7 @@ def main(k: int):
     wd = 0.0
 
     lrs = [1e-3, 3e-3, 1e-2, 3e-2]
-    l1s = [0.0, 1e-5, 1e-4]
+    l1s = [1e-5, 1e-4]
     n_layers = [1, 2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
@@ -75,6 +75,7 @@ def main(k: int):
         runs.loc[idx] = [str(val) for val in cols]
         runs.to_csv(f_runs, mode="w", header=True, index=False)
         n_epochs = len(metrics["train_loss"])
+        # quantized layers: function R^k -> R^k
 
         # save trained model
         torch.save(model, model_path)
@@ -86,6 +87,7 @@ def main(k: int):
 
     complexities = []
     accs = []
+    df_runs = pd.read_csv(f_runs)
     for idx in range(n_runs):
         model_path = f"{f_models}/{idx}.pth"
         model = torch.load(model_path)
@@ -97,12 +99,27 @@ def main(k: int):
         bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
         pred = bg(bg_data)
         complexities.append(bg.complexity())
-        accs.append(1 - sum(abs(pred - y)) / len(pred))
+        acc = 1 - sum(abs(pred - y)) / len(pred)
+        accs.append(acc)
+        print(
+            f"compl = {bg.complexity()}\tl1 = {df_runs['l1'].iloc[idx]}\tacc = {acc}\tlr = {df_runs['lr'].iloc[idx]}"
+        )
 
     # TODO für morgen:
     #   Regeln lernen und miteinander vergleichen können
     sns.scatterplot(x=complexities, y=accs)
     plt.show()
+
+    df_metrics = pd.read_csv(f_losses)
+    for i in range(n_runs):
+        run_info = df_runs.iloc[i]
+        temp = df_metrics[df_metrics["idx"] == i]
+        title = f"l1: {run_info['l1']}   |   layers: {run_info['n_layer']}   |   lr: {run_info['lr']}"
+        sns.lineplot(x=[i + 1 for i in range(temp.shape[0])], y=temp["train_loss"])
+        plt.title(title)
+        plt.show()
+
+    # find "best" models in terms of complexity and validation accuracy
 
 
 def get_arguments() -> Namespace:

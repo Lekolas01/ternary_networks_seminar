@@ -19,6 +19,8 @@ We also show the tree structure of a model built on all of the features.
 # First load the copy of the Iris dataset shipped with scikit-learn:
 from sklearn.datasets import load_iris
 
+from models.model_collection import ModelFactory
+
 iris = load_iris()
 
 
@@ -88,6 +90,7 @@ plt.show()
 # %%
 a = [1, 2, 3, 4, 5, 6, 7]
 l = len(a)
-a[-len(a)]
+a[-len(a)] <= a[-1]
 
 # %%
+a = ModelFactory.get_model_by_spec()
