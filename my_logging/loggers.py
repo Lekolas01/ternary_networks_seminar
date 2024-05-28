@@ -219,7 +219,7 @@ class Tracker:
             self.stop_training = True
         # stop early if validation error hasn't decreased for a decent amount of time
         valid_stop_delay = 300
-        eps = 1e-3
+        eps = 3e-4
         if (
             len(self.mean_train_loss) >= valid_stop_delay
             and self.mean_valid_loss[-valid_stop_delay]

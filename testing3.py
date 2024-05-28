@@ -15,6 +15,8 @@ the training samples.
 We also show the tree structure of a model built on all of the features.
 """
 
+import torch
+
 # %%
 # First load the copy of the Iris dataset shipped with scikit-learn:
 from sklearn.datasets import load_iris
@@ -93,4 +95,21 @@ l = len(a)
 a[-len(a)] <= a[-1]
 
 # %%
-a = ModelFactory.get_model_by_spec()
+import torch
+
+a = torch.normal(0, 1, size=(5, 2))
+w = torch.rand((2, 1))
+temp = a @ w
+print(temp)
+temp = torch.normal(0, 1, size=(1024, 8))
+y_low = -abs(torch.rand(8))
+y_high = abs(torch.rand(8))
+torch.where(temp >= 0, y_high, y_low).shape
+
+
+# %%
+import torch.nn as nn
+
+a = nn.Sequential(nn.Linear(8, 4), nn.Tanh(), nn.Linear(4, 3), nn.Sigmoid())
+type(a[0])
+# %%

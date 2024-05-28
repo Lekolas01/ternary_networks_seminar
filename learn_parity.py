@@ -1,8 +1,5 @@
-import contextlib
 import itertools
 import os
-import shutil
-import sys
 from argparse import ArgumentParser, Namespace
 
 import matplotlib.pyplot as plt
@@ -10,16 +7,17 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-from genericpath import isfile
+import torch.nn as nn
+from ckmeans_1d_dp import ckmeans
+from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import Activation
-from bool_parse import ExpressionEvaluator
-from gen_data import gen_data
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
 from rule_extraction import nn_to_rule_set
+from rule_set import PercGraph, QuantizedLayer
 from train_mlp import train_mlp
-from utilities import acc, set_seed
+from utilities import set_seed
 
 # Grid Search over NN training hyperparameters
 #   call train_mlp.py
@@ -28,11 +26,39 @@ from utilities import acc, set_seed
 # create graph for rule sets: dimensions are complexity and accuracy
 
 
+def quantize_last_layer(model: nn.Sequential, dl: DataLoader) -> QuantizedLayer:
+    # compute up to the first layer in model.
+    # save a distribution of it's output for each output node
+    # quantize each
+    layer1: nn.Linear = model[0]  # type: ignore
+    w = layer1.weight.detach().numpy()
+    plt.imshow(w, cmap="bwr", interpolation="nearest")
+    plt.draw()
+    layer1_act: nn.Module = model[1]
+    assert isinstance(layer1, nn.Linear)
+    assert isinstance(layer1_act, nn.Tanh)
+    X, dl_y = next(iter(dl))
+    y: torch.Tensor = layer1_act(layer1(X))
+    y_arr = y.detach().numpy()
+    ck_ans = ckmeans(y_arr[:, 0], (2))
+    cluster = ck_ans.cluster
+    ck_ans = [ckmeans(y_arr[:, i], (2)) for i in range(layer1.out_features)]
+    cluster = [ans.cluster for ans in ck_ans]
+    # max_0 = [np.max(y[cluster == 0]) ]
+    max_0 = np.max(y[cluster == 0])
+    min_1 = np.min(y[cluster == 1])
+    y_thr = (max_0 + min_1) / 2
+    x_thr = np.arctanh(y_thr)
+    plt.show()
+
+    return QuantizedLayer(layer1.weight, None, None, None)
+
+
 def main(k: int):
     seed = 1
     set_seed(seed)
     # Generate dataframe for parity
-    f_root = f"runs/parity{k}"
+    f_root = f"runs/parity_other{k}"
     f_data = f"{f_root}/data.csv"
     f_models = f"{f_root}/models"
     f_runs = f"{f_root}/runs.csv"
@@ -67,8 +93,15 @@ def main(k: int):
         spec.append(((k, 1, Activation.SIGMOID)))
 
         model = ModelFactory.get_model_by_spec(spec)
+        p_graph = PercGraph()
 
-        metrics, dl = train_mlp(df, model, seed, bs, lr, max_epochs, l1, wd)
+        metrics, dl, full_dl = train_mlp(
+            df, p_graph, model, seed, bs, lr, max_epochs, l1, wd
+        )
+        # save trained model
+        torch.save(model, model_path)
+        q_layer = quantize_last_layer(model, full_dl)
+        p_graph.add_layer(q_layer)
 
         # add run to runs file
         cols = [idx, lr, n_layer, seed, max_epochs, bs, l1, wd]
@@ -77,13 +110,11 @@ def main(k: int):
         n_epochs = len(metrics["train_loss"])
         # quantized layers: function R^k -> R^k
 
-        # save trained model
-        torch.save(model, model_path)
-
         # append losses to losses.csv
         metrics.insert(loc=0, column="idx", value=idx)
         metrics.insert(loc=1, column="epoch", value=[i + 1 for i in range(n_epochs)])
         metrics.to_csv(f_losses, mode="a", index=False, header=(idx == 0))
+        exit()
 
     complexities = []
     accs = []
@@ -128,9 +159,8 @@ def get_arguments() -> Namespace:
     )
     parser.add_argument("k", help="Arity")
     parser.add_argument(
-        "--new",
-        action="store_true",
-        help="If specified, the model will be retrained.",
+        "--root",
+        help="Root folder for all the run info.",
     )
     return parser.parse_args()
 

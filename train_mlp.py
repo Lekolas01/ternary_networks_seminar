@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 
 from datasets import FileDataset
 from my_logging.loggers import LogMetrics, SaveModel, Tracker
+from rule_set import PercGraph
 from train_model import training_loop
 from utilities import set_seed
 
@@ -67,6 +68,7 @@ def main():
 
 def train_mlp(
     data: pd.DataFrame,
+    p_graph: PercGraph,
     model: nn.Sequential,
     seed: int,
     batch_size: int,
@@ -79,6 +81,7 @@ def train_mlp(
 
     train_dl = DataLoader(FileDataset(data), batch_size=batch_size, shuffle=True)
     valid_dl = DataLoader(FileDataset(data), batch_size=batch_size, shuffle=True)
+    full_dl = DataLoader(FileDataset(data), batch_size=data.shape[0], shuffle=True)
     loss_fn = nn.BCELoss()
     optim = torch.optim.Adam(
         model.parameters(),
@@ -107,6 +110,7 @@ def train_mlp(
             device="cpu",
         ),
         train_dl,
+        full_dl,
     )
 
 

@@ -6,13 +6,41 @@ from graphlib import TopologicalSorter
 from typing import Tuple
 
 import numpy as np
+import torch
+import torch.nn as nn
 from torch import isin
+from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
 from q_neuron import Perceptron, QuantizedNeuronGraph, QuantizedNeuronGraph2
 from utilities import flatten
+
+
+class QuantizedLayer(nn.Module):
+    def __init__(self, weight: torch.Tensor, bias: torch.Tensor, y_low: float, y_high: float):
+        self.weight = weight
+        self.bias = bias
+        self.y_low = y_low
+        self.y_high = y_high
+
+    def forward(self, x: torch.Tensor):
+        ans = x @ self.weight + self.bias
+        return torch.where(ans >= 0, self.y_high, self.y_low)
+
+
+class PercGraph(nn.Module):
+    def __init__(self):
+        self.layers: list[QuantizedLayer] = []
+
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+    def add_layer(self, layer: QuantizedLayer):
+        self.layers.append(layer)
 
 
 class DpNode:
