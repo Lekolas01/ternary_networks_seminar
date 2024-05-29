@@ -19,28 +19,26 @@ from utilities import flatten
 
 
 class QuantizedLayer(nn.Module):
-    def __init__(self, weight: torch.Tensor, bias: torch.Tensor, y_low: float, y_high: float):
-        self.weight = weight
-        self.bias = bias
+    def __init__(
+        self,
+        lin: nn.Linear,
+        y_low: torch.Tensor,
+        y_high: torch.Tensor,
+    ):
+        super(QuantizedLayer, self).__init__()
+        self.lin = lin
         self.y_low = y_low
         self.y_high = y_high
 
     def forward(self, x: torch.Tensor):
-        ans = x @ self.weight + self.bias
+        ans = self.lin(x)
         return torch.where(ans >= 0, self.y_high, self.y_low)
 
+    def __str__(self):
+        return f"QuantizedLayer(in_features={self.lin.in_features}, out_features={self.lin.out_features})"
 
-class PercGraph(nn.Module):
-    def __init__(self):
-        self.layers: list[QuantizedLayer] = []
-
-    def forward(self, x):
-        for layer in self.layers:
-            x = layer(x)
-        return x
-
-    def add_layer(self, layer: QuantizedLayer):
-        self.layers.append(layer)
+    def __repr__(self):
+        return str(self)
 
 
 class DpNode:

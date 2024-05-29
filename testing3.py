@@ -22,6 +22,7 @@ import torch
 from sklearn.datasets import load_iris
 
 from models.model_collection import ModelFactory
+from rule_set import QuantizedLayer
 
 iris = load_iris()
 
@@ -112,4 +113,36 @@ import torch.nn as nn
 
 a = nn.Sequential(nn.Linear(8, 4), nn.Tanh(), nn.Linear(4, 3), nn.Sigmoid())
 type(a[0])
+# %%
+from rule_set import QuantizedLayer
+import torch
+
+ql = QuantizedLayer(
+    torch.tensor([[1.0, 2], [4, 6], [-2.5, 1.2]]),
+    torch.tensor([-2.0, -1.0]),
+    torch.tensor([-0.64, -0.91]),
+    torch.tensor([0.96, 0.44]),
+)
+x = torch.rand((5, 3))
+print(f"{ql.weight = }")
+print(f"{ql.bias = }")
+print(f"{x = }")
+print(f"{ql(x) = }")
+
+# %%
+import torch.nn as nn
+
+a = nn.Sequential()
+x = torch.rand((5, 3))
+print(x)
+print(a(x))
+
+# %%
+a = nn.Linear(in_features=5, out_features=8)
+print(a.weight.requires_grad_(False))
+print(a.bias.requires_grad_(False))
+print(a.weight.shape)
+a.bias += 1
+print(a.bias)
+
 # %%

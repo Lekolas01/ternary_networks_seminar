@@ -53,7 +53,10 @@ def train(
 
 @torch.no_grad()
 def validate(
-    dl: DataLoader, model: Module, loss_fn: Module, device: Device
+    dl: DataLoader,
+    model: Module,
+    loss_fn: Module,
+    device: Device,
 ) -> list[float]:
     """
     Function for the validation step of the training loop

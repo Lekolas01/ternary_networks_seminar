@@ -12,10 +12,11 @@ from ckmeans_1d_dp import ckmeans
 from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import Activation
+from datasets import FileDataset
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
 from rule_extraction import nn_to_rule_set
-from rule_set import PercGraph, QuantizedLayer
+from rule_set import QuantizedLayer
 from train_mlp import train_mlp
 from utilities import set_seed
 
@@ -26,39 +27,68 @@ from utilities import set_seed
 # create graph for rule sets: dimensions are complexity and accuracy
 
 
-def quantize_last_layer(model: nn.Sequential, dl: DataLoader) -> QuantizedLayer:
-    # compute up to the first layer in model.
-    # save a distribution of it's output for each output node
-    # quantize each
-    layer1: nn.Linear = model[0]  # type: ignore
-    w = layer1.weight.detach().numpy()
-    plt.imshow(w, cmap="bwr", interpolation="nearest")
-    plt.draw()
-    layer1_act: nn.Module = model[1]
-    assert isinstance(layer1, nn.Linear)
-    assert isinstance(layer1_act, nn.Tanh)
-    X, dl_y = next(iter(dl))
-    y: torch.Tensor = layer1_act(layer1(X))
-    y_arr = y.detach().numpy()
-    ck_ans = ckmeans(y_arr[:, 0], (2))
-    cluster = ck_ans.cluster
-    ck_ans = [ckmeans(y_arr[:, i], (2)) for i in range(layer1.out_features)]
-    cluster = [ans.cluster for ans in ck_ans]
-    # max_0 = [np.max(y[cluster == 0]) ]
-    max_0 = np.max(y[cluster == 0])
-    min_1 = np.min(y[cluster == 1])
-    y_thr = (max_0 + min_1) / 2
-    x_thr = np.arctanh(y_thr)
-    plt.show()
+def quantize_first_lin_layer(
+    model: nn.Sequential, full_dl: DataLoader
+) -> nn.Sequential:
+    lin_layer_indices = [
+        i for i in range(len(model)) if isinstance(model[i], nn.Linear)
+    ]
+    lin_layer_idx = lin_layer_indices[0]
+    assert lin_layer_idx >= 0
+    layer: nn.Linear = model[lin_layer_idx]  # type: ignore
+    act = model[lin_layer_idx + 1]
+    q_layer = quantize_layer(layer, act, len(lin_layer_indices) == 1, full_dl)
+    model = nn.Sequential(
+        *[model[i] for i in range(lin_layer_idx)],
+        q_layer,
+        *[model[i] for i in range(2 + lin_layer_idx, len(model))],
+    )
+    return model
 
-    return QuantizedLayer(layer1.weight, None, None, None)
+
+def quantize_layer(
+    lin_layer: nn.Linear, act: nn.Module, is_last: bool, dl: DataLoader
+) -> QuantizedLayer:
+    assert isinstance(lin_layer, nn.Linear)
+    lin_layer.requires_grad_(False)
+
+    if is_last:
+        assert isinstance(act, nn.Sigmoid)
+        return QuantizedLayer(lin_layer, torch.tensor(0.0), torch.tensor(1.0))
+
+    X, y = next(iter(dl))
+    y_hat: torch.Tensor = act(lin_layer(X)).detach().numpy()
+    b = torch.Tensor(lin_layer.out_features)
+    y_low = torch.Tensor(lin_layer.out_features)
+    y_high = torch.Tensor(lin_layer.out_features)
+    assert isinstance(act, nn.Tanh)
+    for i in range(lin_layer.out_features):
+        ck_ans = ckmeans(y_hat[:, i], (2))
+        cluster = ck_ans.cluster
+        max_0 = np.max(y_hat[:, i][cluster == 0])
+        min_1 = np.min(y_hat[:, i][cluster == 1])
+        y_thr = (max_0 + min_1) / 2
+        x_thr = np.arctanh(y_thr)
+        b[i] = lin_layer.bias[i] - x_thr
+        y_low[i] = ck_ans.centers[0]
+        y_high[i] = ck_ans.centers[1]
+    with torch.no_grad():
+        lin_layer.bias -= b  # type: ignore
+    return QuantizedLayer(lin_layer, y_low, y_high)
+
+
+def first_linear_layer(model: nn.Sequential) -> int:
+    for idx, layer in enumerate(model):
+        if isinstance(layer, nn.Linear):
+            return idx
+    return -1
 
 
 def main(k: int):
     seed = 1
     set_seed(seed)
     # Generate dataframe for parity
-    f_root = f"runs/parity_other{k}"
+    f_root = f"runs/parity{k}"
     f_data = f"{f_root}/data.csv"
     f_models = f"{f_root}/models"
     f_runs = f"{f_root}/runs.csv"
@@ -72,13 +102,13 @@ def main(k: int):
     print(f"Generated dataset with shape {df.shape}")
 
     # Do a single NN training run on this dataset
-    max_epochs = 6000
+    max_epochs = 100
     bs = 64
     wd = 0.0
 
     lrs = [1e-3, 3e-3, 1e-2, 3e-2]
     l1s = [1e-5, 1e-4]
-    n_layers = [1, 2, 3]
+    n_layers = [2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
@@ -87,33 +117,48 @@ def main(k: int):
         print(f"{max_epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
         model_path = f"{f_models}/{idx}.pth"
         if os.path.isfile(model_path):
+            model = torch.load(model_path)
             print("Model already trained. Skipping this training session...")
             continue
-        spec: NNSpec = [(k, k, Activation.TANH) for _ in range(n_layer)]
+        spec: NNSpec = [(k, k, Activation.TANH) for i in range(n_layer)]
         spec.append(((k, 1, Activation.SIGMOID)))
 
         model = ModelFactory.get_model_by_spec(spec)
-        p_graph = PercGraph()
 
-        metrics, dl, full_dl = train_mlp(
-            df, p_graph, model, seed, bs, lr, max_epochs, l1, wd
-        )
-        # save trained model
-        torch.save(model, model_path)
-        q_layer = quantize_last_layer(model, full_dl)
-        p_graph.add_layer(q_layer)
+        all_metrics = []
+        for i in range(n_layer):  # for each layer from left to right:
+            # train a neural net
+            metrics, dl, full_dl = train_mlp(
+                df, model, seed, bs, lr, max_epochs, l1, wd
+            )
+            print(model)
+            model = quantize_first_lin_layer(model, full_dl)
+            print(model)
+            all_metrics.append(metrics)
 
-        # add run to runs file
-        cols = [idx, lr, n_layer, seed, max_epochs, bs, l1, wd]
-        runs.loc[idx] = [str(val) for val in cols]
-        runs.to_csv(f_runs, mode="w", header=True, index=False)
-        n_epochs = len(metrics["train_loss"])
-        # quantized layers: function R^k -> R^k
+        # quantize the last layer
+        model = quantize_first_lin_layer(model, full_dl)
+
+        # merge metrics together
+        metrics = pd.concat(all_metrics)
 
         # append losses to losses.csv
         metrics.insert(loc=0, column="idx", value=idx)
-        metrics.insert(loc=1, column="epoch", value=[i + 1 for i in range(n_epochs)])
+        metrics.insert(
+            loc=1,
+            column="epoch",
+            value=[i + 1 for i in range(len(metrics["train_loss"]))],
+        )
         metrics.to_csv(f_losses, mode="a", index=False, header=(idx == 0))
+        cols = [idx, lr, n_layer, seed, max_epochs, bs, l1, wd]
+        runs.loc[idx] = [str(val) for val in cols]
+
+        # append run config to run file
+        runs.to_csv(f_runs, mode="a", header=(idx == 0), index=False)
+
+        print(f"{model = }")
+        # save quantized model
+        torch.save(model, model_path)
         exit()
 
     complexities = []

@@ -6,8 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from datasets import FileDataset
-from my_logging.loggers import LogMetrics, SaveModel, Tracker
-from rule_set import PercGraph
+from my_logging.loggers import LogMetrics, Tracker
 from train_model import training_loop
 from utilities import set_seed
 
@@ -68,7 +67,6 @@ def main():
 
 def train_mlp(
     data: pd.DataFrame,
-    p_graph: PercGraph,
     model: nn.Sequential,
     seed: int,
     batch_size: int,
