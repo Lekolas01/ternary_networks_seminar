@@ -1,3 +1,4 @@
+import copy
 import itertools
 import os
 from argparse import ArgumentParser, Namespace
@@ -28,17 +29,15 @@ from utilities import accuracy, set_seed
 # create graph for rule sets: dimensions are complexity and accuracy
 
 
-def quantize_first_lin_layer(
-    model: nn.Sequential, full_dl: DataLoader
-) -> nn.Sequential:
+def quantize_first_lin_layer(model: nn.Sequential, df: pd.DataFrame) -> nn.Sequential:
+    full_dl = DataLoader(FileDataset(df), batch_size=df.shape[0], shuffle=True)
     lin_layer_indices = [
         i for i in range(len(model)) if isinstance(model[i], nn.Linear)
     ]
     lin_layer_idx = lin_layer_indices[0]
     assert lin_layer_idx >= 0
-    layer: nn.Linear = model[lin_layer_idx]  # type: ignore
-    act = model[lin_layer_idx + 1]
-    q_layer = quantize_layer(layer, act, len(lin_layer_indices) == 1, full_dl)
+
+    q_layer = quantize_layer(model, lin_layer_idx, len(lin_layer_indices) == 1, full_dl)
     model = nn.Sequential(
         *[model[i] for i in range(lin_layer_idx)],
         q_layer,
@@ -48,9 +47,11 @@ def quantize_first_lin_layer(
 
 
 def quantize_layer(
-    lin_layer: nn.Linear, act: nn.Module, is_last: bool, dl: DataLoader
+    model: nn.Sequential, lin_layer_idx: int, is_last: bool, dl: DataLoader
 ) -> QuantizedLayer:
+    lin_layer: nn.Linear = model[lin_layer_idx]  # type: ignore
     assert isinstance(lin_layer, nn.Linear)
+    act = model[lin_layer_idx + 1]
     lin_layer.requires_grad_(False)
 
     if is_last:
@@ -58,8 +59,11 @@ def quantize_layer(
         return QuantizedLayer(lin_layer, torch.tensor(0.0), torch.tensor(1.0))
 
     X, y = next(iter(dl))
+    for i in range(lin_layer_idx):
+        X = model[i](X)
+
     y_hat: torch.Tensor = act(lin_layer(X)).detach().numpy()
-    b = torch.Tensor(lin_layer.out_features)
+    x_thrs = torch.Tensor(lin_layer.out_features)
     y_low = torch.Tensor(lin_layer.out_features)
     y_high = torch.Tensor(lin_layer.out_features)
     assert isinstance(act, nn.Tanh)
@@ -70,11 +74,11 @@ def quantize_layer(
         min_1 = np.min(y_hat[:, i][cluster == 1])
         y_thr = (max_0 + min_1) / 2
         x_thr = np.arctanh(y_thr)
-        b[i] = lin_layer.bias[i] - x_thr
+        x_thrs[i] = x_thr
         y_low[i] = ck_ans.centers[0]
         y_high[i] = ck_ans.centers[1]
     with torch.no_grad():
-        lin_layer.bias -= b  # type: ignore
+        lin_layer.bias -= x_thrs  # type: ignore
     return QuantizedLayer(lin_layer, y_low, y_high)
 
 
@@ -109,7 +113,7 @@ def main(k: int):
 
     lrs = [1e-3, 3e-3, 1e-2, 3e-2]
     l1s = [1e-5, 1e-4]
-    n_layers = [1, 2, 3]
+    n_layers = [2, 3, 4]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
@@ -117,12 +121,34 @@ def main(k: int):
     for idx, (l1, lr, n_layer) in enumerate(itertools.product(l1s, lrs, n_layers)):
         print(f"{max_epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
         model_path = f"{f_models}/{idx}.pth"
+        # if idx == 0:
+        #     continue
+        # full_dl = DataLoader(FileDataset(df), batch_size=df.shape[0], shuffle=True)
+        # model = torch.load(f"{f_models}/{idx}.pth")
+        # keys = list(df.columns)
+        # keys.pop()
+        # X, y = next(iter(full_dl))
+        # y = y.detach().numpy()
+        # ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+        # ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+        # print(f"{accuracy(model, full_dl, 'cpu')}")
+        # model = quantize_first_lin_layer(model, df)
+        # print(model[0])
+        # print(model[0](X))
+        # print(f"{accuracy(model, full_dl, 'cpu')}")
+        # ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+        # q_ng_pred = q_ng(ng_data)
+        # # print(f"{q_ng_pred = }")
+        # print(f"{ng_data['h1'] = }")
+        # q_ng_acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
+        # print(f"q_ng_acc = {q_ng_acc}")
+
         if os.path.isfile(model_path):
             model = torch.load(model_path)
             print("Model already trained. Skipping this training session...")
             continue
-        spec: NNSpec = [(k, k, Activation.TANH) for i in range(n_layer)]
-        spec.append(((k, 1, Activation.SIGMOID)))
+        spec: NNSpec = [(k - i, k - i - 1, Activation.TANH) for i in range(n_layer)]
+        spec.append(((k - n_layer, 1, Activation.SIGMOID)))
 
         model = ModelFactory.get_model_by_spec(spec)
 
@@ -132,26 +158,31 @@ def main(k: int):
             metrics, dl, full_dl = train_mlp(
                 df, model, seed, bs, lr, max_epochs, l1, wd
             )
-            # torch.save(model, f"{f_models}/full_precision_{idx}.pth")
-            torch.save(model, model_path)
-            exit()
-            keys = list(df.columns)
-            keys.pop()
-            y = np.array(df["target"])
-            ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-            ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
-            print(f"{accuracy(model, full_dl, 'cpu')}")
-            model = quantize_first_lin_layer(model, full_dl)
-            print(f"{accuracy(model, full_dl, 'cpu')}")
-            ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-            pred = q_ng(ng_data)
-            q_ng_acc = 1 - sum(abs(pred - y)) / len(pred)
-            print(f"q_ng_acc = {q_ng_acc}")
+            if i == 0:
+                torch.save(model, f"{f_models}/full_precision_{idx}.pth")
+                torch.save(model, model_path)
+                keys = list(df.columns)
+                keys.pop()
+                y = np.array(df["target"])
+                ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+                ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+                ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+                q_ng_pred = q_ng(ng_data)
+                q_ng_acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
+                print(f"old q_ng_acc = {q_ng_acc}")
+                other_model = copy.deepcopy(model)
+                while any(isinstance(l, nn.Linear) for l in other_model):
+                    other_model = quantize_first_lin_layer(other_model, df)
+                print(
+                    f"immediately quantized model acc: {accuracy(other_model, full_dl, 'cpu')}"
+                )
+            print(f"accuracy before layer quant. = {accuracy(model, full_dl, 'cpu')}")
+            model = quantize_first_lin_layer(model, df)
+            print(f"accuracy after layer quant. = {accuracy(model, full_dl, 'cpu')}")
             all_metrics.append(metrics)
-            exit()
 
         # quantize the last layer
-        model = quantize_first_lin_layer(model, full_dl)
+        model = quantize_first_lin_layer(model, df)
 
         # merge metrics together
         metrics = pd.concat(all_metrics)
@@ -170,10 +201,10 @@ def main(k: int):
         # append run config to run file
         runs.to_csv(f_runs, mode="a", header=(idx == 0), index=False)
 
-        print(f"{model = }")
         # save quantized model
         torch.save(model, model_path)
-        exit()
+        print(f"accuracy after final quant. = {accuracy(model, full_dl, 'cpu')}")
+        print()
 
     complexities = []
     accs = []
@@ -187,9 +218,9 @@ def main(k: int):
         ng_data = {key: np.array(df[key], dtype=float) for key in keys}
         _, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
         bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
-        pred = bg(bg_data)
+        q_ng_pred = bg(bg_data)
         complexities.append(bg.complexity())
-        acc = 1 - sum(abs(pred - y)) / len(pred)
+        acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
         accs.append(acc)
         print(
             f"compl = {bg.complexity()}\tl1 = {df_runs['l1'].iloc[idx]}\tacc = {acc}\tlr = {df_runs['lr'].iloc[idx]}"

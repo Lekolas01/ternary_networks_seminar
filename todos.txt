@@ -3,3 +3,19 @@ Datasets to test on:
     + connect 4         https://archive.ics.uci.edu/dataset/26/connect+4
     + mushroom          https://archive.ics.uci.edu/dataset/73/mushroom
     + parity10           
+    + METRABRIC dataset
+    + MAGIC (large, particle physics dataset)
+    + MiniBoone (large, particle physics dataset)
+    + Beck's abcdefg
+    + Beck's harder deep rule set
+
+Other algorithms to test:
+    + DEEP-RED (see)
+    + ECLAIRE
+    + C5.0
+    + PedC5.0
+    + TREPAN
+    + RIPPER
+    
+
+
