@@ -18,7 +18,8 @@ from models.model_collection import ModelFactory, NNSpec
 from rule_extraction import nn_to_rule_set
 from rule_set import QuantizedLayer
 from train_mlp import train_mlp
-from utilities import set_seed
+from train_model import validate
+from utilities import accuracy, set_seed
 
 # Grid Search over NN training hyperparameters
 #   call train_mlp.py
@@ -102,13 +103,13 @@ def main(k: int):
     print(f"Generated dataset with shape {df.shape}")
 
     # Do a single NN training run on this dataset
-    max_epochs = 100
+    max_epochs = 6000
     bs = 64
     wd = 0.0
 
     lrs = [1e-3, 3e-3, 1e-2, 3e-2]
     l1s = [1e-5, 1e-4]
-    n_layers = [2, 3]
+    n_layers = [1, 2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
@@ -131,10 +132,23 @@ def main(k: int):
             metrics, dl, full_dl = train_mlp(
                 df, model, seed, bs, lr, max_epochs, l1, wd
             )
-            print(model)
+            # torch.save(model, f"{f_models}/full_precision_{idx}.pth")
+            torch.save(model, model_path)
+            exit()
+            keys = list(df.columns)
+            keys.pop()
+            y = np.array(df["target"])
+            ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+            ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+            print(f"{accuracy(model, full_dl, 'cpu')}")
             model = quantize_first_lin_layer(model, full_dl)
-            print(model)
+            print(f"{accuracy(model, full_dl, 'cpu')}")
+            ng_data = {key: np.array(df[key], dtype=float) for key in keys}
+            pred = q_ng(ng_data)
+            q_ng_acc = 1 - sum(abs(pred - y)) / len(pred)
+            print(f"q_ng_acc = {q_ng_acc}")
             all_metrics.append(metrics)
+            exit()
 
         # quantize the last layer
         model = quantize_first_lin_layer(model, full_dl)
@@ -171,7 +185,7 @@ def main(k: int):
         keys.pop()
         y = np.array(df["target"])
         ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        _, _, bg = nn_to_rule_set(model, ng_data, keys)
+        _, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
         bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
         pred = bg(bg_data)
         complexities.append(bg.complexity())

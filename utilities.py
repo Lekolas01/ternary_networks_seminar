@@ -23,7 +23,7 @@ def plot_nn_dist(model: nn.Sequential):
     plt.show()
 
 
-def acc(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
+def accuracy(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
     """
     Compute the accuracy of a model on the data held by a data loader.
     """

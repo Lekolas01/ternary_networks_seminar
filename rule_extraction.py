@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from neuron import NeuronGraph
 from q_neuron import QuantizedNeuronGraph, QuantizedNeuronGraph2
 from rule_set import RuleSetGraph
-from utilities import acc
+from utilities import accuracy
 
 
 def nn_to_rule_set(

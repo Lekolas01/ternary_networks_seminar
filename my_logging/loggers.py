@@ -192,8 +192,12 @@ class Tracker:
         # train- and test accuracy
         self.mean_train_loss.append(mean(train_losses))
         self.mean_valid_loss.append(mean(valid_losses))
-        self.train_acc.append(utilities.acc(self.model, self.train_dl, self.device))
-        self.valid_acc.append(utilities.acc(self.model, self.valid_dl, self.device))
+        self.train_acc.append(
+            utilities.accuracy(self.model, self.train_dl, self.device)
+        )
+        self.valid_acc.append(
+            utilities.accuracy(self.model, self.valid_dl, self.device)
+        )
 
         # train- and test accuracies after quantization
         if isinstance(self.model, TernaryModule):
@@ -201,11 +205,11 @@ class Tracker:
             self.compl = quantized_model.complexity()
             simple_model = self.model.quantized(prune=True).to(self.device)
             self.simple_compl = simple_model.complexity()
-            self.q_train_acc = utilities.acc(
+            self.q_train_acc = utilities.accuracy(
                 quantized_model, self.train_dl, self.device
             )
             self.q_valid_acc = self.q_train_acc
-            self.q_valid_acc = utilities.acc(
+            self.q_valid_acc = utilities.accuracy(
                 quantized_model, self.valid_dl, self.device
             )
 
