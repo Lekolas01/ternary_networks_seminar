@@ -14,31 +14,13 @@ from torch.utils.data.dataloader import DataLoader
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import Perceptron, QuantizedNeuronGraph, QuantizedNeuronGraph2
+from q_neuron import (
+    Perceptron,
+    QuantizedLayer,
+    QuantizedNeuronGraph,
+    QuantizedNeuronGraph2,
+)
 from utilities import flatten
-
-
-class QuantizedLayer(nn.Module):
-    def __init__(
-        self,
-        lin: nn.Linear,
-        y_low: torch.Tensor,
-        y_high: torch.Tensor,
-    ):
-        super(QuantizedLayer, self).__init__()
-        self.lin = lin
-        self.y_low = y_low
-        self.y_high = y_high
-
-    def forward(self, x: torch.Tensor):
-        ans = self.lin(x)
-        return torch.where(ans >= 0, self.y_high, self.y_low)
-
-    def __str__(self):
-        return f"QuantizedLayer(in_features={self.lin.in_features}, out_features={self.lin.out_features})"
-
-    def __repr__(self):
-        return str(self)
 
 
 class DpNode:
@@ -57,15 +39,15 @@ class Dp:
         assert 0 <= n_vars
         self.n_vars = n_vars
         self.data: list[list[DpNode]] = [[] for _ in range(self.n_vars + 1)]
-        self.eps = 1e-10
+        self.eps = 1e-6
 
-    def find(self, k: int, val: float) -> DpNode | None:
+    def find(self, k: int, val: float, eps=1e-6) -> DpNode | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
         if k > len(self.data):
             return None
         arr = self.data[k]
         for t in arr:
-            if t.min_thr + self.eps < val < t.max_thr - self.eps:
+            if t.min_thr + eps < val < t.max_thr - eps:
                 return t
         return None
 
@@ -312,6 +294,7 @@ class RuleSetNeuron(Node):
                 max(n1.min_thr, n2.min_thr - weight),
                 min(n1.max_thr, n2.max_thr - weight),
             )
+            assert new_min < new_max
             ans = DpNode("rename_me", new_min, new_max)
             dp.insert(k, ans)
             return ans
@@ -387,14 +370,15 @@ class RuleSetNeuron(Node):
                         node.key, [IfThenRule(node.key, [], val=True)]
                     )
                 else:
-                    target_1 = dp.find(k + 1, node.mean)
+                    target_1 = dp.find(k + 1, node.mean, eps=0.0)
                     if target_1 is None:
                         print(f"{dp = }")
                         print(f"{k + 1 = }")
                         print(f"{node.mean = }")
-                    assert target_1 is not None
+                    if target_1 is None:
+                        raise ValueError
 
-                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1])
+                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1], eps=0.0)
                     assert target_2 is not None
                     rule1 = IfThenRule(node.key, [(target_1.key, True)])
                     rule2 = IfThenRule(

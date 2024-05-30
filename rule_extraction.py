@@ -9,26 +9,29 @@ import seaborn as sns
 import torch
 import torch.nn as nn
 from matplotlib import pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
 from neuron import NeuronGraph
-from q_neuron import QuantizedNeuronGraph, QuantizedNeuronGraph2
+from q_neuron import QNG_from_QNN, QuantizedLayer, QuantizedNeuronGraph2
 from rule_set import RuleSetGraph
-from utilities import accuracy
 
 
 def nn_to_rule_set(
     model: nn.Sequential, data: MutableMapping[str, np.ndarray], vars: Sequence[str]
 ):
-    # transform the trained neural network to a directed graph of full-precision neurons
-    neuron_graph = NeuronGraph.from_nn(model, vars)
-    # transform the graph to a new graph of perceptrons with quantized step functions
-    # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
-    q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+    q_neuron_graph: QuantizedNeuronGraph2
+    if isinstance(model[0], nn.Linear):
+        # transform the trained neural network to a directed graph of full-precision neurons
+        neuron_graph = NeuronGraph.from_nn(model, vars)
+        # transform the graph to a new graph of perceptrons with quantized step functions
+        # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
+        q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+    else:
+        assert isinstance(model[0], QuantizedLayer)
+        q_neuron_graph = QNG_from_QNN(model, vars)
 
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
-    return (neuron_graph, q_neuron_graph, bool_graph)
+    return (q_neuron_graph, bool_graph)
 
 
 def inspect_model(f_model: str, f_data: str):
@@ -47,7 +50,7 @@ def inspect_model(f_model: str, f_data: str):
     bg_data = {key: np.array(df[key], dtype=bool) for key in keys}
 
     print("Transforming model to rule set...")
-    ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+    q_ng, bg = nn_to_rule_set(model, ng_data, keys)
 
     np.set_printoptions(precision=3)
     np.set_printoptions(suppress=True)
@@ -163,7 +166,7 @@ def rule_extraction_grid(f_models: str, f_data: str):
     bgs = []
     for idx, f_model in enumerate(files):
         model = torch.load(f_model)
-        ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+        q_ng, bg = nn_to_rule_set(model, ng_data, keys)
 
         nn_out = model(nn_data).detach().numpy()
         nn_pred = np.round(nn_out)

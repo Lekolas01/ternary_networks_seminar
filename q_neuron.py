@@ -1,8 +1,11 @@
 import copy
+import enum
 from collections.abc import Mapping, MutableMapping
-from typing import Self
+from typing import Self, Sequence
 
 import numpy as np
+import torch
+import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
 
 from bool_formula import PARITY, Activation, overlap, possible_data
@@ -139,6 +142,76 @@ class QuantizedNeuronGraph2(Graph):
 
     def __repr__(self):
         return str(self)
+
+
+class CustomLayer(nn.Module):
+    def __init__(self, lin: nn.Linear, quantized: list[bool]):
+        self.lin = lin
+        self.quantized = quantized
+
+    def forward(self, x):
+        ans = self.lin(x)
+
+
+class QuantizedLayer(nn.Module):
+    def __init__(
+        self,
+        lin: nn.Linear,
+        y_low: torch.Tensor,
+        y_high: torch.Tensor,
+    ):
+        super(QuantizedLayer, self).__init__()
+        self.lin = lin
+        self.y_low = y_low
+        self.y_high = y_high
+
+    def forward(self, x: torch.Tensor):
+        ans = self.lin(x)
+        return torch.where(ans >= 0, self.y_high, self.y_low)
+
+    def __str__(self):
+        return f"QuantizedLayer(in_features={self.lin.in_features}, out_features={self.lin.out_features})"
+
+    def __repr__(self):
+        return str(self)
+
+
+def QNG_from_QNN(
+    model: nn.Sequential, varnames: Sequence[str]
+) -> QuantizedNeuronGraph2:
+    def key_gen():
+        idx = 0
+        while True:
+            idx += 1
+            yield f"h{idx}"
+
+    if isinstance(model[-1], nn.Flatten):
+        model = model[:-1]
+    assert all([isinstance(l, QuantizedLayer) for l in model])
+    names = key_gen()
+    ans: list[Perceptron] = []
+    varnames = list(copy.copy(varnames))
+    curr_shape = len(varnames)
+    for idx, q_layer in enumerate(model):
+        out_features, in_features = q_layer.lin.weight.shape
+        y_low, y_high = q_layer.y_low, q_layer.y_high
+        if y_low.dim() == 0:
+            y_low, y_high = [y_low.item()], [y_high.item()]
+        in_keys = varnames[-curr_shape:]
+        assert curr_shape == in_features
+        curr_shape = out_features
+        weight: list[list[float]] = q_layer.lin.weight.tolist()
+        bias = q_layer.lin.bias.tolist()
+        for j in range(curr_shape):
+            new_name = next(names)
+            ins = {key: weight[j][i] for i, key in enumerate(in_keys)}
+            q_neuron = Perceptron(new_name, ins, bias[j], [y_low[j], y_high[j]])
+            ans.append(q_neuron)
+            varnames.append(new_name)
+            if idx == len(model) - 1:
+                assert curr_shape == 1
+                q_neuron.key = "target"
+    return QuantizedNeuronGraph2(ans)
 
 
 def normalized(q_ng: QuantizedNeuronGraph2) -> QuantizedNeuronGraph2:

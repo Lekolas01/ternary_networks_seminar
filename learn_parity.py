@@ -16,8 +16,8 @@ from bool_formula import Activation
 from datasets import FileDataset
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
+from q_neuron import QuantizedLayer, QuantizedNeuronGraph
 from rule_extraction import nn_to_rule_set
-from rule_set import QuantizedLayer
 from train_mlp import train_mlp
 from train_model import validate
 from utilities import accuracy, set_seed
@@ -113,7 +113,7 @@ def main(k: int):
 
     lrs = [1e-3, 3e-3, 1e-2, 3e-2]
     l1s = [1e-5, 1e-4]
-    n_layers = [2, 3, 4]
+    n_layers = [1, 2, 3]
     runs = pd.DataFrame(
         columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
     )
@@ -130,7 +130,7 @@ def main(k: int):
         # X, y = next(iter(full_dl))
         # y = y.detach().numpy()
         # ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        # ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+        # q_ng, bg = nn_to_rule_set(model, ng_data, keys)
         # print(f"{accuracy(model, full_dl, 'cpu')}")
         # model = quantize_first_lin_layer(model, df)
         # print(model[0])
@@ -165,7 +165,7 @@ def main(k: int):
                 keys.pop()
                 y = np.array(df["target"])
                 ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-                ng, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+                q_ng, bg = nn_to_rule_set(model, ng_data, keys)
                 ng_data = {key: np.array(df[key], dtype=float) for key in keys}
                 q_ng_pred = q_ng(ng_data)
                 q_ng_acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
@@ -216,14 +216,14 @@ def main(k: int):
         keys.pop()
         y = np.array(df["target"])
         ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        _, q_ng, bg = nn_to_rule_set(model, ng_data, keys)
+        q_ng, bg = nn_to_rule_set(model, ng_data, keys)
         bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
         q_ng_pred = bg(bg_data)
         complexities.append(bg.complexity())
         acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
         accs.append(acc)
         print(
-            f"compl = {bg.complexity()}\tl1 = {df_runs['l1'].iloc[idx]}\tacc = {acc}\tlr = {df_runs['lr'].iloc[idx]}"
+            f"l1 = {df_runs['l1'].iloc[idx]}\tlr = {df_runs['lr'].iloc[idx]}\tn_layers = {df_runs['n_layer'].iloc[idx]}\tacc = {acc}\tcompl = {bg.complexity()}"
         )
 
     # TODO für morgen:

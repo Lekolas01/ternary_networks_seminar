@@ -290,11 +290,9 @@ class BED:
 
     def simplify(self) -> None:
         knowledge = {}
-        temp = self.nodes[self.target_key()]
-        easy_root = temp.simplified(knowledge)
+        easy_root = self.nodes[self.target_key()].simplified(knowledge)
         print(knowledge)
         print(easy_root)
-        temp = 0
 
 
 if __name__ == "__main__":

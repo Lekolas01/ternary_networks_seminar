@@ -92,6 +92,11 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
             )
 
         case "mushroom":
+            from ucimlrepo import fetch_ucirepo
+
+            # fetch dataset
+            mushroom = fetch_ucirepo(id=73)
+            # datasets.append(FileDataset(mushroom.data))
             path = Path("data", "mushroom", "agaricus-lepiota.data")
             names = [
                 "edible",
