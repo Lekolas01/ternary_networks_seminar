@@ -14,9 +14,9 @@ from C45 import C45Classifier
 from ckmeans_1d_dp import ckmeans
 from genericpath import isfile
 from sklearn import tree
+from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier
 from torch.utils.data.dataloader import DataLoader
-from sklearn.model_selection import cross_val_score
 
 from bool_formula import Activation, overlap
 from datasets import FileDataset, get_df
@@ -200,9 +200,6 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         runs.to_csv(f_runs, mode="w", header=True, index=False)
         print()
     return runs
-
-
-def cross_validation():
 
 
 def main(key: str, retrain=False):
