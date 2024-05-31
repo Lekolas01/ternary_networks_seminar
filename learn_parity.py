@@ -16,7 +16,9 @@ from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.exceptions import NotFittedError
-from sklearn.model_selection import cross_val_score
+from sklearn.experimental import enable_halving_search_cv
+from sklearn.model_selection import GridSearchCV, HalvingGridSearchCV, cross_val_score
+from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from torch import Tensor
 from torch.utils.data import TensorDataset
@@ -39,6 +41,18 @@ from utilities import accuracy, set_seed
 # create graph for rule sets: dimensions are complexity and accuracy
 
 
+def plot_decision_tree(clf_object, feature_names, class_names):
+    plt.figure(figsize=(15, 10))
+    tree.plot_tree(
+        clf_object,
+        filled=True,
+        feature_names=feature_names,
+        class_names=class_names,
+        rounded=True,
+    )
+    plt.show()
+
+
 def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     seed = 1
     set_seed(seed)
@@ -59,7 +73,7 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     bs = 64
     wd = 0.0
 
-    ks = [5]
+    ks = [8]
     lrs = [1e-2, 1e-3]
     l1s = [0.0, 1e-5, 3e-3]
     n_layers = [1, 2]
@@ -70,6 +84,17 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     all_metrics = []
     n_runs = len(l1s) * len(lrs) * len(n_layers)
     bgs = []
+    param_grid = {
+        "k": [5, 10],
+        "lr": [1e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
+        "l1": [0.0, 1e-5, 1e-4, 3e-3],
+        "n_layer": [1, 2, 3],
+    }
+    re_clf = RuleExtractionClassifier(100, -2, -5, 3, 5000, 0.0)
+    grid_search = HalvingGridSearchCV(re_clf, param_grid, factor=2, scoring="f1_macro")
+    grid_search.fit(X, y)
+
+    exit()
 
     for idx, (lr, k, n_layer, l1) in enumerate(
         itertools.product(lrs, ks, n_layers, l1s)
@@ -78,12 +103,13 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
             f"{idx = }\t{max_epochs = }\t|{bs = }\t|{wd = }\t|{k = }\t{l1 = }\t|{lr = }\t|{n_layer = }"
         )
         re_clf = RuleExtractionClassifier(lr, k, n_layer, l1, max_epochs, wd)
-        re_clf.fit(X, y)
-        prediction = re_clf.predict(X)
-        print(prediction)
-        y_arr = np.array(y, dtype=bool)
-        print(np.mean(prediction == y_arr))
-        exit()
+        re_scores = cross_val_score(re_clf, X, y, cv=5, scoring="f1_macro")
+        print(f"{re_scores = }")
+
+        print(f"")
+        print("------------------ CART classifier ------------------")
+
+        # Train classifier
         model_path = f"{f_models}/{idx}.pth"
 
         # if os.path.isfile(model_path) and not new:
@@ -187,19 +213,6 @@ def main(key: str, retrain=False):
     plt.draw()
 
     df = pd.read_csv(f_data)
-    print(f"")
-    print("------------------ CART classifier ------------------")
-
-    # Train classifier
-    dtree = DecisionTreeClassifier()
-    X = df.drop(["target"], axis=1)
-    y = df["target"]
-    dtree = dtree.fit(X, y)
-    _ = plt.figure(figsize=(10, 10), dpi=240)
-    tree.plot_tree(dtree, feature_names=list(df.columns))
-    print(dtree.predict(X))
-    plt.show()
-    print("-----------------------------------------------------")
 
     df_metrics = pd.read_csv(f_losses)
     for i in range(n_runs):

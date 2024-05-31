@@ -3,8 +3,9 @@ import copy
 import numpy as np
 import torch
 import torch.nn as nn
-from _ckmeans_1d_dp import ckmeans
+from ckmeans_1d_dp import ckmeans
 from pandas import DataFrame, Series
+from sklearn.base import BaseEstimator
 from sklearn.exceptions import NotFittedError
 from torch import Tensor
 from torch.utils.data import TensorDataset
@@ -19,7 +20,7 @@ from train_model import training_loop
 from utilities import set_seed
 
 
-class RuleExtractionClassifier:
+class RuleExtractionClassifier(BaseEstimator):
     def __init__(
         self, lr: float, k: int, n_layer: int, l1: float, epochs: int, wd: float
     ):
@@ -29,7 +30,7 @@ class RuleExtractionClassifier:
         self.l1 = l1
         self.device = "cpu"
         self.batch_size = 64
-        self.epochs = 5000
+        self.epochs = epochs
         self.wd = wd
 
     # convert a df to tensor to be used in pytorch
@@ -61,6 +62,7 @@ class RuleExtractionClassifier:
         return q_model
 
     def fit(self, X: DataFrame, y: Series):
+        print(self)
         q_model = self.train_q_model(X, y)
         q_ng = QNG_from_QNN(q_model, list(X.columns))
         self.bool_graph = RuleSetGraph.from_q_neuron_graph(q_ng)
@@ -71,6 +73,9 @@ class RuleExtractionClassifier:
             raise NotFittedError
         data = {key: np.array(X[key], dtype=bool) for key in X.columns}
         return self.bool_graph(data)
+
+    def __str__(self):
+        return f"RuleExtractionClassifier(lr={self.lr}, k={self.k}, n_layer={self.n_layer}, l1={self.l1})"
 
     def train_mlp(
         self,
@@ -97,18 +102,7 @@ class RuleExtractionClassifier:
                 ["timestamp", "epoch", "train_loss", "train_acc"],
             )
         )
-
-        return training_loop(
-            model,
-            loss_fn,
-            optim,
-            dl,
-            dl,
-            epochs=epochs,
-            lambda1=l1,
-            tracker=tracker,
-            device="cpu",
-        )
+        return training_loop(model, loss_fn, optim, dl, dl, epochs, l1, "cpu", tracker)
 
 
 def quantize_first_lin_layer(model: nn.Sequential, dl: DataLoader) -> nn.Sequential:
@@ -142,7 +136,7 @@ def quantize_layer(
     for i in range(lin_layer_idx):
         X = model[i](X)
 
-    y_hat: Tensor = act(lin_layer(X)).detach().numpy()
+    y_hat: Tensor = act(lin_layer(X)).detach().numpy().astype(np.float64)
     x_thrs = Tensor(lin_layer.out_features)
     y_low = Tensor(lin_layer.out_features)
     y_high = Tensor(lin_layer.out_features)
