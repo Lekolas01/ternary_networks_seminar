@@ -158,7 +158,7 @@ class IfThenRule(Node):
         return [key for key, _ in self.ins]
 
     def complexity(self) -> int:
-        return 1 if self.is_const else 1 + len(self.ins)
+        return 1 if self.is_const else len(self.ins)
 
 
 class Subproblem:

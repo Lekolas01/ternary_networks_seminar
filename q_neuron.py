@@ -153,6 +153,17 @@ class CustomLayer(nn.Module):
         ans = self.lin(x)
 
 
+class SparseLayer(nn.Module):
+    def __init__(self, lin: nn.Linear):
+        super(SparseLayer, self).__init__()
+        self.lin = lin
+        self.m = torch.empty(self.lin.weight.shape)
+
+    def forward(self, x):
+        w = self.lin * self.m
+        ans = w(x)
+
+
 class QuantizedLayer(nn.Module):
     def __init__(
         self,

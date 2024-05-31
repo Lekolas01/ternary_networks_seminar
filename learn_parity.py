@@ -3,23 +3,28 @@ import itertools
 import os
 from argparse import ArgumentParser, Namespace
 
+import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
+from C45 import C45Classifier
 from ckmeans_1d_dp import ckmeans
+from genericpath import isfile
+from sklearn import tree
+from sklearn.tree import DecisionTreeClassifier
 from torch.utils.data.dataloader import DataLoader
+from sklearn.model_selection import cross_val_score
 
-from bool_formula import Activation
-from datasets import FileDataset
+from bool_formula import Activation, overlap
+from datasets import FileDataset, get_df
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
-from q_neuron import QuantizedLayer, QuantizedNeuronGraph
+from q_neuron import QuantizedLayer
 from rule_extraction import nn_to_rule_set
 from train_mlp import train_mlp
-from train_model import validate
 from utilities import accuracy, set_seed
 
 # Grid Search over NN training hyperparameters
@@ -27,6 +32,14 @@ from utilities import accuracy, set_seed
 # For each trained model, extract rule set
 # save all rule sets
 # create graph for rule sets: dimensions are complexity and accuracy
+
+
+class RuleExtractionClassifier:
+    def __init__(self):
+        pass
+
+    def fit(self, X, y):
+        pass
 
 
 def quantize_first_lin_layer(model: nn.Sequential, df: pd.DataFrame) -> nn.Sequential:
@@ -89,103 +102,56 @@ def first_linear_layer(model: nn.Sequential) -> int:
     return -1
 
 
-def main(k: int):
+def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     seed = 1
     set_seed(seed)
     # Generate dataframe for parity
-    f_root = f"runs/parity{k}"
-    f_data = f"{f_root}/data.csv"
-    f_models = f"{f_root}/models"
-    f_runs = f"{f_root}/runs.csv"
-    f_losses = f"{f_root}/losses.csv"
 
     os.makedirs(f_models, exist_ok=True)
-    df = parity_df(k=k, shuffle=False, n=1024)
-    # write dataset to data.csv
-    df.to_csv(f_data, index=False)
-    df = pd.read_csv(f_data)
-    print(f"Generated dataset with shape {df.shape}")
+    if not os.path.isfile(f_data):
+        full_df = get_df(key)
+        ds = FileDataset(full_df)
+        ds.df.to_csv(f_data, index=False)
+    full_df = pd.read_csv(f_data)
+    in_shape = full_df.shape[1] - 1  # -1 for target column
 
     # Do a single NN training run on this dataset
-    max_epochs = 6000
+    max_epochs = 5000
     bs = 64
     wd = 0.0
 
-    lrs = [1e-3, 3e-3, 1e-2, 3e-2]
-    l1s = [1e-5, 1e-4]
-    n_layers = [1, 2, 3]
+    ks = [5]
+    lrs = [1e-2, 1e-3]
+    l1s = [0.0, 1e-5, 3e-3]
+    n_layers = [1, 2]
     runs = pd.DataFrame(
-        columns=["idx", "lr", "n_layer", "seed", "epochs", "bs", "l1", "wd"]
+        columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
+        + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
+    all_metrics = []
     n_runs = len(l1s) * len(lrs) * len(n_layers)
-    for idx, (l1, lr, n_layer) in enumerate(itertools.product(l1s, lrs, n_layers)):
-        print(f"{max_epochs = }\t|{bs = }\t|{wd = }\t|{lr = }\t|{n_layer = }\t|{l1 = }")
-        model_path = f"{f_models}/{idx}.pth"
-        # if idx == 0:
-        #     continue
-        # full_dl = DataLoader(FileDataset(df), batch_size=df.shape[0], shuffle=True)
-        # model = torch.load(f"{f_models}/{idx}.pth")
-        # keys = list(df.columns)
-        # keys.pop()
-        # X, y = next(iter(full_dl))
-        # y = y.detach().numpy()
-        # ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        # q_ng, bg = nn_to_rule_set(model, ng_data, keys)
-        # print(f"{accuracy(model, full_dl, 'cpu')}")
-        # model = quantize_first_lin_layer(model, df)
-        # print(model[0])
-        # print(model[0](X))
-        # print(f"{accuracy(model, full_dl, 'cpu')}")
-        # ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        # q_ng_pred = q_ng(ng_data)
-        # # print(f"{q_ng_pred = }")
-        # print(f"{ng_data['h1'] = }")
-        # q_ng_acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
-        # print(f"q_ng_acc = {q_ng_acc}")
+    bgs = []
 
-        if os.path.isfile(model_path):
-            model = torch.load(model_path)
-            print("Model already trained. Skipping this training session...")
-            continue
+    for idx, (lr, k, n_layer, l1) in enumerate(
+        itertools.product(lrs, ks, n_layers, l1s)
+    ):
+        print(
+            f"{idx = }\t{max_epochs = }\t|{bs = }\t|{wd = }\t|{k = }\t{l1 = }\t|{lr = }\t|{n_layer = }"
+        )
+        model_path = f"{f_models}/{idx}.pth"
+
+        # if os.path.isfile(model_path) and not new:
+        #     model = torch.load(model_path)
+        #     print("Model already trained. Skipping this training run...")
+        # else:
         spec: NNSpec = [(k - i, k - i - 1, Activation.TANH) for i in range(n_layer)]
         spec.append(((k - n_layer, 1, Activation.SIGMOID)))
+        layer1 = spec.pop(0)
+        spec.insert(0, (in_shape, k - 1, Activation.TANH))
 
         model = ModelFactory.get_model_by_spec(spec)
-
-        all_metrics = []
-        for i in range(n_layer):  # for each layer from left to right:
-            # train a neural net
-            metrics, dl, full_dl = train_mlp(
-                df, model, seed, bs, lr, max_epochs, l1, wd
-            )
-            if i == 0:
-                torch.save(model, f"{f_models}/full_precision_{idx}.pth")
-                torch.save(model, model_path)
-                keys = list(df.columns)
-                keys.pop()
-                y = np.array(df["target"])
-                ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-                q_ng, bg = nn_to_rule_set(model, ng_data, keys)
-                ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-                q_ng_pred = q_ng(ng_data)
-                q_ng_acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
-                print(f"old q_ng_acc = {q_ng_acc}")
-                other_model = copy.deepcopy(model)
-                while any(isinstance(l, nn.Linear) for l in other_model):
-                    other_model = quantize_first_lin_layer(other_model, df)
-                print(
-                    f"immediately quantized model acc: {accuracy(other_model, full_dl, 'cpu')}"
-                )
-            print(f"accuracy before layer quant. = {accuracy(model, full_dl, 'cpu')}")
-            model = quantize_first_lin_layer(model, df)
-            print(f"accuracy after layer quant. = {accuracy(model, full_dl, 'cpu')}")
-            all_metrics.append(metrics)
-
-        # quantize the last layer
-        model = quantize_first_lin_layer(model, df)
-
-        # merge metrics together
-        metrics = pd.concat(all_metrics)
+        # train a neural net
+        metrics, dl, _ = train_mlp(full_df, model, seed, bs, lr, max_epochs, l1, wd)
 
         # append losses to losses.csv
         metrics.insert(loc=0, column="idx", value=idx)
@@ -194,67 +160,120 @@ def main(k: int):
             column="epoch",
             value=[i + 1 for i in range(len(metrics["train_loss"]))],
         )
+        all_metrics.append(metrics)
         metrics.to_csv(f_losses, mode="a", index=False, header=(idx == 0))
-        cols = [idx, lr, n_layer, seed, max_epochs, bs, l1, wd]
-        runs.loc[idx] = [str(val) for val in cols]
 
-        # append run config to run file
-        runs.to_csv(f_runs, mode="a", header=(idx == 0), index=False)
-
-        # save quantized model
-        torch.save(model, model_path)
-        print(f"accuracy after final quant. = {accuracy(model, full_dl, 'cpu')}")
-        print()
-
-    complexities = []
-    accs = []
-    df_runs = pd.read_csv(f_runs)
-    for idx in range(n_runs):
-        model_path = f"{f_models}/{idx}.pth"
-        model = torch.load(model_path)
-        keys = list(df.columns)
-        keys.pop()
-        y = np.array(df["target"])
-        ng_data = {key: np.array(df[key], dtype=float) for key in keys}
-        q_ng, bg = nn_to_rule_set(model, ng_data, keys)
-        bg_data = {key: np.array(data, dtype=bool) for key, data in ng_data.items()}
-        q_ng_pred = bg(bg_data)
-        complexities.append(bg.complexity())
-        acc = 1 - sum(abs(q_ng_pred - y)) / len(q_ng_pred)
-        accs.append(acc)
-        print(
-            f"l1 = {df_runs['l1'].iloc[idx]}\tlr = {df_runs['lr'].iloc[idx]}\tn_layers = {df_runs['n_layer'].iloc[idx]}\tacc = {acc}\tcompl = {bg.complexity()}"
+        full_dl = DataLoader(
+            FileDataset(full_df), batch_size=full_df.shape[0], shuffle=False
         )
+        nn_acc = accuracy(model, full_dl, "cpu")
+        # print(f"full precision model acc: {full_precision_acc}")
+        q_model = copy.deepcopy(model)
+        while any(isinstance(l, nn.Linear) for l in q_model):
+            q_model = quantize_first_lin_layer(q_model, full_df)
 
-    # TODO für morgen:
-    #   Regeln lernen und miteinander vergleichen können
+        quantized_acc = accuracy(q_model, full_dl, "cpu")
+        # print(f"Quantized model acc: {quantized_acc}")
+        q_ng, bg, ng_data = nn_to_rule_set(model, full_df)
+        bgs.append(bg)
+        q_ng_pred = q_ng(ng_data)
+        y = np.array(full_df["target"])
+        y_int = np.array(y, dtype=int)
+        q_ng_acc = np.mean(q_ng_pred == y_int)
+        bg_data = {key: np.array(value, dtype=bool) for key, value in ng_data.items()}
+        bg_pred = np.array(bg(bg_data), dtype=int)
+        bg_acc = np.mean(bg_pred == y_int)
+        print(f"Rule Set Accuracy: {bg_acc}")
+        X, y = next(iter(full_dl))
+        nn_out = model(X).detach().numpy().round().astype(int)
+        fidelity = np.mean(nn_out == bg_pred)
+
+        torch.save(model, f"{f_models}/full_precision_{idx}.pth")
+        torch.save(q_model, model_path)
+
+        cols = (
+            [idx, seed, lr, k, n_layer, l1, metrics.shape[0], wd]
+            + [metrics["train_loss"][metrics.shape[0] - 1], nn_acc]
+            + [bg_acc, fidelity, bg.complexity()]
+        )
+        runs.loc[idx] = [str(val) for val in cols]
+        runs.to_csv(f_runs, mode="w", header=True, index=False)
+        print()
+    return runs
+
+
+def cross_validation():
+
+
+def main(key: str, retrain=False):
+    retrain = False
+    f_root = f"runs/{key}"
+    f_data = f"{f_root}/data.csv"
+    f_models = f"{f_root}/models"
+    f_runs = f"{f_root}/runs.csv"
+    f_losses = f"{f_root}/losses.csv"
+
+    if retrain:
+        runs = training_runs(key, f_root, f_data, f_models, f_runs, f_losses)
+    else:
+        runs = pd.read_csv(f_runs)
+
+    n_runs = runs.shape[0]
+    models = [torch.load(f"{f_models}/{idx}.pth") for idx in range(n_runs)]
+    df = pd.read_csv(f_data)
+    n_runs = runs.shape[0]
+
+    complexities = runs["complexity"]
+    accs = runs["bg_acc"]
+    bgs = [nn_to_rule_set(model, df)[1] for model in models]
+
+    # find "best" models in terms of complexity and validation accuracy
+    stats = zip([i for i in range(len(accs))], accs, complexities)
+    stats = sorted(stats, key=lambda x: (-x[1], x[2]))
+    best_results = stats[0]
+    best_model = bgs[best_results[0]]
+    print(f"Best Model: {best_model}")
+    print(f"Best Model Accuracy = {best_results[1]}")
+    print(f"Best Model complexity = {best_results[2]}")
+    print(f"Mean accuracy = {np.mean(accs)}")
+    print(f"Std. accuracy = {np.std(accs)}")
+    print(f"Mean compl. = {np.mean(complexities)}")
+    print(f"Std compl. = {np.std(complexities)}")
+
     sns.scatterplot(x=complexities, y=accs)
-    plt.show()
+    plt.draw()
 
     df_metrics = pd.read_csv(f_losses)
     for i in range(n_runs):
-        run_info = df_runs.iloc[i]
+        run_info = runs.iloc[i]
         temp = df_metrics[df_metrics["idx"] == i]
         title = f"l1: {run_info['l1']}   |   layers: {run_info['n_layer']}   |   lr: {run_info['lr']}"
         sns.lineplot(x=[i + 1 for i in range(temp.shape[0])], y=temp["train_loss"])
         plt.title(title)
-        plt.show()
+        # plt.show()
 
-    # find "best" models in terms of complexity and validation accuracy
+    print(f"")
+    print("------------------ CART classifier ------------------")
+
+    # Train classifier
+    dtree = DecisionTreeClassifier()
+    X = df.drop(["target"], axis=1)
+    y = df["target"]
+    dtree = dtree.fit(X, y)
+    _ = plt.figure(figsize=(10, 10), dpi=240)
+    tree.plot_tree(dtree, feature_names=list(df.columns))
+    dtree.predict(X)
+    plt.show()
 
 
 def get_arguments() -> Namespace:
     parser = ArgumentParser(
         description="Train an MLP on a binary classification task with an ADAM optimizer."
     )
-    parser.add_argument("k", help="Arity")
-    parser.add_argument(
-        "--root",
-        help="Root folder for all the run info.",
-    )
+    parser.add_argument("dataset")
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = get_arguments()
-    main(int(args.k))
+    main(args.dataset)

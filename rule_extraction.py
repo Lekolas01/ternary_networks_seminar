@@ -15,23 +15,25 @@ from q_neuron import QNG_from_QNN, QuantizedLayer, QuantizedNeuronGraph2
 from rule_set import RuleSetGraph
 
 
-def nn_to_rule_set(
-    model: nn.Sequential, data: MutableMapping[str, np.ndarray], vars: Sequence[str]
-):
+def nn_to_rule_set(model: nn.Sequential, df: pd.DataFrame):
+    keys = list(
+        df.columns[:-1]
+    )  # assume that df only has one target column at the far right
+    data = {key: np.array(df[key], dtype=float) for key in keys}
     q_neuron_graph: QuantizedNeuronGraph2
     if isinstance(model[0], nn.Linear):
         # transform the trained neural network to a directed graph of full-precision neurons
-        neuron_graph = NeuronGraph.from_nn(model, vars)
+        neuron_graph = NeuronGraph.from_nn(model, keys)
         # transform the graph to a new graph of perceptrons with quantized step functions
         # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
         q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
     else:
         assert isinstance(model[0], QuantizedLayer)
-        q_neuron_graph = QNG_from_QNN(model, vars)
+        q_neuron_graph = QNG_from_QNN(model, keys)
 
     # transform the quantized graph to a set of if-then rules
     bool_graph = RuleSetGraph.from_q_neuron_graph(q_neuron_graph)
-    return (q_neuron_graph, bool_graph)
+    return (q_neuron_graph, bool_graph, data)
 
 
 def inspect_model(f_model: str, f_data: str):

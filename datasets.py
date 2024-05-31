@@ -1,8 +1,15 @@
+import copy
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 from torch.utils.data.dataset import Dataset
+from ucimlrepo import fetch_ucirepo
+
+from bool_parse import ExpressionEvaluator
+from gen_data import gen_data
+from generate_parity_dataset import parity_df
 
 
 class FileDataset(Dataset):
@@ -38,7 +45,7 @@ class FileDataset(Dataset):
         assert (
             target in df.columns
         ), f"Target column '{target}' must exist in column names {df.columns}."
-
+        # df = copy.deepcopy(df)
         df = df[(df != "?").all(axis=1)]  # remove rows with missing values
         for column in df.columns:
             if normalize and df[column].dtype in ["float64", "int64"]:
@@ -46,6 +53,7 @@ class FileDataset(Dataset):
                 mean = df[column].mean()
                 std = df[column].std()
                 df[column] = (df[column] - mean) / std
+
             elif df[column].dtype == "object" and column != target:
                 # one-hot encode categorical columns
                 df = pd.concat(
@@ -54,19 +62,37 @@ class FileDataset(Dataset):
                 )
                 df.drop([column], axis=1, inplace=True)
 
-        # dummy encode target variable and move it to the far right
-        if len(df[target].unique()) > 1:
+        self.n_target = 0
+        if len(df[target].unique()) > 2:
+            dummies = [df, pd.get_dummies(df[target], prefix=target, drop_first=False)]
+            df = pd.concat(
+                dummies,
+                axis=1,
+            )
+            df.drop([target], axis=1, inplace=True)
+            self.n_target = len(dummies)
+        elif len(df[target].unique()) == 2:
             df = pd.concat(
                 [df, pd.get_dummies(df[target], prefix=target, drop_first=True)],
                 axis=1,
             )
             df.drop([target], axis=1, inplace=True)
+            df.rename(columns={df.columns[-1]: "target"}, inplace=True)
+            self.n_target = 1
+        else:
+            raise ValueError("Must have more than one constant target value.")
 
+        self.df = df
         n_rows = len(df)
         ix_low, ix_high = int(range[0] * n_rows), int(range[1] * n_rows)
 
-        self.x = torch.tensor(df.iloc[ix_low:ix_high, :-1].values, dtype=torch.float32)
-        self.y = torch.tensor(df.iloc[ix_low:ix_high, -1].values, dtype=torch.float32)
+        self.x = torch.tensor(
+            df.iloc[ix_low:ix_high, : -self.n_target].values, dtype=torch.float32
+        )
+        self.y = torch.tensor(
+            df.iloc[ix_low:ix_high, -self.n_target].values, dtype=torch.float32
+        )
+        self.shape = (len(self.y), self.x.shape[1] + 1)
 
     def __len__(self):
         return len(self.y)
@@ -132,6 +158,32 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
         case _:
             raise ValueError("Non-existing dataset: {d}".format(d=ds))
     return datasets[0], datasets[1]
+
+
+def get_df(key: str) -> pd.DataFrame:
+    def get_df_from_uci(id: int) -> pd.DataFrame:
+        temp = fetch_ucirepo(id=id)
+        X = temp.data.features  # type: ignore
+        y = temp.data.targets  # type: ignore
+        ans = X.join(y)
+        ans.rename(columns={y.columns[0]: "target"}, inplace=True)
+        return ans
+
+    match key:
+        case "parity10":
+            return parity_df(k=10, shuffle=False, n=1024)
+        case "adult":
+            return get_df_from_uci(2)
+        case "mushroom":
+            return get_df_from_uci(73)
+        case "car_evaluation":
+            return get_df_from_uci(19)
+        case "abcdefg":
+            e = ExpressionEvaluator()
+            fn = e.parse("(a | b) & (c | d) & (e | (f & g))")
+            return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
+        case _:
+            raise ValueError
 
 
 if __name__ == "__main__":
