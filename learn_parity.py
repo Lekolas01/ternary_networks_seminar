@@ -13,18 +13,23 @@ import torch.nn as nn
 from C45 import C45Classifier
 from ckmeans_1d_dp import ckmeans
 from genericpath import isfile
+from pandas import DataFrame, Series
 from sklearn import tree
+from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import cross_val_score
 from sklearn.tree import DecisionTreeClassifier
+from torch import Tensor
+from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import Activation, overlap
 from datasets import FileDataset, get_df
 from generate_parity_dataset import parity_df
 from models.model_collection import ModelFactory, NNSpec
-from q_neuron import QuantizedLayer
+from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_extraction import nn_to_rule_set
-from train_mlp import train_mlp
+from rule_extraction_classifier import RuleExtractionClassifier
+from rule_set import RuleSetGraph
 from utilities import accuracy, set_seed
 
 # Grid Search over NN training hyperparameters
@@ -32,74 +37,6 @@ from utilities import accuracy, set_seed
 # For each trained model, extract rule set
 # save all rule sets
 # create graph for rule sets: dimensions are complexity and accuracy
-
-
-class RuleExtractionClassifier:
-    def __init__(self):
-        pass
-
-    def fit(self, X, y):
-        pass
-
-
-def quantize_first_lin_layer(model: nn.Sequential, df: pd.DataFrame) -> nn.Sequential:
-    full_dl = DataLoader(FileDataset(df), batch_size=df.shape[0], shuffle=True)
-    lin_layer_indices = [
-        i for i in range(len(model)) if isinstance(model[i], nn.Linear)
-    ]
-    lin_layer_idx = lin_layer_indices[0]
-    assert lin_layer_idx >= 0
-
-    q_layer = quantize_layer(model, lin_layer_idx, len(lin_layer_indices) == 1, full_dl)
-    model = nn.Sequential(
-        *[model[i] for i in range(lin_layer_idx)],
-        q_layer,
-        *[model[i] for i in range(2 + lin_layer_idx, len(model))],
-    )
-    return model
-
-
-def quantize_layer(
-    model: nn.Sequential, lin_layer_idx: int, is_last: bool, dl: DataLoader
-) -> QuantizedLayer:
-    lin_layer: nn.Linear = model[lin_layer_idx]  # type: ignore
-    assert isinstance(lin_layer, nn.Linear)
-    act = model[lin_layer_idx + 1]
-    lin_layer.requires_grad_(False)
-
-    if is_last:
-        assert isinstance(act, nn.Sigmoid)
-        return QuantizedLayer(lin_layer, torch.tensor(0.0), torch.tensor(1.0))
-
-    X, y = next(iter(dl))
-    for i in range(lin_layer_idx):
-        X = model[i](X)
-
-    y_hat: torch.Tensor = act(lin_layer(X)).detach().numpy()
-    x_thrs = torch.Tensor(lin_layer.out_features)
-    y_low = torch.Tensor(lin_layer.out_features)
-    y_high = torch.Tensor(lin_layer.out_features)
-    assert isinstance(act, nn.Tanh)
-    for i in range(lin_layer.out_features):
-        ck_ans = ckmeans(y_hat[:, i], (2))
-        cluster = ck_ans.cluster
-        max_0 = np.max(y_hat[:, i][cluster == 0])
-        min_1 = np.min(y_hat[:, i][cluster == 1])
-        y_thr = (max_0 + min_1) / 2
-        x_thr = np.arctanh(y_thr)
-        x_thrs[i] = x_thr
-        y_low[i] = ck_ans.centers[0]
-        y_high[i] = ck_ans.centers[1]
-    with torch.no_grad():
-        lin_layer.bias -= x_thrs  # type: ignore
-    return QuantizedLayer(lin_layer, y_low, y_high)
-
-
-def first_linear_layer(model: nn.Sequential) -> int:
-    for idx, layer in enumerate(model):
-        if isinstance(layer, nn.Linear):
-            return idx
-    return -1
 
 
 def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
@@ -114,6 +51,8 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         ds.df.to_csv(f_data, index=False)
     full_df = pd.read_csv(f_data)
     in_shape = full_df.shape[1] - 1  # -1 for target column
+    X = full_df.iloc[:, :-1]
+    y = full_df.iloc[:, -1]
 
     # Do a single NN training run on this dataset
     max_epochs = 5000
@@ -124,7 +63,7 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     lrs = [1e-2, 1e-3]
     l1s = [0.0, 1e-5, 3e-3]
     n_layers = [1, 2]
-    runs = pd.DataFrame(
+    runs = DataFrame(
         columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
         + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
@@ -138,6 +77,13 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         print(
             f"{idx = }\t{max_epochs = }\t|{bs = }\t|{wd = }\t|{k = }\t{l1 = }\t|{lr = }\t|{n_layer = }"
         )
+        re_clf = RuleExtractionClassifier(lr, k, n_layer, l1, max_epochs, wd)
+        re_clf.fit(X, y)
+        prediction = re_clf.predict(X)
+        print(prediction)
+        y_arr = np.array(y, dtype=bool)
+        print(np.mean(prediction == y_arr))
+        exit()
         model_path = f"{f_models}/{idx}.pth"
 
         # if os.path.isfile(model_path) and not new:
@@ -171,7 +117,6 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         q_model = copy.deepcopy(model)
         while any(isinstance(l, nn.Linear) for l in q_model):
             q_model = quantize_first_lin_layer(q_model, full_df)
-
         quantized_acc = accuracy(q_model, full_dl, "cpu")
         # print(f"Quantized model acc: {quantized_acc}")
         q_ng, bg, ng_data = nn_to_rule_set(model, full_df)
@@ -210,7 +155,7 @@ def main(key: str, retrain=False):
     f_runs = f"{f_root}/runs.csv"
     f_losses = f"{f_root}/losses.csv"
 
-    if retrain:
+    if not os.path.isfile(f_runs) or retrain:
         runs = training_runs(key, f_root, f_data, f_models, f_runs, f_losses)
     else:
         runs = pd.read_csv(f_runs)
@@ -218,6 +163,7 @@ def main(key: str, retrain=False):
     n_runs = runs.shape[0]
     models = [torch.load(f"{f_models}/{idx}.pth") for idx in range(n_runs)]
     df = pd.read_csv(f_data)
+
     n_runs = runs.shape[0]
 
     complexities = runs["complexity"]
@@ -240,15 +186,7 @@ def main(key: str, retrain=False):
     sns.scatterplot(x=complexities, y=accs)
     plt.draw()
 
-    df_metrics = pd.read_csv(f_losses)
-    for i in range(n_runs):
-        run_info = runs.iloc[i]
-        temp = df_metrics[df_metrics["idx"] == i]
-        title = f"l1: {run_info['l1']}   |   layers: {run_info['n_layer']}   |   lr: {run_info['lr']}"
-        sns.lineplot(x=[i + 1 for i in range(temp.shape[0])], y=temp["train_loss"])
-        plt.title(title)
-        # plt.show()
-
+    df = pd.read_csv(f_data)
     print(f"")
     print("------------------ CART classifier ------------------")
 
@@ -259,8 +197,18 @@ def main(key: str, retrain=False):
     dtree = dtree.fit(X, y)
     _ = plt.figure(figsize=(10, 10), dpi=240)
     tree.plot_tree(dtree, feature_names=list(df.columns))
-    dtree.predict(X)
+    print(dtree.predict(X))
     plt.show()
+    print("-----------------------------------------------------")
+
+    df_metrics = pd.read_csv(f_losses)
+    for i in range(n_runs):
+        run_info = runs.iloc[i]
+        temp = df_metrics[df_metrics["idx"] == i]
+        title = f"l1: {run_info['l1']}   |   layers: {run_info['n_layer']}   |   lr: {run_info['lr']}"
+        sns.lineplot(x=[i + 1 for i in range(temp.shape[0])], y=temp["train_loss"])
+        plt.title(title)
+        # plt.show()
 
 
 def get_arguments() -> Namespace:
