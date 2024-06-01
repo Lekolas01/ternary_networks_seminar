@@ -10,18 +10,13 @@ import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
+import wittgenstein as lw
 from ckmeans_1d_dp import ckmeans
 from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.exceptions import NotFittedError
-from sklearn.experimental import enable_halving_search_cv
-from sklearn.model_selection import (
-    GridSearchCV,
-    HalvingGridSearchCV,
-    cross_val_score,
-    RandomizedSearchCV,
-)
+from sklearn.model_selection import RandomizedSearchCV, cross_val_score
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from torch import Tensor
@@ -73,13 +68,12 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     y = full_df.iloc[:, -1]
 
     # Do a single NN training run on this dataset
-    max_epochs = 5000
+    max_epochs = 8000
     bs = 64
     wd = 0.0
 
-    ks = [8]
-    lrs = [1e-2, 1e-3]
-    l1s = [0.0, 1e-5, 3e-3]
+    l1s = [0.0]
+    lrs = [3e-4, 3e-3]
     n_layers = [1, 2]
     runs = DataFrame(
         columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
@@ -89,17 +83,38 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     n_runs = len(l1s) * len(lrs) * len(n_layers)
     bgs = []
     param_grid = {
-        "k": [5, 10],
-        "lr": [1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
-        "l1": [0.0, 1e-5, 1e-4, 3e-3],
+        "k": [8],
+        "lr": [3e-4, 3e-3, 1e-2],
+        "l1": [1e-5, 1e-3],
         "n_layer": [1, 2, 3],
     }
-    re_clf = RuleExtractionClassifier(100, -2, -5, 3, 5000, 0.0)
+
+    ripper_clf = lw.RIPPER()
+    ripper_clf.fit(X, y)
+    ripper_clf.out_model()
+    re_scores = cross_val_score(ripper_clf, X, y, cv=5, scoring="f1_macro")
+    print(re_scores)
+
+    re_clf = RuleExtractionClassifier(0.003, 8, 2, 1e-5, max_epochs, 0.0)
+    # re_clf.fit(X, y)
+    re_scores = cross_val_score(re_clf, X, y, cv=10, scoring="f1_macro")
+    print(re_scores)
+    exit()
+    re_clf = RuleExtractionClassifier(1e-3, 8, 2, 1e-5, max_epochs, 0.0)
     grid_search = RandomizedSearchCV(
-        re_clf, param_grid, n_iter=10, n_jobs=-1, scoring="f1_macro"
+        re_clf, param_grid, n_iter=10, n_jobs=4, scoring="f1_macro", error_score="raise"
     )
     grid_search.fit(X, y)
+    p = grid_search.best_params_
+    print(f"{p = }")
+    re_clf = RuleExtractionClassifier(
+        p["lr"], p["k"], p["n_layer"], p["l1"], max_epochs, 0.0
+    )
 
+    exit()
+    re_clf = RuleExtractionClassifier(0.003, 8, 2, 1e-05, max_epochs, 0.0)
+    re_scores = cross_val_score(re_clf, X, y, cv=5, scoring="f1_macro")
+    print(re_scores)
     exit()
 
     for idx, (lr, k, n_layer, l1) in enumerate(

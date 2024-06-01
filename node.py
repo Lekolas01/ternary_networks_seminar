@@ -1,3 +1,4 @@
+import random
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, MutableMapping, Sequence, Set
 from copy import deepcopy
@@ -31,10 +32,19 @@ class Graph(ABC):
 
     def __call__(self, vars: MutableMapping[str, np.ndarray]) -> np.ndarray:
         order = self.topological_order()
+        n_samples = 0
         for key in order:
             vars[key] = self.nodes[key](vars)
+
             if key == "target":
-                return vars[key]
+                if vars[key].ndim != 0:
+                    return vars[key]
+                else:
+                    a = random.choice(list(vars.values()))
+                    while a.ndim == 0:
+                        a = random.choice(list(vars.values()))
+                    return np.repeat(vars[key], a.shape[0])
+
         raise ValueError("Could not find a node with key 'target'.")
 
     def __str__(self) -> str:

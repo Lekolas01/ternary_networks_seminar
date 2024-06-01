@@ -21,7 +21,7 @@ import torch
 # First load the copy of the Iris dataset shipped with scikit-learn:
 from sklearn.datasets import load_iris
 
-from models.model_collection import ModelFactory
+from models.model_collection import ModelFactory, SteepTanh
 from rule_set import QuantizedLayer
 
 iris = load_iris()
@@ -113,9 +113,10 @@ import torch.nn as nn
 
 a = nn.Sequential(nn.Linear(8, 4), nn.Tanh(), nn.Linear(4, 3), nn.Sigmoid())
 type(a[0])
+import torch
+
 # %%
 from rule_set import QuantizedLayer
-import torch
 
 ql = QuantizedLayer(
     torch.tensor([[1.0, 2], [4, 6], [-2.5, 1.2]]),
@@ -145,4 +146,21 @@ print(a.weight.shape)
 a.bias += 1
 print(a.bias)
 
+# %%
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import torch
+
+from models.model_collection import SteepTanh
+
+a = SteepTanh(1)
+x = np.arange(-5, 5, 0.01)
+y = a(torch.tensor(x))
+sns.lineplot(x=x, y=y)
+
+plt.show()
+
+# %%
+np.arctanh(0.08)
 # %%

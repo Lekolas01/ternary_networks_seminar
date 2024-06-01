@@ -8,11 +8,12 @@ from pandas import DataFrame, Series
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import NotFittedError
 from torch import Tensor
+from torch.nn import Sequential
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import Activation
-from models.model_collection import ModelFactory, NNSpec
+from models.model_collection import ModelFactory, NNSpec, SteepTanh
 from my_logging.loggers import LogMetrics, Tracker
 from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_set import RuleSetGraph
@@ -37,10 +38,10 @@ class RuleExtractionClassifier(BaseEstimator):
     def df_to_tensor(self, df) -> Tensor:
         return torch.from_numpy(df.values).float().to(self.device)
 
-    def convert_to_rule_set(self, model: nn.Sequential, dl: DataLoader):
+    def convert_to_rule_set(self, model: Sequential, dl: DataLoader):
         pass
 
-    def train_q_model(self, X: DataFrame, y: Series) -> nn.Sequential:
+    def train_q_model(self, X: Tensor, y: Tensor) -> tuple[Sequential, Sequential]:
         _, n_features = X.shape
         spec: NNSpec = [
             (self.k - i, self.k - i - 1, Activation.TANH) for i in range(self.n_layer)
@@ -50,29 +51,36 @@ class RuleExtractionClassifier(BaseEstimator):
         spec.insert(0, (n_features, self.k - 1, Activation.TANH))
 
         model = ModelFactory.get_model_by_spec(spec)
-        X_tensor = self.df_to_tensor(X)
-        y_tensor = self.df_to_tensor(y)
 
-        dataset = TensorDataset(X_tensor, y_tensor)
+        dataset = TensorDataset(X, y)
         dl = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         metrics = self.train_mlp(dl, model, 1, self.lr, self.epochs, self.l1, self.wd)
         q_model = copy.deepcopy(model)
         while any(isinstance(l, nn.Linear) for l in q_model):
             q_model = quantize_first_lin_layer(q_model, dl)
-        return q_model
+        return q_model, model
 
     def fit(self, X: DataFrame, y: Series):
-        print(self)
-        q_model = self.train_q_model(X, y)
+        X_tensor = self.df_to_tensor(X)
+        y_tensor = self.df_to_tensor(y)
+        q_model, model = self.train_q_model(X_tensor, y_tensor)
+
         q_ng = QNG_from_QNN(q_model, list(X.columns))
         self.bool_graph = RuleSetGraph.from_q_neuron_graph(q_ng)
+        bg_pred = self.bool_graph(X)
+        nn_out = model(X_tensor)
+        nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
+        nn_acc = np.mean(nn_pred == y)
+        bg_acc = np.mean(bg_pred == y)
+        fidelity = np.mean(nn_pred == bg_pred)
+        print(f"{nn_acc = } | {bg_acc = } | {fidelity = }")
         return self
 
-    def predict(self, X):
+    def predict(self, X: DataFrame):
         if not hasattr(self, "bool_graph"):
             raise NotFittedError
-        data = {key: np.array(X[key], dtype=bool) for key in X.columns}
-        return self.bool_graph(data)
+        ans = self.bool_graph(X)
+        return ans
 
     def __str__(self):
         return f"RuleExtractionClassifier(lr={self.lr}, k={self.k}, n_layer={self.n_layer}, l1={self.l1})"
@@ -140,7 +148,7 @@ def quantize_layer(
     x_thrs = Tensor(lin_layer.out_features)
     y_low = Tensor(lin_layer.out_features)
     y_high = Tensor(lin_layer.out_features)
-    assert isinstance(act, nn.Tanh)
+    assert isinstance(act, SteepTanh)
     for i in range(lin_layer.out_features):
         ck_ans = ckmeans(y_hat[:, i], (2))
         cluster = ck_ans.cluster

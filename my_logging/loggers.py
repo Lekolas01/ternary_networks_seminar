@@ -75,10 +75,6 @@ class LogMetrics(Logger):
             bar += f"{m_format[metric]}\t"
         end = "\n" if self.t.stop_condition() else "\r"
         print(bar, end=end)
-        if self.t.stop_condition():
-            print(
-                "Early stopping condition reached. Continue training with next run..."
-            )
 
 
 class Plotter(Logger):
@@ -223,7 +219,7 @@ class Tracker:
             self.stop_training = True
         # stop early if validation error hasn't decreased for a decent amount of time
         valid_stop_delay = 500
-        eps = 1e-4
+        eps = 3e-4
         if (
             len(self.mean_train_loss) >= valid_stop_delay
             and self.mean_valid_loss[-valid_stop_delay]

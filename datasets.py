@@ -177,7 +177,8 @@ def get_df(key: str) -> pd.DataFrame:
         case "mushroom":
             return get_df_from_uci(73)
         case "car_evaluation":
-            return get_df_from_uci(19)
+            ans = get_df_from_uci(19)
+            return ans
         case "abcdefg":
             e = ExpressionEvaluator()
             fn = e.parse("(a | b) & (c | d) & (e | (f & g))")
