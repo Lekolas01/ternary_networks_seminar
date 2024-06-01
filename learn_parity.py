@@ -10,14 +10,18 @@ import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
-from C45 import C45Classifier
 from ckmeans_1d_dp import ckmeans
 from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.exceptions import NotFittedError
 from sklearn.experimental import enable_halving_search_cv
-from sklearn.model_selection import GridSearchCV, HalvingGridSearchCV, cross_val_score
+from sklearn.model_selection import (
+    GridSearchCV,
+    HalvingGridSearchCV,
+    cross_val_score,
+    RandomizedSearchCV,
+)
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from torch import Tensor
@@ -86,12 +90,14 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     bgs = []
     param_grid = {
         "k": [5, 10],
-        "lr": [1e-5, 1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
+        "lr": [1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
         "l1": [0.0, 1e-5, 1e-4, 3e-3],
         "n_layer": [1, 2, 3],
     }
     re_clf = RuleExtractionClassifier(100, -2, -5, 3, 5000, 0.0)
-    grid_search = HalvingGridSearchCV(re_clf, param_grid, factor=2, scoring="f1_macro")
+    grid_search = RandomizedSearchCV(
+        re_clf, param_grid, n_iter=10, n_jobs=-1, scoring="f1_macro"
+    )
     grid_search.fit(X, y)
 
     exit()
