@@ -34,7 +34,10 @@ def train(
         y = y.to(device)
         optim.zero_grad()
         y_hat = model(X)
-        loss = loss_fn(y_hat, y.float())
+        try:
+            loss = loss_fn(y_hat, y.float())
+        except:
+            temp = 0
         if lambda1 != 0:
             # don't regularize bias
             all_linear1_params = torch.cat(

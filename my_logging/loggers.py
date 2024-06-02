@@ -136,7 +136,7 @@ class LogModel(Logger):
 class Tracker:
     """Tracks useful information on the current epoch."""
 
-    def __init__(self, epochs: int = 0, *loggers: Logger):
+    def __init__(self, epochs: int = 0, delay=100, *loggers: Logger):
         """
         Parameters
         ----------
@@ -144,6 +144,7 @@ class Tracker:
             List of loggers used for logging training information.
         """
         self.epochs = epochs
+        self.delay = delay
         self.loggers = []
         for logger in loggers:
             self.add_logger(logger)
@@ -218,7 +219,7 @@ class Tracker:
         if self.epoch == self.epochs:
             self.stop_training = True
         # stop early if validation error hasn't decreased for a decent amount of time
-        valid_stop_delay = 500
+        valid_stop_delay = self.delay
         eps = 3e-4
         if (
             len(self.mean_train_loss) >= valid_stop_delay

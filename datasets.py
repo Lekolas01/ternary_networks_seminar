@@ -160,7 +160,7 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
     return datasets[0], datasets[1]
 
 
-def get_df(key: str) -> pd.DataFrame:
+def get_df(key: str) -> tuple[pd.DataFrame, int]:
     def get_df_from_uci(id: int) -> pd.DataFrame:
         temp = fetch_ucirepo(id=id)
         X = temp.data.features  # type: ignore
@@ -171,18 +171,19 @@ def get_df(key: str) -> pd.DataFrame:
 
     match key:
         case "parity10":
-            return parity_df(k=10, shuffle=False, n=1024)
+            return parity_df(k=10, shuffle=False, n=1024), 1
         case "adult":
-            return get_df_from_uci(2)
+            return get_df_from_uci(2), 1
         case "mushroom":
-            return get_df_from_uci(73)
+            return get_df_from_uci(73), 1
         case "car_evaluation":
-            ans = get_df_from_uci(19)
+            ans = get_df_from_uci(19), 4
+
             return ans
         case "abcdefg":
             e = ExpressionEvaluator()
             fn = e.parse("(a | b) & (c | d) & (e | (f & g))")
-            return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
+            return gen_data(fn, dead_cols=3, shuffle=True, n=1024), 1
         case _:
             raise ValueError
 
