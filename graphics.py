@@ -24,7 +24,7 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
     plt.show()
 
     fig, axes = plt.subplots(
-        nrows=1, ncols=1, sharex=False, sharey=True, figsize=(15, 5)
+        nrows=1, ncols=2, sharex=False, sharey=True, figsize=(15, 5)
     )
     margin = 0.1
     data_y = neuron.act_fn(sums)
@@ -39,8 +39,8 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
     axes[1].set_xlabel("s(x)")
     axes[1].set_ylabel("a(s(x))")
     axes[1].set_ylim((-1 - margin, 1 + margin))
-    sns.histplot(ax=axes[0], x=sums, kde=True, bins=24, stat="density")
-    sns.histplot(ax=axes[2], y=data_y, kde=True, bins=24, stat="density")
+    # sns.histplot(ax=axes[0], x=sums, kde=True, bins=24, stat="density")
+    # sns.histplot(ax=axes[2], y=data_y, kde=True, bins=24, stat="density")
     # for now, we only allow either 1 or 2 clusters
     ans = ckmeans(x=data_y, k=(1, 2))
     clusters = ans.cluster
@@ -57,8 +57,8 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
 
     if len(centers) == 1:
         print(f"constant function at neuron {neuron}.")
-    sns.lineplot(ax=axes[1], x=x_vals, y=y_vals)
-    sns.lineplot(ax=axes[1], x=x, y=y, color="r", linewidth=1.0)
+    sns.lineplot(ax=axes[0], x=x_vals, y=y_vals)
+    sns.lineplot(ax=axes[0], x=x, y=y, color="r", linewidth=1.0)
     plt.show()
 
 

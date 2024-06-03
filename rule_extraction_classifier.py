@@ -1,5 +1,7 @@
 import copy
 import os
+import timeit
+from timeit import default_timer as timer
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -63,11 +65,15 @@ class RuleExtractionClassifier(BaseEstimator):
         spec.insert(0, (n_features, self.k - 1, Activation.TANH))
 
         model = ModelFactory.get_model_by_spec(spec, steepness=self.steepness)
+        if torch.any(model[0].weight.isnan()):
+            print(spec)
+        assert not torch.any(model[0].weight.isnan())
         # print(model)
 
         dataset = TensorDataset(X, y)
         # model_path = f"temp/testing_model.pth"
         dl = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        assert not torch.any(model[0].weight.isnan())
         metrics = self.train_mlp(
             dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay, False
         )
@@ -79,7 +85,6 @@ class RuleExtractionClassifier(BaseEstimator):
         q_model = copy.deepcopy(model)
         nn_out = model(X)
         # qnn_out = q_model(X)
-
         # nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
         # qnn_pred = np.array(np.round(qnn_out.detach().numpy()), dtype=bool)
         # y_arr = np.array(y.detach().numpy(), dtype=bool)
@@ -103,6 +108,8 @@ class RuleExtractionClassifier(BaseEstimator):
         return q_model, model
 
     def fit(self, X: DataFrame, y: Series):
+        start = timer()
+
         X_tensor = self.df_to_tensor(X)
         y_tensor = self.df_to_tensor(y)
         q_model, model = self.train_q_model(X_tensor, y_tensor)
@@ -119,9 +126,10 @@ class RuleExtractionClassifier(BaseEstimator):
         fid_qnn = np.mean(nn_pred == qnn_pred)
         fid_qng = np.mean(nn_pred == q_ng_pred)
         fid_rule_set = np.mean(nn_pred == bg_pred)
-        # print(
-        #     f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {fid_qnn} | fid(nn, q_ng) = {fid_qng} | fid(nn, rule_set) = {fid_rule_set}"
-        # )
+        end = timer()
+        print(
+            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {fid_qnn} | fid(nn, q_ng) = {fid_qng} | fid(nn, rule_set) = {fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}"
+        )
         return self
 
     def predict(self, X: DataFrame):
@@ -145,8 +153,10 @@ class RuleExtractionClassifier(BaseEstimator):
         delay: int,
         log_metrics: bool,
     ):
+        assert not torch.any(model[0].weight.isnan())
         seed = set_seed(seed)
         loss_fn = nn.BCELoss()
+        assert not torch.any(model[0].weight.isnan())
         optim = torch.optim.Adam(
             model.parameters(),
             lr=lr,
@@ -154,13 +164,18 @@ class RuleExtractionClassifier(BaseEstimator):
             eps=1e-08,
             weight_decay=wd,
         )
+        assert not torch.any(model[0].weight.isnan())
         tracker = Tracker(epochs=epochs, delay=delay)
+        assert not torch.any(model[0].weight.isnan())
         if log_metrics:
+            assert not torch.any(model[0].weight.isnan())
             tracker.add_logger(
                 LogMetrics(
                     ["timestamp", "epoch", "train_loss", "train_acc"],
                 )
             )
+            assert not torch.any(model[0].weight.isnan())
+        assert not torch.any(model[0].weight.isnan())
         return training_loop(model, loss_fn, optim, dl, dl, epochs, l1, "cpu", tracker)
 
 

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from neuron import Activation
 
@@ -12,7 +13,8 @@ class SteepTanh(nn.Module):
         self.k = k
 
     def forward(self, x):
-        return 2 / (1 + torch.exp(-self.k * x)) - 1
+        # return 2 / (1 + torch.exp(-self.k * x)) - 1 # not numerically stable???
+        return F.tanh(self.k * x / 2)
 
     def __str__(self):
         return f"Tanh(k = {self.k})"

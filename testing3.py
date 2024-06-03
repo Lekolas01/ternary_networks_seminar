@@ -118,12 +118,6 @@ import torch
 # %%
 from rule_set import QuantizedLayer
 
-ql = QuantizedLayer(
-    torch.tensor([[1.0, 2], [4, 6], [-2.5, 1.2]]),
-    torch.tensor([-2.0, -1.0]),
-    torch.tensor([-0.64, -0.91]),
-    torch.tensor([0.96, 0.44]),
-)
 x = torch.rand((5, 3))
 print(f"{ql.weight = }")
 print(f"{ql.bias = }")
@@ -143,7 +137,6 @@ a = nn.Linear(in_features=5, out_features=8)
 print(a.weight.requires_grad_(False))
 print(a.bias.requires_grad_(False))
 print(a.weight.shape)
-a.bias += 1
 print(a.bias)
 
 # %%
@@ -151,6 +144,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import torch
+import torch.nn.functional as F
 
 from models.model_collection import SteepTanh
 
@@ -163,4 +157,13 @@ plt.show()
 
 # %%
 np.arctanh(0.08)
+import time
+
+# %%
+import timeit
+
+start = timeit.timeit()
+time.sleep(1.45)
+end = timeit.timeit()
+print(end - start)
 # %%

@@ -1,3 +1,7 @@
+import time
+import timeit
+from timeit import default_timer as timer
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import sklearn
@@ -9,6 +13,12 @@ from torch.utils.data import DataLoader
 from ucimlrepo import fetch_ucirepo
 
 from datasets import FileDataset
+
+start = timer()
+time.sleep(1.45)
+end = timer()
+print(end - start)  # Time in seconds, e.g. 5.38091952400282
+exit()
 
 # fetch dataset
 car_evaluation = fetch_ucirepo(id=19)

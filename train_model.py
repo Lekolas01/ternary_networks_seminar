@@ -27,30 +27,45 @@ def train(
     model = model.to(device)
     model.train()
     losses = []
+    assert not torch.any(model[0].weight.isnan())
 
     for X, y in dl:
+        assert not torch.any(model[0].weight.isnan())
         tracker.batch_start()
         X = X.to(device)
         y = y.to(device)
-        optim.zero_grad()
         y_hat = model(X)
+        optim.zero_grad()
+        assert not torch.any(model[0].weight.isnan())
         try:
+            assert not torch.any(model[0].weight.isnan())
             loss = loss_fn(y_hat, y.float())
+            assert not torch.any(model[0].weight.isnan())
         except:
             temp = 0
         if lambda1 != 0:
+            assert not torch.any(model[0].weight.isnan())
             # don't regularize bias
             all_linear1_params = torch.cat(
                 [x.view(-1) for x in model.parameters() if x.dim() == 2]
             )
             l1_regularization = lambda1 * torch.norm(all_linear1_params, 1)
             loss = loss + l1_regularization
+            assert not torch.any(model[0].weight.isnan())
         losses.append(loss.item())
-        loss.backward()
+        assert not torch.any(model[0].weight.isnan())
+        try:
+            assert not torch.any(model[0].weight.isnan())
+            loss.backward()
+            assert not torch.any(model[0].weight.isnan())
+        except:
+            print("hi")
+            temp = 0
+        assert not torch.any(model[0].weight.isnan())
         optim.step()
-
+        assert not torch.any(model[0].weight.isnan())
         tracker.batch_end()
-
+        assert not torch.any(model[0].weight.isnan())
     return losses
 
 
@@ -94,18 +109,24 @@ def training_loop(
     tracker.training_start(model, train_loader, valid_loader, criterion)
     # Train model
     while not tracker.stop_condition():
+        assert not torch.any(model[0].weight.isnan())
         tracker.epoch_start()
         # training
+        assert not torch.any(model[0].weight.isnan())
         train_loss = train(
             train_loader, model, criterion, optimizer, device, tracker, lambda1
         )
+        assert not torch.any(model[0].weight.isnan())
 
         # validation
         with torch.no_grad():
             valid_loss = validate(valid_loader, model, criterion, device)
+        assert not torch.any(model[0].weight.isnan())
 
         if scheduler is not None:
             scheduler.step()
+        assert not torch.any(model[0].weight.isnan())
 
         tracker.epoch_end(train_loss, valid_loss)
+        assert not torch.any(model[0].weight.isnan())
     return tracker.training_end()

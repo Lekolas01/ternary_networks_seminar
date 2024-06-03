@@ -1,6 +1,7 @@
 import copy
 import itertools
 import os
+import timeit
 from argparse import ArgumentParser, Namespace
 
 import graphviz
@@ -19,6 +20,7 @@ from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import RandomizedSearchCV, cross_val_score
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.utils import shuffle
 from torch import Tensor
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
@@ -53,13 +55,13 @@ def plot_decision_tree(clf_object, feature_names, class_names):
 
 
 def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
-    seed = 0
+    seed = 1
     set_seed(seed)
     # Generate dataframe for parity
 
     os.makedirs(f_models, exist_ok=True)
-    full_df, n_targets = get_df(key)
-    ds = FileDataset(full_df)
+    full_df = get_df(key)
+    ds = FileDataset(full_df, encode=list(full_df.columns[:-1]))
     ds.df.to_csv(f_data, index=False)
     full_df = pd.read_csv(f_data)
 
@@ -67,11 +69,12 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     X = full_df.iloc[:, :-1]
     y = full_df.iloc[:, -1]
 
+    X, y = shuffle(X, y, random_state=42)
     # Do a single NN training run on this dataset
     grid_search_epochs = 300
     grid_search_delay = 200
     max_epochs = 8000
-    delay = 450
+    delay = 800
     bs = 64
     wd = 0.0
 
@@ -82,6 +85,27 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
         + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
+
+    # calculate ripper cross validation
+    ripper_clf = lw.RIPPER()
+
+    param_grid = {"prune_size": [0.33, 0.5], "k": [1, 2]}
+    grid_search = RandomizedSearchCV(
+        ripper_clf,
+        param_grid,
+        n_iter=5,
+        scoring="accuracy",
+        error_score="raise",
+        verbose=2,
+    )
+    grid_search.fit(X, y)
+    p = grid_search.best_params_
+    print(f"{p = }")
+    ripper_clf = lw.RIPPER(prune_size=p["prune_size"], k=p["k"])
+    ripper_cv_scores = cross_val_score(ripper_clf, X, y, cv=10, scoring="accuracy")
+    print(f"{ripper_cv_scores = }")
+
+    # calculate best hyperparameters for rule extraction
     param_grid = {
         "k": [8],
         "lr": [3e-4, 3e-3, 1e-2],
@@ -89,34 +113,28 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         "n_layer": [1, 2, 3],
         "steepness": [2, 4, 8],
     }
-
-    # calculate ripper cross validation
-    ripper_clf = lw.RIPPER()
-    ripper_clf.fit(X, y)
-    ripper_cv_scores = cross_val_score(ripper_clf, X, y, cv=10, scoring="f1_macro")
-    print(f"{ripper_cv_scores = }")
-
-    # calculate best hyperparameters for rule extraction
+    # re_clf = RuleExtractionClassifier(
+    #     0.003, 8, 2, 0.0, grid_search_epochs, 0.0, steepness=6, delay=grid_search_delay
+    # )
+    # grid_search = RandomizedSearchCV(
+    #     re_clf, param_grid, n_iter=5, scoring="accuracy", error_score="raise", verbose=1
+    # )
+    # grid_search.fit(X, y)
+    # p = grid_search.best_params_
+    # print(f"{p = }")
     re_clf = RuleExtractionClassifier(
-        0.003, 8, 2, 0.0, grid_search_epochs, 0.0, steepness=8, delay=grid_search_delay
-    )
-    grid_search = RandomizedSearchCV(
-        re_clf, param_grid, n_iter=5, scoring="f1_macro", error_score="raise", verbose=1
-    )
-    grid_search.fit(X, y)
-    p = grid_search.best_params_
-    print(f"{p = }")
-    re_clf = RuleExtractionClassifier(
-        p["lr"],
-        p["k"],
-        p["n_layer"],
-        p["l1"],
+        0.003,  # p["lr"],
+        8,  # p["k"],
+        1,  # p["n_layer"],
+        3e-4,  # p["l1"],
         max_epochs,
         0.0,
-        steepness=p["steepness"],
+        6,  # steepness=p["steepness"],
         delay=delay,
     )
-    re_cv_scores = cross_val_score(re_clf, X, y, cv=10, scoring="f1_macro")
+    re_cv_scores = cross_val_score(
+        re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+    )
     print(f"{re_cv_scores = }")
     return runs
 
