@@ -55,7 +55,7 @@ class RuleExtractionClassifier(BaseEstimator):
     def convert_to_rule_set(self, model: Sequential, dl: DataLoader):
         pass
 
-    def train_q_model(self, X: Tensor, y: Tensor) -> tuple[Sequential, Sequential]:
+    def train_qnn(self, X: Tensor, y: Tensor) -> tuple[Sequential, Sequential]:
         _, n_features = X.shape
         spec: NNSpec = [
             (self.k - i, self.k - i - 1, Activation.TANH) for i in range(self.n_layer)
@@ -112,13 +112,13 @@ class RuleExtractionClassifier(BaseEstimator):
 
         X_tensor = self.df_to_tensor(X)
         y_tensor = self.df_to_tensor(y)
-        q_model, model = self.train_q_model(X_tensor, y_tensor)
+        qnn, nn = self.train_qnn(X_tensor, y_tensor)
 
-        q_ng = QNG_from_QNN(q_model, list(X.columns))
-        self.bool_graph = RuleSetGraph.from_q_neuron_graph(q_ng)
-        nn_out = model(X_tensor)
+        q_ng = QNG_from_QNN(qnn, list(X.columns))
+        self.bool_graph = RuleSetGraph.from_QNG(q_ng)
+        nn_out = nn(X_tensor)
         nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
-        qnn_pred = np.array(q_model(X_tensor))
+        qnn_pred = np.array(qnn(X_tensor))
         q_ng_pred = q_ng(X)
         bg_pred = self.bool_graph(X)
         nn_acc = np.mean(nn_pred == y)
@@ -209,6 +209,7 @@ def quantize_layer(
         return QuantizedLayer(lin_layer, torch.tensor(0.0), torch.tensor(1.0))
     for i in range(lin_layer_idx):
         X = model[i](X)
+        # ERROR? don't you need to call act(X) as well?
 
     y_hat: Tensor = act(lin_layer(X))
     y_hat_arr = y_hat.detach().numpy().astype(np.float64)

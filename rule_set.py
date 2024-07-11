@@ -15,8 +15,12 @@ from torch.utils.data.dataloader import DataLoader
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import (Perceptron, QuantizedLayer, QuantizedNeuronGraph,
-                      QuantizedNeuronGraph2)
+from q_neuron import (
+    Perceptron,
+    QuantizedLayer,
+    QuantizedNeuronGraph,
+    QuantizedNeuronGraph2,
+)
 from utilities import flatten
 
 
@@ -433,7 +437,7 @@ class RuleSetGraph(Graph):
         super().__init__(rule_set_neurons)
 
     @classmethod
-    def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
+    def from_QNG(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
         rule_neurons = [
             RuleSetNeuron(q_n, q_ng, simplify)
             for key, q_n in q_ng.nodes.items()
