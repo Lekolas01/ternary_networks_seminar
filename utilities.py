@@ -112,6 +112,11 @@ def progress_bar(progress: int, total: int, width=40) -> str:
     return f"\r|{bar}|{written_progress}"
 
 
+def plot_1d_dist(x, bins=None):
+    plt.hist(x, bins)
+    plt.show()
+
+
 def main():
     # for i in tqdm(range(100), desc="Loading...", ascii=False):
     #     sleep(0.05)

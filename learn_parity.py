@@ -1,6 +1,7 @@
 import copy
 import itertools
 import os
+import timeit
 from argparse import ArgumentParser, Namespace
 
 import graphviz
@@ -10,20 +11,16 @@ import pandas as pd
 import seaborn as sns
 import torch
 import torch.nn as nn
+import wittgenstein as lw
 from ckmeans_1d_dp import ckmeans
 from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.exceptions import NotFittedError
-from sklearn.experimental import enable_halving_search_cv
-from sklearn.model_selection import (
-    GridSearchCV,
-    HalvingGridSearchCV,
-    cross_val_score,
-    RandomizedSearchCV,
-)
+from sklearn.model_selection import RandomizedSearchCV, cross_val_score
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.utils import shuffle
 from torch import Tensor
 from torch.utils.data import TensorDataset
 from torch.utils.data.dataloader import DataLoader
@@ -63,119 +60,82 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
     # Generate dataframe for parity
 
     os.makedirs(f_models, exist_ok=True)
-    if not os.path.isfile(f_data):
-        full_df = get_df(key)
-        ds = FileDataset(full_df)
-        ds.df.to_csv(f_data, index=False)
+    full_df = get_df(key)
+    ds = FileDataset(full_df, encode=list(full_df.columns[:-1]))
+    ds.df.to_csv(f_data, index=False)
     full_df = pd.read_csv(f_data)
+
     in_shape = full_df.shape[1] - 1  # -1 for target column
     X = full_df.iloc[:, :-1]
     y = full_df.iloc[:, -1]
 
+    X, y = shuffle(X, y, random_state=42)
     # Do a single NN training run on this dataset
-    max_epochs = 5000
+    grid_search_epochs = 300
+    grid_search_delay = 200
+    max_epochs = 8000
+    delay = 800
     bs = 64
     wd = 0.0
 
-    ks = [8]
-    lrs = [1e-2, 1e-3]
-    l1s = [0.0, 1e-5, 3e-3]
+    l1s = [0.0]
+    lrs = [3e-4, 3e-3]
     n_layers = [1, 2]
     runs = DataFrame(
         columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
         + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
-    all_metrics = []
-    n_runs = len(l1s) * len(lrs) * len(n_layers)
-    bgs = []
-    param_grid = {
-        "k": [5, 10],
-        "lr": [1e-4, 3e-4, 1e-3, 3e-3, 1e-2],
-        "l1": [0.0, 1e-5, 1e-4, 3e-3],
-        "n_layer": [1, 2, 3],
-    }
-    re_clf = RuleExtractionClassifier(100, -2, -5, 3, 5000, 0.0)
+
+    # calculate ripper cross validation
+    ripper_clf = lw.RIPPER()
+
+    param_grid = {"prune_size": [0.33, 0.5], "k": [1, 2]}
     grid_search = RandomizedSearchCV(
-        re_clf, param_grid, n_iter=10, n_jobs=-1, scoring="f1_macro"
+        ripper_clf,
+        param_grid,
+        n_iter=5,
+        scoring="accuracy",
+        error_score="raise",
+        verbose=2,
     )
     grid_search.fit(X, y)
+    p = grid_search.best_params_
+    print(f"{p = }")
+    ripper_clf = lw.RIPPER(prune_size=p["prune_size"], k=p["k"])
+    ripper_cv_scores = cross_val_score(ripper_clf, X, y, cv=10, scoring="accuracy")
+    print(f"{ripper_cv_scores = }")
 
-    exit()
-
-    for idx, (lr, k, n_layer, l1) in enumerate(
-        itertools.product(lrs, ks, n_layers, l1s)
-    ):
-        print(
-            f"{idx = }\t{max_epochs = }\t|{bs = }\t|{wd = }\t|{k = }\t{l1 = }\t|{lr = }\t|{n_layer = }"
-        )
-        re_clf = RuleExtractionClassifier(lr, k, n_layer, l1, max_epochs, wd)
-        re_scores = cross_val_score(re_clf, X, y, cv=5, scoring="f1_macro")
-        print(f"{re_scores = }")
-
-        print(f"")
-        print("------------------ CART classifier ------------------")
-
-        # Train classifier
-        model_path = f"{f_models}/{idx}.pth"
-
-        # if os.path.isfile(model_path) and not new:
-        #     model = torch.load(model_path)
-        #     print("Model already trained. Skipping this training run...")
-        # else:
-        spec: NNSpec = [(k - i, k - i - 1, Activation.TANH) for i in range(n_layer)]
-        spec.append(((k - n_layer, 1, Activation.SIGMOID)))
-        layer1 = spec.pop(0)
-        spec.insert(0, (in_shape, k - 1, Activation.TANH))
-
-        model = ModelFactory.get_model_by_spec(spec)
-        # train a neural net
-        metrics, dl, _ = train_mlp(full_df, model, seed, bs, lr, max_epochs, l1, wd)
-
-        # append losses to losses.csv
-        metrics.insert(loc=0, column="idx", value=idx)
-        metrics.insert(
-            loc=1,
-            column="epoch",
-            value=[i + 1 for i in range(len(metrics["train_loss"]))],
-        )
-        all_metrics.append(metrics)
-        metrics.to_csv(f_losses, mode="a", index=False, header=(idx == 0))
-
-        full_dl = DataLoader(
-            FileDataset(full_df), batch_size=full_df.shape[0], shuffle=False
-        )
-        nn_acc = accuracy(model, full_dl, "cpu")
-        # print(f"full precision model acc: {full_precision_acc}")
-        q_model = copy.deepcopy(model)
-        while any(isinstance(l, nn.Linear) for l in q_model):
-            q_model = quantize_first_lin_layer(q_model, full_df)
-        quantized_acc = accuracy(q_model, full_dl, "cpu")
-        # print(f"Quantized model acc: {quantized_acc}")
-        q_ng, bg, ng_data = nn_to_rule_set(model, full_df)
-        bgs.append(bg)
-        q_ng_pred = q_ng(ng_data)
-        y = np.array(full_df["target"])
-        y_int = np.array(y, dtype=int)
-        q_ng_acc = np.mean(q_ng_pred == y_int)
-        bg_data = {key: np.array(value, dtype=bool) for key, value in ng_data.items()}
-        bg_pred = np.array(bg(bg_data), dtype=int)
-        bg_acc = np.mean(bg_pred == y_int)
-        print(f"Rule Set Accuracy: {bg_acc}")
-        X, y = next(iter(full_dl))
-        nn_out = model(X).detach().numpy().round().astype(int)
-        fidelity = np.mean(nn_out == bg_pred)
-
-        torch.save(model, f"{f_models}/full_precision_{idx}.pth")
-        torch.save(q_model, model_path)
-
-        cols = (
-            [idx, seed, lr, k, n_layer, l1, metrics.shape[0], wd]
-            + [metrics["train_loss"][metrics.shape[0] - 1], nn_acc]
-            + [bg_acc, fidelity, bg.complexity()]
-        )
-        runs.loc[idx] = [str(val) for val in cols]
-        runs.to_csv(f_runs, mode="w", header=True, index=False)
-        print()
+    # calculate best hyperparameters for rule extraction
+    param_grid = {
+        "k": [8],
+        "lr": [3e-4, 3e-3, 1e-2],
+        "l1": [1e-5, 1e-3],
+        "n_layer": [1, 2, 3],
+        "steepness": [2, 4, 8],
+    }
+    # re_clf = RuleExtractionClassifier(
+    #     0.003, 8, 2, 0.0, grid_search_epochs, 0.0, steepness=6, delay=grid_search_delay
+    # )
+    # grid_search = RandomizedSearchCV(
+    #     re_clf, param_grid, n_iter=5, scoring="accuracy", error_score="raise", verbose=1
+    # )
+    # grid_search.fit(X, y)
+    # p = grid_search.best_params_
+    # print(f"{p = }")
+    re_clf = RuleExtractionClassifier(
+        0.003,  # p["lr"],
+        8,  # p["k"],
+        1,  # p["n_layer"],
+        3e-4,  # p["l1"],
+        max_epochs,
+        0.0,
+        6,  # steepness=p["steepness"],
+        delay=delay,
+    )
+    re_cv_scores = cross_val_score(
+        re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+    )
+    print(f"{re_cv_scores = }")
     return runs
 
 
@@ -189,6 +149,7 @@ def main(key: str, retrain=False):
 
     if not os.path.isfile(f_runs) or retrain:
         runs = training_runs(key, f_root, f_data, f_models, f_runs, f_losses)
+        runs.to_csv()
     else:
         runs = pd.read_csv(f_runs)
 

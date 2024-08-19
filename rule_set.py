@@ -6,6 +6,7 @@ from graphlib import TopologicalSorter
 from typing import Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch import isin
@@ -98,7 +99,10 @@ class IfThenRule(Node):
         ans = np.ones_like(vars[key], dtype=bool)
         for name, val in self.ins:
             temp = vars[name] if val else ~vars[name]
-            ans = ans & temp
+            try:
+                ans = ans & temp
+            except:
+                raise ValueError
 
         return ans
 
@@ -433,7 +437,7 @@ class RuleSetGraph(Graph):
         super().__init__(rule_set_neurons)
 
     @classmethod
-    def from_q_neuron_graph(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
+    def from_QNG(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
         rule_neurons = [
             RuleSetNeuron(q_n, q_ng, simplify)
             for key, q_n in q_ng.nodes.items()
@@ -451,3 +455,9 @@ class RuleSetGraph(Graph):
             for node in self.nodes.values()
             if isinstance(node, RuleSetNeuron)
         )
+
+    def __call__(self, data: pd.DataFrame | dict[str, np.ndarray]) -> np.ndarray:
+        if isinstance(data, pd.DataFrame):
+            keys = list(data.columns)
+            data = {key: np.array(data[key], dtype=bool) for key in keys}
+        return super().__call__(data)

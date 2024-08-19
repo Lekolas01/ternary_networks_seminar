@@ -73,8 +73,8 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
 
     if len(centers) == 1:
         print(f"constant function at neuron {neuron}.")
-    sns.lineplot(ax=axes[1], x=x_vals, y=y_vals)
-    sns.lineplot(ax=axes[1], x=x, y=y, color="r", linewidth=1.0)
+    sns.lineplot(ax=axes[0], x=x_vals, y=y_vals)
+    sns.lineplot(ax=axes[0], x=x, y=y, color="r", linewidth=1.0)
     plt.show()
 
 

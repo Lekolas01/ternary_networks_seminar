@@ -4,6 +4,7 @@ from collections.abc import Mapping, MutableMapping
 from typing import Self, Sequence
 
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from ckmeans_1d_dp import ckmeans
@@ -142,6 +143,12 @@ class QuantizedNeuronGraph2(Graph):
 
     def __repr__(self):
         return str(self)
+
+    def __call__(self, data: pd.DataFrame | dict[str, np.ndarray]) -> np.ndarray:
+        if isinstance(data, pd.DataFrame):
+            keys = list(data.columns)
+            data = {key: np.array(data[key], dtype=bool) for key in keys}
+        return super().__call__(data)
 
 
 class CustomLayer(nn.Module):

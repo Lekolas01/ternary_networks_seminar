@@ -1,8 +1,26 @@
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from neuron import Activation
 
 NNSpec = list[tuple[int, int, Activation]]
+
+
+class SteepTanh(nn.Module):
+    def __init__(self, k: float):
+        super(SteepTanh, self).__init__()
+        self.k = k
+
+    def forward(self, x):
+        # return 2 / (1 + torch.exp(-self.k * x)) - 1 # not numerically stable???
+        return F.tanh(self.k * x / 2)
+
+    def __str__(self):
+        return f"Tanh(k = {self.k})"
+
+    def __repr__(self):
+        return str(self)
 
 
 class ModelFactory:
@@ -47,11 +65,15 @@ class ModelFactory:
         return cls.get_model_by_spec(nn_spec)
 
     @classmethod
-    def get_model_by_spec(cls, nn_spec: NNSpec):
+    def get_model_by_spec(cls, nn_spec: NNSpec, steepness=2.0):
         ans = nn.Sequential()
         for idx, layer_spec in enumerate(nn_spec):
             ans.add_module(f"lin{idx}", nn.Linear(layer_spec[0], layer_spec[1]))
-            act_fn = nn.Tanh() if layer_spec[2] == Activation.TANH else nn.Sigmoid()
+            act_fn = (
+                SteepTanh(steepness)
+                if layer_spec[2] == Activation.TANH
+                else nn.Sigmoid()
+            )
             ans.add_module(f"act_fn{idx}", act_fn)
         ans.add_module(f"flatten", nn.Flatten(0))
         return ans

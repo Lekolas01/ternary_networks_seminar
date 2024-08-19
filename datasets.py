@@ -27,6 +27,7 @@ class FileDataset(Dataset):
         range: tuple[float, float] = (0, 1),
         target="target",
         normalize=False,
+        encode=[],
     ):
         """
         path: str
@@ -48,19 +49,18 @@ class FileDataset(Dataset):
         # df = copy.deepcopy(df)
         df = df[(df != "?").all(axis=1)]  # remove rows with missing values
         for column in df.columns:
-            if normalize and df[column].dtype in ["float64", "int64"]:
-                # normalize numerical columns to mean = 0 and std = 1
-                mean = df[column].mean()
-                std = df[column].std()
-                df[column] = (df[column] - mean) / std
-
-            elif df[column].dtype == "object" and column != target:
+            if (df[column].dtype == "object" or column in encode) and column != target:
                 # one-hot encode categorical columns
                 df = pd.concat(
                     [df, pd.get_dummies(df[column], prefix=column, drop_first=False)],
                     axis=1,
                 )
                 df.drop([column], axis=1, inplace=True)
+            elif normalize and df[column].dtype in ["float64", "int64"]:
+                # normalize numerical columns to mean = 0 and std = 1
+                mean = df[column].mean()
+                std = df[column].std()
+                df[column] = (df[column] - mean) / std
 
         self.n_target = 0
         if len(df[target].unique()) > 2:
@@ -177,11 +177,18 @@ def get_df(key: str) -> pd.DataFrame:
         case "mushroom":
             return get_df_from_uci(73)
         case "car_evaluation":
-            return get_df_from_uci(19)
+            ans = get_df_from_uci(19)
+            # the most common output is unacc;
+            # make it the positive class and the other columns the negative class
+            ans.loc[ans["target"] != "unacc", "target"] = 0
+            ans.loc[ans["target"] == "unacc", "target"] = 1
+            return ans
         case "abcdefg":
             e = ExpressionEvaluator()
             fn = e.parse("(a | b) & (c | d) & (e | (f & g))")
             return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
+        case "monk":
+            return get_df_from_uci(id=70)
         case _:
             raise ValueError
 
