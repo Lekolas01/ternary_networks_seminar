@@ -113,15 +113,6 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         "n_layer": [1, 2, 3],
         "steepness": [2, 4, 8],
     }
-    # re_clf = RuleExtractionClassifier(
-    #     0.003, 8, 2, 0.0, grid_search_epochs, 0.0, steepness=6, delay=grid_search_delay
-    # )
-    # grid_search = RandomizedSearchCV(
-    #     re_clf, param_grid, n_iter=5, scoring="accuracy", error_score="raise", verbose=1
-    # )
-    # grid_search.fit(X, y)
-    # p = grid_search.best_params_
-    # print(f"{p = }")
     re_clf = RuleExtractionClassifier(
         0.003,  # p["lr"],
         8,  # p["k"],
