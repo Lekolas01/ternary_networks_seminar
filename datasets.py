@@ -106,6 +106,7 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
     For obtaining two FileDatasets (one train, one validation) based on dataset name.
     """
     datasets = []
+    from ucimlrepo import fetch_ucirepo
     match ds:
         case "adult":
             path = Path("data/adult/adult.csv")
@@ -118,7 +119,6 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
             )
 
         case "mushroom":
-            from ucimlrepo import fetch_ucirepo
 
             # fetch dataset
             mushroom = fetch_ucirepo(id=73)
@@ -151,6 +151,56 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
             ]
             datasets.append(FileDataset(path=path, target="edible"))
             datasets.append(FileDataset(path=path, target="edible"))
+        case "king_rook-king_pawn":
+            chess_king_rook_vs_king_pawn = fetch_ucirepo(id=22)
+            names = [
+                "bkblk",
+                "bknwy",
+                "bkon8",
+                "bkona",
+                "bkspr",
+                "bkxbq",
+                "bkxcr",
+                "bkxwp",
+                "blxwp",
+                "bxqsq",
+                "cntxt",
+                "dsopp",
+                "dwipd",
+                "hdchk",
+                "katri",
+                "mulch",
+                "qxmsq",
+                "r2ar8",
+                "reskd",
+                "reskr",
+                "rimmx",
+                "rkxwp",
+                "rxmsq",
+                "simpl",
+                "skach",
+                "skewr",
+                "skrxp",
+                "spcop",
+                "stlmt",
+                "thrsk",
+                "wkcti",
+                "wkna8",
+                "wknck",
+                "wkovl",
+                "wkpos",
+                "wtoeg"
+            ]
+        case "king_rook-king":
+            chess_king_rook_vs_king = fetch_ucirepo(id=23)
+            names = [
+                "white-king-file",
+                "white-king-rank",
+                "white-rook-file",
+                "white-rook-rank",
+                "black-king-file",
+
+            ]
         case "logical_AND":
             path = Path("data", "generated", ds, "data.csv")
             datasets.append(FileDataset(path=path))
