@@ -22,7 +22,8 @@ import torch
 from sklearn.datasets import load_iris
 
 from models.model_collection import ModelFactory, SteepTanh
-from rule_set import QuantizedLayer
+from q_neuron import Perceptron, QuantizedNeuronGraph2
+from rule_set import QuantizedLayer, RuleSetNeuron
 
 iris = load_iris()
 
@@ -166,4 +167,14 @@ start = timeit.timeit()
 time.sleep(1.45)
 end = timeit.timeit()
 print(end - start)
+# %%
+from q_neuron import Perceptron, QuantizedNeuronGraph2
+from rule_set import RuleSetNeuron
+
+q_neuron = Perceptron(
+    "y", {"x1": 3.0, "x2": 3.0, "x3": 1.0, "x4": 1.0, "x5": 1.0}, -5.5
+)
+rs = RuleSetNeuron(q_neuron, QuantizedNeuronGraph2([q_neuron]), True)
+print(rs)
+
 # %%

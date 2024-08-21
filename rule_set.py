@@ -222,6 +222,7 @@ class Subproblem:
     def __str__(self) -> str:
         if self.is_const:
             return f"SP({self.key} := {bool_2_ch(self.val)})"
+        return "\n\t".join([f"{self.key}\t:= {r.body()}" for r in self.rules])
         return f"SP({self.key} := {' | '.join(r.body() for r in self.rules)})"
 
     def __repr__(self) -> str:

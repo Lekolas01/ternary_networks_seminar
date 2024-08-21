@@ -32,8 +32,8 @@ def nn_to_rule_set(model: nn.Sequential, df: pd.DataFrame):
         q_neuron_graph = QNG_from_QNN(model, keys)
 
     # transform the quantized graph to a set of if-then rules
-    bool_graph = RuleSetGraph.from_QNG(q_neuron_graph)
-    return (q_neuron_graph, bool_graph, data)
+    rule_set = RuleSetGraph.from_QNG(q_neuron_graph)
+    return (q_neuron_graph, rule_set, data)
 
 
 def inspect_model(f_model: str, f_data: str):
