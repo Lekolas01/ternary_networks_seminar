@@ -50,7 +50,7 @@ class RuleExtractionClassifier(BaseEstimator):
 
     # convert a df to tensor to be used in pytorch
     def df_to_tensor(self, df) -> Tensor:
-        return torch.from_numpy(df.values).float().to(self.device)
+        return torch.from_numpy(df.values.astype(np.float32)).to(self.device)
 
     def convert_to_rule_set(self, model: Sequential, dl: DataLoader):
         pass
@@ -68,14 +68,14 @@ class RuleExtractionClassifier(BaseEstimator):
         if torch.any(model[0].weight.isnan()):
             print(spec)
         assert not torch.any(model[0].weight.isnan())
-        # print(model)
+        print(model)
 
         dataset = TensorDataset(X, y)
         # model_path = f"temp/testing_model.pth"
         dl = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         assert not torch.any(model[0].weight.isnan())
         metrics = self.train_mlp(
-            dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay, False
+            dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay, True
         )
         #            torch.save(model, model_path)
         #            print(f"Saved model to {model_path}")

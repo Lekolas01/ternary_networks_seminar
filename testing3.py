@@ -23,7 +23,7 @@ from sklearn.datasets import load_iris
 
 from models.model_collection import ModelFactory, SteepTanh
 from q_neuron import Perceptron, QuantizedNeuronGraph2
-from rule_set import QuantizedLayer, RuleSetNeuron
+from rule_set import QuantizedLayer, RuleSetGraph, RuleSetNeuron
 
 iris = load_iris()
 
@@ -174,6 +174,7 @@ from rule_set import RuleSetNeuron
 q_neuron = Perceptron(
     "y", {"x1": 3.0, "x2": 3.0, "x3": 1.0, "x4": 1.0, "x5": 1.0}, -5.5
 )
+RuleSetGraph.from_QNG
 rs = RuleSetNeuron(q_neuron, QuantizedNeuronGraph2([q_neuron]), True)
 print(rs)
 

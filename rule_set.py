@@ -445,6 +445,9 @@ class RuleSetGraph(Graph):
             if isinstance(q_n, Perceptron)
         ]
         ans = RuleSetGraph(rule_neurons)
+
+        if simplify:
+            ans.simplify()
         return ans
 
     def __repr__(self):
@@ -462,3 +465,7 @@ class RuleSetGraph(Graph):
             keys = list(data.columns)
             data = {key: np.array(data[key], dtype=bool) for key in keys}
         return super().__call__(data)
+
+    def simplify(self):
+
+        pass

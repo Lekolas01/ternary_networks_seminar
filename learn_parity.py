@@ -1,45 +1,21 @@
-import copy
-import itertools
 import os
-import timeit
 from argparse import ArgumentParser, Namespace
 
-import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-import torch.nn as nn
 import wittgenstein as lw
-from ckmeans_1d_dp import ckmeans
-from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
-from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import RandomizedSearchCV, cross_val_score
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import shuffle
-from torch import Tensor
-from torch.utils.data import TensorDataset
-from torch.utils.data.dataloader import DataLoader
 
-from bool_formula import Activation, overlap
 from datasets import FileDataset, get_df
-from generate_parity_dataset import parity_df
-from models.model_collection import ModelFactory, NNSpec
-from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_extraction import nn_to_rule_set
 from rule_extraction_classifier import RuleExtractionClassifier
-from rule_set import RuleSetGraph
-from utilities import accuracy, set_seed
-
-# Grid Search over NN training hyperparameters
-#   call train_mlp.py
-# For each trained model, extract rule set
-# save all rule sets
-# create graph for rule sets: dimensions are complexity and accuracy
+from utilities import set_seed
 
 
 def plot_decision_tree(clf_object, feature_names, class_names):
@@ -54,56 +30,34 @@ def plot_decision_tree(clf_object, feature_names, class_names):
     plt.show()
 
 
-def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
+def load_dataset(key: str) -> tuple[DataFrame, Series]:
+    f_data = f"data/{key}.csv"
+    if not os.path.isfile(f_data):
+        print(f"Loading dataset with key {key}")
+        df = get_df(key)
+        ds = FileDataset(df, encode=True)
+        ds.df.to_csv(f_data, index=False)
+        print(f"Saved dataset to {f_data}")
+
+    df = pd.read_csv(f_data)
+    X = df.iloc[:, :-1]
+    y = df.iloc[:, -1]
+    return X, y
+
+
+def training_runs(key):
     seed = 1
     set_seed(seed)
-    # Generate dataframe for parity
 
-    os.makedirs(f_models, exist_ok=True)
-    full_df = get_df(key)
-    ds = FileDataset(full_df, encode=list(full_df.columns[:-1]))
-    ds.df.to_csv(f_data, index=False)
-    full_df = pd.read_csv(f_data)
+    X, y = load_dataset(key)
 
-    in_shape = full_df.shape[1] - 1  # -1 for target column
-    X = full_df.iloc[:, :-1]
-    y = full_df.iloc[:, -1]
-
-    X, y = shuffle(X, y, random_state=42)
-    # Do a single NN training run on this dataset
-    grid_search_epochs = 300
-    grid_search_delay = 200
     max_epochs = 8000
-    delay = 800
-    bs = 64
-    wd = 0.0
+    delay = 500
 
-    l1s = [0.0]
-    lrs = [3e-4, 3e-3]
-    n_layers = [1, 2]
     runs = DataFrame(
         columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
         + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
-
-    # calculate ripper cross validation
-    ripper_clf = lw.RIPPER()
-
-    param_grid = {"prune_size": [0.33, 0.5], "k": [1, 2]}
-    grid_search = RandomizedSearchCV(
-        ripper_clf,
-        param_grid,
-        n_iter=5,
-        scoring="accuracy",
-        error_score="raise",
-        verbose=2,
-    )
-    grid_search.fit(X, y)
-    p = grid_search.best_params_
-    print(f"{p = }")
-    ripper_clf = lw.RIPPER(prune_size=p["prune_size"], k=p["k"])
-    ripper_cv_scores = cross_val_score(ripper_clf, X, y, cv=10, scoring="accuracy")
-    print(f"{ripper_cv_scores = }")
 
     # calculate best hyperparameters for rule extraction
     param_grid = {
@@ -114,14 +68,7 @@ def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
         "steepness": [2, 4, 8],
     }
     re_clf = RuleExtractionClassifier(
-        0.003,  # p["lr"],
-        8,  # p["k"],
-        1,  # p["n_layer"],
-        3e-4,  # p["l1"],
-        max_epochs,
-        0.0,
-        6,  # steepness=p["steepness"],
-        delay=delay,
+        0.003, 8, 1, 3e-4, max_epochs, 0.0, 6, delay=delay
     )
     re_cv_scores = cross_val_score(
         re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
@@ -139,7 +86,7 @@ def main(key: str, retrain=False):
     f_losses = f"{f_root}/losses.csv"
 
     if not os.path.isfile(f_runs) or retrain:
-        runs = training_runs(key, f_root, f_data, f_models, f_runs, f_losses)
+        runs = training_runs(key)
         runs.to_csv()
     else:
         runs = pd.read_csv(f_runs)
