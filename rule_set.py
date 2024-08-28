@@ -7,20 +7,11 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-from torch import isin
-from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import (
-    Perceptron,
-    QuantizedLayer,
-    QuantizedNeuronGraph,
-    QuantizedNeuronGraph2,
-)
+from q_neuron import Perceptron, QuantizedNeuronGraph
 from utilities import flatten
 
 
@@ -40,15 +31,14 @@ class Dp:
         assert 0 <= n_vars
         self.n_vars = n_vars
         self.data: list[list[DpNode]] = [[] for _ in range(self.n_vars + 1)]
-        self.eps = 1e-6
 
-    def find(self, k: int, val: float, eps=1e-6) -> DpNode | None:
+    def find(self, k: int, val: float) -> DpNode | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
         if k > len(self.data):
             return None
         arr = self.data[k]
         for t in arr:
-            if t.min_thr + eps < val < t.max_thr - eps:
+            if t.min_thr < val < t.max_thr:
                 return t
         return None
 
@@ -58,7 +48,7 @@ class Dp:
             self.find(k, val.min_thr) is not None
             or self.find(k, val.max_thr) is not None
         ):
-            print(f"{self.data = }")
+            print(f"{self.data[k] = }")
             print(f"{k = }")
             print(f"{val = }")
             raise ValueError
@@ -237,7 +227,7 @@ class Subproblem:
 
 class RuleSetNeuron(Node):
     def __init__(
-        self, q_neuron: Perceptron, q_ng: QuantizedNeuronGraph2, simplify: bool
+        self, q_neuron: Perceptron, q_ng: QuantizedNeuronGraph, simplify: bool
     ) -> None:
         self.q_neuron = q_neuron
         self.q_ng = q_ng
@@ -375,7 +365,7 @@ class RuleSetNeuron(Node):
                         node.key, [IfThenRule(node.key, [], val=True)]
                     )
                 else:
-                    target_1 = dp.find(k + 1, node.mean, eps=0.0)
+                    target_1 = dp.find(k + 1, node.mean)
                     if target_1 is None:
                         print(f"{dp = }")
                         print(f"{k + 1 = }")
@@ -383,7 +373,7 @@ class RuleSetNeuron(Node):
                     if target_1 is None:
                         raise ValueError
 
-                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1], eps=0.0)
+                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
                     rule1 = IfThenRule(node.key, [(target_1.key, True)])
                     rule2 = IfThenRule(
@@ -445,7 +435,7 @@ class RuleSetGraph(Graph):
         super().__init__(rule_set_neurons)
 
     @classmethod
-    def from_QNG(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
+    def from_QNG(cls, q_ng: QuantizedNeuronGraph, simplify=True):
         # keep track of the needed rule set neurons
         needed_rule_set_neurons: set[str] = {"target"}
         rule_set_neurons = []

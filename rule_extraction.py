@@ -11,7 +11,7 @@ import torch.nn as nn
 from matplotlib import pyplot as plt
 
 from neuron import NeuronGraph
-from q_neuron import QNG_from_QNN, QuantizedLayer, QuantizedNeuronGraph2
+from q_neuron import QNG_from_QNN, QuantizedLayer, QuantizedNeuronGraph
 from rule_set import RuleSetGraph
 
 
@@ -20,13 +20,13 @@ def nn_to_rule_set(model: nn.Sequential, df: pd.DataFrame):
         df.columns[:-1]
     )  # assume that df only has one target column at the far right
     data = {key: np.array(df[key], dtype=float) for key in keys}
-    q_neuron_graph: QuantizedNeuronGraph2
+    q_neuron_graph: QuantizedNeuronGraph
     if isinstance(model[0], nn.Linear):
         # transform the trained neural network to a directed graph of full-precision neurons
         neuron_graph = NeuronGraph.from_nn(model, keys)
         # transform the graph to a new graph of perceptrons with quantized step functions
         # q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
-        q_neuron_graph = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+        q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     else:
         assert isinstance(model[0], QuantizedLayer)
         q_neuron_graph = QNG_from_QNN(model, keys)

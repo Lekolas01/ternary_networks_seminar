@@ -229,6 +229,8 @@ def get_df(key: str) -> pd.DataFrame:
         return ans
 
     match key:
+        case "parity4":
+            return parity_df(k=4, shuffle=False, n=1024)
         case "parity10":
             return parity_df(k=10, shuffle=False, n=1024)
         case "adult":

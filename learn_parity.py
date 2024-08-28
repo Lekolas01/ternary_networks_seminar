@@ -1,5 +1,6 @@
 import os
 from argparse import ArgumentParser, Namespace
+from distutils.sysconfig import customize_compiler
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,13 +10,24 @@ import torch
 import wittgenstein as lw
 from pandas import DataFrame, Series
 from sklearn import tree
-from sklearn.model_selection import RandomizedSearchCV, cross_val_score
+from sklearn.metrics import accuracy_score, make_scorer
+from sklearn.model_selection import (
+    ParameterSampler,
+    RandomizedSearchCV,
+    cross_val_score,
+    train_test_split,
+)
 from sklearn.utils import shuffle
 
 from datasets import FileDataset, get_df
 from rule_extraction import nn_to_rule_set
 from rule_extraction_classifier import RuleExtractionClassifier
-from utilities import set_seed
+from utilities import accuracy, set_seed
+
+
+def custom_score(acc, complexity):
+    l = 0.05
+    return 1 / ((1.0 + l - acc) * complexity)
 
 
 def plot_decision_tree(clf_object, feature_names, class_names):
@@ -50,8 +62,9 @@ def training_runs(key):
     set_seed(seed)
 
     X, y = load_dataset(key)
-
-    max_epochs = 8000
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=seed
+    )
 
     runs = DataFrame(
         columns=["idx", "seed", "lr", "layer_width", "n_layer", "l1", "epochs", "wd"]
@@ -63,51 +76,54 @@ def training_runs(key):
         layer_width=3,
         n_layer=1,
         l1=3e-5,
-        epochs=max_epochs,
+        epochs=5000,
         wd=0.0,
         steepness=6,
-        delay=400,
+        delay=200,
     )
 
     # find best hyperparameter settings
     # abcdefg: Best parameters: {'l1': 1e-05, 'layer_width': 8, 'lr': 0.0003, 'n_layer': 1, 'steepness': 6}
     param_grid = {
-        "layer_width": [8],
-        "lr": [3e-4, 3e-3],
-        "l1": [1e-5],
-        "n_layer": [1, 2],
-        "steepness": [2, 6],
+        "layer_width": [5, 10],
+        "lr": [1e-4, 3e-3],
+        "l1": [1e-4, 3e-3],
+        "n_layer": [1, 2, 3],
+        "steepness": [2, 4, 8],
     }
 
-    random_search = RandomizedSearchCV(
-        re_clf,
-        param_grid,
-        scoring="accuracy",
-        n_iter=5,
-        cv=5,
-        error_score="raise",
-    )
+    n_iter = 8
+    # do a random search over the hyperparameter space
+    sampler = ParameterSampler(param_grid, n_iter=n_iter, random_state=seed + 1)
 
-    # random_search.fit(X, y)
-    # re_clf.set_params(**random_search.best_params_)
+    accs, complexities = np.zeros(n_iter), np.zeros(n_iter)
+    for i, sample in enumerate(sampler):
+        re_clf.set_params(**sample)
+        re_clf.fit(X_train, y_train)
 
+        accs[i] = accuracy_score(y_test, re_clf.predict(X_test))
+        complexities[i] = re_clf.bool_graph.complexity()
+
+    print(f"{accs = }")
+    print(f"{complexities = }")
+    print(f"{custom_score(accs, complexities)= }")
+    exit()
     # with these new-found hyperparameter settings, we do one final cross validation
-    # re_cv_scores = cross_val_score(
-    #     re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
-    # )
-    # print(f"cross validation scores: {re_cv_scores}")
+    re_cv_scores = cross_val_score(
+        re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+    )
+    print(f"cross validation scores: {re_cv_scores}")
 
     # Best parameters:
     # abcdefg:
-    re_clf.set_params(l1=1e-03, layer_width=8, lr=0.003, n_layer=2, steepness=6)
-    print(re_clf.get_params())
-    print(f"Best parameters: {re_clf.get_params()}")
+    # re_clf.set_params(l1=1e-04, layer_width=8, lr=0.003, n_layer=2, steepness=6)
 
     # finally, we do a single fit on the whole dataset, and observe the learned rule set
     re_clf.fit(X, y)
-    print(f"Rule set: {str(re_clf.bool_graph)}")
-    print(f"{re_clf.q_ng = }")
+    # print(f"Rule set: {str(re_clf.bool_graph)}")
+    # print(f"{re_clf.q_ng = }")
     print(f"{re_clf.bool_graph.complexity() = }")
+    exit()
     return runs
 
 

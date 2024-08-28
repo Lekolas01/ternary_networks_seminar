@@ -11,6 +11,7 @@ from ckmeans_1d_dp import ckmeans
 from pandas import DataFrame, Series
 from sklearn.base import BaseEstimator
 from sklearn.exceptions import NotFittedError
+from sklearn.metrics import make_scorer
 from torch import Tensor
 from torch.nn import Sequential
 from torch.utils.data import TensorDataset
