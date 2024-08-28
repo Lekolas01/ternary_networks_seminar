@@ -22,14 +22,14 @@ from my_logging.loggers import LogMetrics, Tracker
 from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_set import RuleSetGraph
 from train_model import training_loop
-from utilities import plot_1d_dist, set_seed
+from utilities import set_seed
 
 
 class RuleExtractionClassifier(BaseEstimator):
     def __init__(
         self,
         lr: float,
-        k: int,
+        layer_width: int,
         n_layer: int,
         l1: float,
         epochs: int,
@@ -38,7 +38,7 @@ class RuleExtractionClassifier(BaseEstimator):
         delay=100,
     ):
         self.lr = lr
-        self.k = k
+        self.layer_width = layer_width
         self.n_layer = n_layer
         self.l1 = l1
         self.device = "cpu"
@@ -58,17 +58,17 @@ class RuleExtractionClassifier(BaseEstimator):
     def train_qnn(self, X: Tensor, y: Tensor) -> tuple[Sequential, Sequential]:
         _, n_features = X.shape
         spec: NNSpec = [
-            (self.k - i, self.k - i - 1, Activation.TANH) for i in range(self.n_layer)
+            (self.layer_width - i, self.layer_width - i - 1, Activation.TANH)
+            for i in range(self.n_layer)
         ]
-        spec.append(((self.k - self.n_layer, 1, Activation.SIGMOID)))
+        spec.append(((self.layer_width - self.n_layer, 1, Activation.SIGMOID)))
         spec.pop(0)
-        spec.insert(0, (n_features, self.k - 1, Activation.TANH))
+        spec.insert(0, (n_features, self.layer_width - 1, Activation.TANH))
 
         model = ModelFactory.get_model_by_spec(spec, steepness=self.steepness)
         if torch.any(model[0].weight.isnan()):
             print(spec)
         assert not torch.any(model[0].weight.isnan())
-        print(model)
 
         dataset = TensorDataset(X, y)
         # model_path = f"temp/testing_model.pth"
@@ -84,15 +84,6 @@ class RuleExtractionClassifier(BaseEstimator):
         #            print(f"Load model from {model_path}")
         q_model = copy.deepcopy(model)
         nn_out = model(X)
-        # qnn_out = q_model(X)
-        # nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
-        # qnn_pred = np.array(np.round(qnn_out.detach().numpy()), dtype=bool)
-        # y_arr = np.array(y.detach().numpy(), dtype=bool)
-        # nn_acc = np.mean(nn_pred == y_arr)
-        # qnn_acc = np.mean(qnn_pred == y_arr)
-        # fidelity = np.mean(nn_pred == qnn_pred)
-        # print("Before first quantization:")
-        # print(f"{nn_acc = } | {qnn_acc = } | {fidelity = }")
 
         while any(isinstance(l, nn.Linear) for l in q_model):
             assert torch.all(torch.isclose(model(X), nn_out))
@@ -108,18 +99,19 @@ class RuleExtractionClassifier(BaseEstimator):
         return q_model, model
 
     def fit(self, X: DataFrame, y: Series):
+        print(f"--- Start fit with {str(self)}")
         start = timer()
 
         X_tensor = self.df_to_tensor(X)
         y_tensor = self.df_to_tensor(y)
         qnn, nn = self.train_qnn(X_tensor, y_tensor)
 
-        q_ng = QNG_from_QNN(qnn, list(X.columns))
-        self.bool_graph = RuleSetGraph.from_QNG(q_ng)
+        self.q_ng = QNG_from_QNN(qnn, list(X.columns))
+        self.bool_graph = RuleSetGraph.from_QNG(self.q_ng)
         nn_out = nn(X_tensor)
         nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
         qnn_pred = np.array(qnn(X_tensor))
-        q_ng_pred = q_ng(X)
+        q_ng_pred = self.q_ng(X)
         bg_pred = self.bool_graph(X)
         nn_acc = np.mean(nn_pred == y)
         bg_acc = np.mean(bg_pred == y)
@@ -128,7 +120,7 @@ class RuleExtractionClassifier(BaseEstimator):
         fid_rule_set = np.mean(nn_pred == bg_pred)
         end = timer()
         print(
-            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {fid_qnn} | fid(nn, q_ng) = {fid_qng} | fid(nn, rule_set) = {fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}"
+            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {fid_qnn} | fid(nn, q_ng) = {fid_qng} | fid(nn, rule_set) = {fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}\n"
         )
         return self
 
@@ -139,7 +131,7 @@ class RuleExtractionClassifier(BaseEstimator):
         return ans
 
     def __str__(self):
-        return f"RuleExtractionClassifier(lr={self.lr}, k={self.k}, n_layer={self.n_layer}, l1={self.l1})"
+        return f"RuleExtractionClassifier(lr={self.lr}, layer_width={self.layer_width}, n_layer={self.n_layer}, l1={self.l1}, epochs={self.epochs}, wd={self.wd}, steepness={self.steepness} delay={self.delay})"
 
     def train_mlp(
         self,
@@ -171,7 +163,7 @@ class RuleExtractionClassifier(BaseEstimator):
             assert not torch.any(model[0].weight.isnan())
             tracker.add_logger(
                 LogMetrics(
-                    ["timestamp", "epoch", "train_loss", "train_acc"],
+                    ["timestamp", "epoch", "train_loss", "train_acc", "valid_acc"],
                 )
             )
             assert not torch.any(model[0].weight.isnan())

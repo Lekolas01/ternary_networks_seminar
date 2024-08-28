@@ -403,6 +403,13 @@ class RuleSetNeuron(Node):
             graph_ins[key] = list(filter(lambda k: k in keys, sp.children()))
         return graph_ins
 
+    def input_rules(self) -> set[str]:
+        ans: set[str] = set()
+        for sp in self.subproblems.values():
+            for child in sp.children():
+                ans.add(child)
+        return ans
+
     def call_order(self) -> list[str]:
         sorter = TopologicalSorter(self.graph_ins())
         return list(sorter.static_order())
@@ -439,12 +446,28 @@ class RuleSetGraph(Graph):
 
     @classmethod
     def from_QNG(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
-        rule_neurons = [
-            RuleSetNeuron(q_n, q_ng, simplify)
-            for key, q_n in q_ng.nodes.items()
-            if isinstance(q_n, Perceptron)
-        ]
-        ans = RuleSetGraph(rule_neurons)
+        # keep track of the needed rule set neurons
+        needed_rule_set_neurons: set[str] = {"target"}
+        rule_set_neurons = []
+
+        q_neurons = list(q_ng.nodes.items())
+        q_neurons.reverse()
+        for key, q_n in q_neurons:
+            if not isinstance(q_n, Perceptron):
+                continue
+            if key not in needed_rule_set_neurons:
+                continue
+            rule_set_neuron = RuleSetNeuron(q_n, q_ng, simplify)
+            graph_ins = rule_set_neuron.input_rules()
+            rule_set_neurons.append(rule_set_neuron)
+            for name in graph_ins:
+                needed_rule_set_neurons.add(name)
+        # rule_neurons = [
+        #     RuleSetNeuron(q_n, q_ng, simplify)
+        #     for key, q_n in q_ng.nodes.items()
+        #     if isinstance(q_n, Perceptron) and key in needed_rule_set_neurons
+        # ]
+        ans = RuleSetGraph(rule_set_neurons)
 
         if simplify:
             ans.simplify()

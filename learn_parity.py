@@ -52,28 +52,62 @@ def training_runs(key):
     X, y = load_dataset(key)
 
     max_epochs = 8000
-    delay = 500
 
     runs = DataFrame(
-        columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
+        columns=["idx", "seed", "lr", "layer_width", "n_layer", "l1", "epochs", "wd"]
         + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
     )
 
-    # calculate best hyperparameters for rule extraction
-    param_grid = {
-        "k": [8],
-        "lr": [3e-4, 3e-3, 1e-2],
-        "l1": [1e-5, 1e-3],
-        "n_layer": [1, 2, 3],
-        "steepness": [2, 4, 8],
-    }
     re_clf = RuleExtractionClassifier(
-        0.003, 8, 1, 3e-4, max_epochs, 0.0, 6, delay=delay
+        lr=0.003,
+        layer_width=3,
+        n_layer=1,
+        l1=3e-5,
+        epochs=max_epochs,
+        wd=0.0,
+        steepness=6,
+        delay=400,
     )
-    re_cv_scores = cross_val_score(
-        re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+
+    # find best hyperparameter settings
+    # abcdefg: Best parameters: {'l1': 1e-05, 'layer_width': 8, 'lr': 0.0003, 'n_layer': 1, 'steepness': 6}
+    param_grid = {
+        "layer_width": [8],
+        "lr": [3e-4, 3e-3],
+        "l1": [1e-5],
+        "n_layer": [1, 2],
+        "steepness": [2, 6],
+    }
+
+    random_search = RandomizedSearchCV(
+        re_clf,
+        param_grid,
+        scoring="accuracy",
+        n_iter=5,
+        cv=5,
+        error_score="raise",
     )
-    print(f"{re_cv_scores = }")
+
+    # random_search.fit(X, y)
+    # re_clf.set_params(**random_search.best_params_)
+
+    # with these new-found hyperparameter settings, we do one final cross validation
+    # re_cv_scores = cross_val_score(
+    #     re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+    # )
+    # print(f"cross validation scores: {re_cv_scores}")
+
+    # Best parameters:
+    # abcdefg:
+    re_clf.set_params(l1=1e-03, layer_width=8, lr=0.003, n_layer=2, steepness=6)
+    print(re_clf.get_params())
+    print(f"Best parameters: {re_clf.get_params()}")
+
+    # finally, we do a single fit on the whole dataset, and observe the learned rule set
+    re_clf.fit(X, y)
+    print(f"Rule set: {str(re_clf.bool_graph)}")
+    print(f"{re_clf.q_ng = }")
+    print(f"{re_clf.bool_graph.complexity() = }")
     return runs
 
 
