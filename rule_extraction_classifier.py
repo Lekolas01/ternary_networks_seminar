@@ -105,23 +105,23 @@ class RuleExtractionClassifier(BaseEstimator):
 
         X_tensor = self.df_to_tensor(X)
         y_tensor = self.df_to_tensor(y)
-        qnn, nn = self.train_qnn(X_tensor, y_tensor)
+        qnn, self.nn = self.train_qnn(X_tensor, y_tensor)
 
         self.q_ng = QNG_from_QNN(qnn, list(X.columns))
         self.bool_graph = RuleSetGraph.from_QNG(self.q_ng)
-        nn_out = nn(X_tensor)
+        nn_out = self.nn(X_tensor)
         nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
         qnn_pred = np.array(qnn(X_tensor))
         q_ng_pred = self.q_ng(X)
         bg_pred = self.bool_graph(X)
         nn_acc = np.mean(nn_pred == y)
         bg_acc = np.mean(bg_pred == y)
-        fid_qnn = np.mean(nn_pred == qnn_pred)
-        fid_qng = np.mean(nn_pred == q_ng_pred)
-        fid_rule_set = np.mean(nn_pred == bg_pred)
+        self.fid_qnn = np.mean(nn_pred == qnn_pred)
+        self.fid_qng = np.mean(nn_pred == q_ng_pred)
+        self.fid_rule_set = np.mean(nn_pred == bg_pred)
         end = timer()
         print(
-            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {fid_qnn} | fid(nn, q_ng) = {fid_qng} | fid(nn, rule_set) = {fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}\n"
+            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {self.fid_qnn} | fid(nn, q_ng) = {self.fid_qng} | fid(nn, rule_set) = {self.fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}\n"
         )
         return self
 

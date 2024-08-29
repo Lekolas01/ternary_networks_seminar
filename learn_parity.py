@@ -1,6 +1,10 @@
+import copy
 import os
 from argparse import ArgumentParser, Namespace
+from cProfile import label
 from distutils.sysconfig import customize_compiler
+from enum import unique
+from turtle import right
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,6 +26,7 @@ from sklearn.utils import shuffle
 from datasets import FileDataset, get_df
 from rule_extraction import nn_to_rule_set
 from rule_extraction_classifier import RuleExtractionClassifier
+from rule_set import RuleSetGraph
 from utilities import accuracy, set_seed
 
 
@@ -58,7 +63,7 @@ def load_dataset(key: str) -> tuple[DataFrame, Series]:
 
 
 def training_runs(key):
-    seed = 1
+    seed = 0
     set_seed(seed)
 
     X, y = load_dataset(key)
@@ -86,44 +91,109 @@ def training_runs(key):
     # abcdefg: Best parameters: {'l1': 1e-05, 'layer_width': 8, 'lr': 0.0003, 'n_layer': 1, 'steepness': 6}
     param_grid = {
         "layer_width": [5, 10],
-        "lr": [1e-4, 3e-3],
+        "lr": [3e-4, 3e-3],
         "l1": [1e-4, 3e-3],
         "n_layer": [1, 2, 3],
         "steepness": [2, 4, 8],
     }
 
-    n_iter = 8
+    n_iter = 15
     # do a random search over the hyperparameter space
-    sampler = ParameterSampler(param_grid, n_iter=n_iter, random_state=seed + 1)
+    sampler = list(ParameterSampler(param_grid, n_iter=n_iter, random_state=seed + 1))
 
-    accs, complexities = np.zeros(n_iter), np.zeros(n_iter)
+    best_model, best_params = RuleSetGraph([]), {}
+    max_score = float("-inf")
+    accs, complexities, scores = np.zeros(n_iter), np.zeros(n_iter), np.zeros(n_iter)
+    fidelities = np.zeros(n_iter)
     for i, sample in enumerate(sampler):
         re_clf.set_params(**sample)
         re_clf.fit(X_train, y_train)
-
         accs[i] = accuracy_score(y_test, re_clf.predict(X_test))
         complexities[i] = re_clf.bool_graph.complexity()
+        scores[i] = custom_score(accs[i], complexities[i])
+        fidelities[i] = re_clf.fid_rule_set
+
+        if scores[i] > max_score:
+            max_score = scores[i]
+            best_model = copy.copy(re_clf.bool_graph)
+            best_params = sample
 
     print(f"{accs = }")
     print(f"{complexities = }")
-    print(f"{custom_score(accs, complexities)= }")
-    exit()
-    # with these new-found hyperparameter settings, we do one final cross validation
+    print(f"{scores = }")
+
+    f_figures = f"figures/{key}/"
+    if not os.path.isdir(f_figures):
+        os.makedirs(f_figures)
+
+    sns.scatterplot(x=complexities, y=accs)
+    plt.title("Rule set complexity / Validation accuracy ")
+    plt.xlabel("Complexity")
+    plt.ylabel("Accuracy")
+    plt.xlim(left=-1, right=np.max(complexities) + np.min(complexities) + 1)
+    plt.ylim(bottom=-0.05, top=1.05)
+    plt.savefig(f_figures + f"compl_acc")
+
+    steepnesses = [sample["steepness"] for sample in sampler]
+    # sns.scatterplot(x=steepnesses, y=fidelities)
+    ans = []
+    unique_st = list(set(steepnesses))
+    unique_st.sort()
+    ans = {}
+    for curr_steep in unique_st:
+        ans[str(curr_steep)] = [
+            a for idx, a in enumerate(fidelities) if steepnesses[idx] == curr_steep
+        ]
+
+    sns.boxplot(ans)
+    plt.title("Tanh activation steepness / Fidelity NN - rule set")
+    plt.xlabel("Steepness")
+    plt.ylabel("Fidelity")
+    plt.ylim(bottom=0.5, top=1.05)
+    plt.savefig(f_figures + f"steepness_fid")
+
+    l1s = [sample["l1"] for sample in sampler]
+    sns.scatterplot(x=l1s, y=complexities)
+    plt.title("L1 regularization factor / Rule set complexity")
+    plt.xlabel("lambda1")
+    plt.ylabel("Complexity")
+    plt.xlim(left=np.min(l1s) - 0.001, right=np.max(l1s) + 0.001)
+    plt.ylim(bottom=-1, top=np.max(complexities) + np.min(complexities) + 1)
+    plt.savefig(f_figures + f"l1_compl")
+
+    n_layers = [sample["n_layer"] for sample in sampler]
+    unique_st = list(set(n_layers))
+    unique_st.sort()
+    ans = {}
+    for curr_steep in unique_st:
+        ans[str(curr_steep)] = [
+            a for idx, a in enumerate(fidelities) if n_layers[idx] == curr_steep
+        ]
+
+    plt.figure()
+    sns.boxplot(ans)
+    plt.title("Number of fully connected Layers / Fidelity NN - rule set")
+    plt.xlabel("No. layers")
+    plt.ylabel("Fidelity")
+    plt.ylim(bottom=0.5, top=1.05)
+    plt.savefig(f_figures + f"nlayer_fid")
+
+    print(f"Best found rule set: {best_model}")
+    print(best_model.complexity())
+
+    # with the new-found hyperparameter settings, we do one final cross validation
+    re_clf.set_params(**best_params)
     re_cv_scores = cross_val_score(
         re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
     )
     print(f"cross validation scores: {re_cv_scores}")
+    print(f"Mean validation acc: {re_cv_scores.mean()}")
+    print(f"Standard deviation: {re_cv_scores.std()}")
 
+    # Draw graphs
     # Best parameters:
     # abcdefg:
     # re_clf.set_params(l1=1e-04, layer_width=8, lr=0.003, n_layer=2, steepness=6)
-
-    # finally, we do a single fit on the whole dataset, and observe the learned rule set
-    re_clf.fit(X, y)
-    # print(f"Rule set: {str(re_clf.bool_graph)}")
-    # print(f"{re_clf.q_ng = }")
-    print(f"{re_clf.bool_graph.complexity() = }")
-    exit()
     return runs
 
 
