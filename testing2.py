@@ -14,10 +14,14 @@ from ucimlrepo import fetch_ucirepo
 
 from datasets import FileDataset
 
-start = timer()
-time.sleep(1.45)
-end = timer()
-print(end - start)  # Time in seconds, e.g. 5.38091952400282
+
+import seaborn
+ 
+ 
+seaborn.set(style='whitegrid')
+tip = seaborn.load_dataset('tips')
+ 
+seaborn.scatterplot(x='day', y='tip', data=tip)
 exit()
 
 # fetch dataset

@@ -232,7 +232,7 @@ def get_df(key: str) -> pd.DataFrame:
         case "parity4":
             return parity_df(k=4, shuffle=False, n=1024)
         case "parity10":
-            return parity_df(k=10, shuffle=False, n=1024)
+            return parity_df(k=10, shuffle=True, n=1024)
         case "adult":
             df = get_df_from_uci(2)
             # clean up the dataset

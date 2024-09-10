@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 import torch.nn as nn
+import sys
 from torch.utils.data.dataloader import DataLoader
 
 import utilities
@@ -70,7 +71,7 @@ class LogMetrics(Logger):
             "valid_acc": f"Valid: {(self.t.valid_acc[-1] * 100):.2f}%",
         }
 
-        bar = utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
+        bar = "\r" + utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
         for metric in self.metrics:
             bar += f"{m_format[metric]}\t"
         end = "\n" if self.t.stop_condition() else "\r"
