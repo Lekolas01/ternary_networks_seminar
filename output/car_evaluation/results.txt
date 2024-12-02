@@ -1,0 +1,402 @@
+--- Hyperparameter search ---
+	param_grid = {'layer_width': [10, 6], 'lr': [0.0003, 0.001, 0.003], 'l1': [1e-05, 0.0004, 0.003], 'n_layer': [1, 2], 'steepness': [4, 8, 16]}
+
+	accs = array([0.90751445, 0.90751445, 0.96820809, 0.94219653, 0.91184971,
+       0.98265896, 0.90895954, 0.97687861, 0.97543353, 0.98410405,
+       0.90317919, 0.99132948, 0.86127168, 0.94653179, 0.99855491])
+	complexities = array([ 745. ,  956. , 1969.5,  714.5,  841. , 2117. , 1264. , 1633.5,
+       1185. , 1286.5, 1503. , 4054.5,  992.5,  693.5, 1638. ])
+	scores = array([0.00022583, 0.00017718, 0.00011184, 0.00032067, 0.00020169,
+       0.00011025, 0.00013232, 0.00016629, 0.0002282 , 0.00018633,
+       0.0001101 , 0.00005969, 0.00013159, 0.00039718, 0.00015827])
+	best_idx = 13
+	best_params = {'steepness': 4, 'n_layer': 1, 'lr': 0.003, 'layer_width': 6, 'l1': 0.003}
+
+------------- RIPPER ---------------
+	Accuracy: 	[1.         0.79190751 0.83236994 0.96531792 0.99421965 0.75722543
+ 0.93063584 0.94797688 0.94767442 1.        ]
+	mean = 0.9167327597795403
+	std = 0.0851466345380268
+
+	Complexity: 	[44 46 32 31 46 38 45 50 38 35]
+	mean = 40.5
+	std = 6.232976816898969
+
+	Best model acc: 1.0
+	Best model comply: 35
+	Best model: ['[safety_low=True]'
+'[persons_4=False^persons_more=False]'
+'[buying_vhigh=True^maint_vhigh=True]'
+'[lug_boot_small=True^safety_med=True^buying_low=False^buying_med=False]'
+'[maint_vhigh=True^safety_med=True^lug_boot_small=True]'
+'[buying_vhigh=True^maint_med=False^maint_low=False]'
+'[maint_vhigh=True^buying_med=False^buying_low=False]'
+'[safety_med=True^lug_boot_med=True^doors_4=False^doors_5more=False^buying_med=False^buying_low=False^doors_3=False]'
+'[lug_boot_small=True^persons_4=False^doors_5more=False^doors_4=False^doors_3=False]'
+'[safety_med=True^lug_boot_small=True^buying_low=False^maint_low=False^maint_med=False]']
+
+------------- DRE ---------------
+	Accuracy: 	[0.96531792 0.78034682 0.86127168 0.79190751 0.98843931 0.74566474
+ 0.95375723 0.95375723 0.91860465 0.9127907 ]
+	mean = 0.8871857776582873
+	std = 0.08249571890583327
+
+	Complexity: 	[768 502 446 511 518 585 482 499 723 691]
+	mean = 572.5
+	std = 107.88257505269328
+
+	Best model acc: 0.9884393063583815
+	Best model comply: 518
+	Best model: Graph[
+	RuleSet h4 [
+	h4	:= h4_1
+	h4	:= !persons_4, h4_2
+	h4_1	:= h4_3
+	h4_1	:= !persons_more, h4_4
+	h4_2	:= h4_5
+	h4_2	:= !persons_more, h4_6
+	h4_3	:= lug_boot_small, h4_8
+	h4_4	:= h4_9
+	h4_4	:= lug_boot_small, h4_11
+	h4_5	:= h4_10
+	h4_5	:= lug_boot_small, h4_12
+	h4_6	:= h4_13
+	h4_6	:= lug_boot_small, h4_14
+	h4_8	:= !doors_5more, h4_16
+	h4_9	:= !doors_5more, h4_17
+	h4_10	:= !doors_5more, h4_18
+	h4_11	:= h4_19
+	h4_11	:= !doors_5more, h4_22
+	h4_12	:= h4_20
+	h4_12	:= !doors_5more, h4_23
+	h4_13	:= h4_21
+	h4_13	:= !doors_5more, h4_24
+	h4_14	:= h4_25
+	h4_14	:= !doors_5more
+	h4_16	:= !doors_4, h4_28
+	h4_17	:= !doors_4, h4_30
+	h4_18	:= !doors_4, h4_32
+	h4_19	:= h4_29
+	h4_19	:= !doors_4, h4_34
+	h4_20	:= h4_31
+	h4_20	:= !doors_4, h4_36
+	h4_21	:= h4_33
+	h4_21	:= !doors_4, h4_37
+	h4_22	:= h4_35
+	h4_22	:= !doors_4, h4_38
+	h4_23	:= h4_36
+	h4_23	:= !doors_4, h4_39
+	h4_24	:= h4_37
+	h4_24	:= !doors_4, h4_41
+	h4_25	:= h4_40
+	h4_25	:= !doors_4
+	h4_28	:= safety_med, h4_44
+	h4_29	:= safety_med, h4_45
+	h4_30	:= safety_med, h4_47
+	h4_31	:= safety_med, h4_48
+	h4_32	:= safety_med, h4_50
+	h4_33	:= safety_med, h4_51
+	h4_34	:= h4_46
+	h4_34	:= safety_med, h4_53
+	h4_35	:= h4_46
+	h4_35	:= safety_med, h4_54
+	h4_36	:= h4_49
+	h4_36	:= safety_med, h4_56
+	h4_37	:= h4_52
+	h4_37	:= safety_med, h4_59
+	h4_38	:= h4_55
+	h4_38	:= safety_med, h4_61
+	h4_39	:= h4_57
+	h4_39	:= safety_med
+	h4_40	:= h4_58
+	h4_40	:= safety_med
+	h4_41	:= h4_60
+	h4_41	:= safety_med
+	h4_44	:= lug_boot_med, h4_64
+	h4_45	:= lug_boot_med, h4_65
+	h4_46	:= lug_boot_med, h4_66
+	h4_47	:= lug_boot_med, h4_67
+	h4_48	:= lug_boot_med, h4_71
+	h4_49	:= lug_boot_med, h4_72
+	h4_50	:= lug_boot_med, h4_73
+	h4_51	:= lug_boot_med, !doors_3
+	h4_52	:= lug_boot_med, h4_75
+	h4_53	:= h4_68
+	h4_53	:= lug_boot_med, h4_78
+	h4_54	:= h4_69
+	h4_54	:= lug_boot_med, h4_78
+	h4_55	:= h4_70
+	h4_55	:= lug_boot_med, h4_78
+	h4_56	:= h4_73
+	h4_56	:= lug_boot_med, h4_80
+	h4_57	:= h4_73
+	h4_57	:= lug_boot_med
+	h4_58	:= h4_75
+	h4_58	:= lug_boot_med
+	h4_59	:= h4_76
+	h4_59	:= lug_boot_med
+	h4_60	:= h4_77
+	h4_60	:= lug_boot_med
+	h4_61	:= h4_79
+	h4_61	:= lug_boot_med
+	h4_64	:= !doors_3, h4_83
+	h4_65	:= !doors_3, h4_86
+	h4_66	:= !doors_3, h4_87
+	h4_67	:= !doors_3, h4_88
+	h4_68	:= !doors_3, h4_89
+	h4_69	:= !doors_3, h4_90
+	h4_70	:= !doors_3, h4_91
+	h4_71	:= !doors_3, h4_94
+	h4_72	:= !doors_3, h4_95
+	h4_73	:= !doors_3, h4_96
+	h4_75	:= h4_83
+	h4_75	:= !doors_3
+	h4_76	:= h4_84
+	h4_76	:= !doors_3
+	h4_77	:= h4_85
+	h4_77	:= !doors_3
+	h4_78	:= h4_92
+	h4_78	:= !doors_3
+	h4_79	:= h4_93
+	h4_79	:= !doors_3
+	h4_80	:= h4_97
+	h4_80	:= !doors_3
+	h4_83	:= !buying_low, h4_100
+	h4_84	:= !buying_low, h4_101
+	h4_85	:= !buying_low, h4_102
+	h4_86	:= !buying_low, h4_103
+	h4_87	:= !buying_low, h4_104
+	h4_88	:= !buying_low, h4_105
+	h4_89	:= !buying_low, h4_106
+	h4_90	:= !buying_low, h4_107
+	h4_91	:= h4_100
+	h4_91	:= !buying_low, h4_108
+	h4_92	:= h4_101
+	h4_92	:= !buying_low, h4_109
+	h4_93	:= h4_103
+	h4_93	:= !buying_low
+	h4_94	:= h4_104
+	h4_94	:= !buying_low
+	h4_95	:= h4_105
+	h4_95	:= !buying_low
+	h4_96	:= h4_109
+	h4_96	:= !buying_low
+	h4_97	:= h4_110
+	h4_97	:= !buying_low
+	h4_100	:= !maint_low, h4_113
+	h4_101	:= !maint_low, h4_114
+	h4_102	:= !maint_low, h4_115
+	h4_103	:= h4_113
+	h4_103	:= !maint_low, h4_118
+	h4_104	:= h4_114
+	h4_104	:= !maint_low, h4_119
+	h4_105	:= h4_115
+	h4_105	:= !maint_low, h4_120
+	h4_106	:= h4_116
+	h4_106	:= !maint_low, h4_120
+	h4_107	:= h4_117
+	h4_107	:= !maint_low, h4_120
+	h4_108	:= h4_118
+	h4_108	:= !maint_low
+	h4_109	:= h4_119
+	h4_109	:= !maint_low
+	h4_110	:= h4_120
+	h4_110	:= !maint_low
+	h4_113	:= !maint_vhigh, h4_124
+	h4_114	:= !maint_vhigh, !buying_vhigh
+	h4_115	:= !maint_vhigh, h4_126
+	h4_116	:= h4_123
+	h4_116	:= !maint_vhigh, h4_126
+	h4_117	:= h4_124
+	h4_117	:= !maint_vhigh, h4_126
+	h4_118	:= h4_124
+	h4_118	:= !maint_vhigh
+	h4_119	:= !buying_vhigh
+	h4_119	:= !maint_vhigh
+	h4_120	:= h4_126
+	h4_120	:= !maint_vhigh
+	h4_123	:= !buying_vhigh, h4_129
+	h4_124	:= !buying_vhigh, buying_med
+	h4_126	:= buying_med
+	h4_126	:= !buying_vhigh
+	h4_129	:= buying_med, h4_133
+	h4_133	:= !maint_med, safety_low
+]
+	RuleSet h1 [
+	h1	:= h1_1
+	h1	:= !safety_low, h1_2
+	h1_1	:= h1_3
+	h1_1	:= persons_more, h1_4
+	h1_2	:= h1_5
+	h1_2	:= persons_more, h1_6
+	h1_3	:= persons_4, h1_8
+	h1_4	:= h1_9
+	h1_4	:= persons_4, h1_11
+	h1_5	:= h1_10
+	h1_5	:= persons_4, h1_12
+	h1_6	:= h1_12
+	h1_6	:= persons_4
+	h1_8	:= buying_med, h1_16
+	h1_9	:= h1_15
+	h1_9	:= buying_med, h1_18
+	h1_10	:= h1_17
+	h1_10	:= buying_med, h1_19
+	h1_11	:= h1_20
+	h1_11	:= buying_med, h1_21
+	h1_12	:= h1_21
+	h1_12	:= buying_med, h1_22
+	h1_15	:= !buying_vhigh, h1_26
+	h1_16	:= h1_24
+	h1_16	:= !buying_vhigh, h1_27
+	h1_17	:= h1_25
+	h1_17	:= !buying_vhigh, h1_28
+	h1_18	:= h1_26
+	h1_18	:= !buying_vhigh, h1_30
+	h1_19	:= h1_29
+	h1_19	:= !buying_vhigh, h1_32
+	h1_20	:= h1_31
+	h1_20	:= !buying_vhigh, h1_33
+	h1_21	:= h1_33
+	h1_21	:= !buying_vhigh, h1_34
+	h1_22	:= h1_34
+	h1_22	:= !buying_vhigh
+	h1_24	:= maint_med, h1_37
+	h1_25	:= maint_med, h1_38
+	h1_26	:= maint_med, h1_40
+	h1_27	:= h1_37
+	h1_27	:= maint_med, h1_42
+	h1_28	:= h1_38
+	h1_28	:= maint_med, h1_43
+	h1_29	:= h1_39
+	h1_29	:= maint_med, h1_44
+	h1_30	:= h1_40
+	h1_30	:= maint_med, h1_45
+	h1_31	:= h1_41
+	h1_31	:= maint_med, h1_46
+	h1_32	:= h1_44
+	h1_32	:= maint_med, h1_47
+	h1_33	:= h1_46
+	h1_33	:= maint_med, h1_48
+	h1_34	:= h1_48
+	h1_34	:= maint_med
+	h1_37	:= !maint_vhigh, h1_51
+	h1_38	:= !maint_vhigh, h1_53
+	h1_39	:= !maint_vhigh, h1_54
+	h1_40	:= !maint_vhigh, h1_56
+	h1_41	:= !maint_vhigh, h1_58
+	h1_42	:= h1_52
+	h1_42	:= !maint_vhigh, h1_59
+	h1_43	:= h1_54
+	h1_43	:= !maint_vhigh, h1_60
+	h1_44	:= h1_55
+	h1_44	:= !maint_vhigh, h1_61
+	h1_45	:= h1_57
+	h1_45	:= !maint_vhigh, h1_63
+	h1_46	:= h1_58
+	h1_46	:= !maint_vhigh, h1_64
+	h1_47	:= h1_62
+	h1_47	:= !maint_vhigh, h1_65
+	h1_48	:= h1_64
+	h1_48	:= !maint_vhigh
+	h1_51	:= maint_low, h1_68
+	h1_52	:= maint_low, h1_69
+	h1_53	:= maint_low, h1_71
+	h1_54	:= maint_low, h1_72
+	h1_55	:= maint_low, h1_73
+	h1_56	:= maint_low, h1_75
+	h1_57	:= maint_low, h1_76
+	h1_58	:= maint_low, buying_low
+	h1_59	:= h1_70
+	h1_59	:= maint_low, h1_79
+	h1_60	:= h1_73
+	h1_60	:= maint_low, h1_80
+	h1_61	:= h1_74
+	h1_61	:= maint_low, h1_81
+	h1_62	:= h1_75
+	h1_62	:= maint_low, h1_81
+	h1_63	:= h1_77
+	h1_63	:= maint_low, h1_83
+	h1_64	:= buying_low
+	h1_64	:= maint_low
+	h1_65	:= h1_82
+	h1_65	:= maint_low
+	h1_68	:= buying_low, h1_86
+	h1_69	:= buying_low, h1_87
+	h1_70	:= buying_low, h1_88
+	h1_71	:= buying_low, h1_90
+	h1_72	:= buying_low, h1_91
+	h1_73	:= buying_low, h1_92
+	h1_74	:= buying_low, h1_94
+	h1_75	:= buying_low, h1_95
+	h1_76	:= buying_low, h1_96
+	h1_77	:= buying_low, h1_98
+	h1_79	:= h1_89
+	h1_79	:= buying_low
+	h1_80	:= h1_93
+	h1_80	:= buying_low
+	h1_81	:= h1_95
+	h1_81	:= buying_low
+	h1_82	:= h1_97
+	h1_82	:= buying_low
+	h1_83	:= h1_98
+	h1_83	:= buying_low
+	h1_86	:= !safety_med, h1_101
+	h1_87	:= !safety_med, h1_102
+	h1_88	:= !safety_med, h1_103
+	h1_89	:= !safety_med, h1_104
+	h1_90	:= !safety_med, h1_105
+	h1_91	:= !safety_med, h1_106
+	h1_92	:= !safety_med, !doors_3
+	h1_93	:= !safety_med, h1_108
+	h1_94	:= !safety_med, h1_109
+	h1_95	:= !safety_med, h1_110
+	h1_96	:= !safety_med, h1_111
+	h1_97	:= !safety_med, h1_112
+	h1_98	:= !safety_med, h1_113
+	h1_101	:= !doors_3, h1_115
+	h1_102	:= !doors_3, h1_117
+	h1_103	:= !doors_3, h1_118
+	h1_104	:= !doors_3, h1_119
+	h1_105	:= !doors_3, h1_121
+	h1_106	:= !doors_3, h1_122
+	h1_108	:= h1_115
+	h1_108	:= !doors_3
+	h1_109	:= h1_116
+	h1_109	:= !doors_3
+	h1_110	:= h1_117
+	h1_110	:= !doors_3
+	h1_111	:= h1_118
+	h1_111	:= !doors_3
+	h1_112	:= h1_120
+	h1_112	:= !doors_3
+	h1_113	:= h1_121
+	h1_113	:= !doors_3
+	h1_115	:= !doors_5more, h1_125
+	h1_116	:= !doors_5more, h1_126
+	h1_117	:= !doors_5more, !doors_4
+	h1_118	:= !doors_5more, h1_128
+	h1_119	:= !doors_5more, h1_129
+	h1_120	:= h1_125
+	h1_120	:= !doors_5more, h1_130
+	h1_121	:= !doors_4
+	h1_121	:= !doors_5more
+	h1_122	:= h1_128
+	h1_122	:= !doors_5more
+	h1_125	:= !doors_4, h1_133
+	h1_126	:= !doors_4, !lug_boot_med
+	h1_128	:= h1_133
+	h1_128	:= !doors_4
+	h1_129	:= !lug_boot_med
+	h1_129	:= !doors_4
+	h1_130	:= h1_135
+	h1_130	:= !doors_4
+	h1_133	:= !lug_boot_med, !lug_boot_small
+	h1_135	:= !lug_boot_small
+	h1_135	:= !lug_boot_med
+]
+	RuleSet target [
+	target	:= h4
+	target	:= !h1
+]
+]
+

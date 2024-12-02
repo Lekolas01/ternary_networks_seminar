@@ -37,6 +37,7 @@ class RuleExtractionClassifier(BaseEstimator):
         wd: float,
         steepness=2,
         delay=100,
+        verbose=True,
     ):
         self.lr = lr
         self.layer_width = layer_width
@@ -48,6 +49,7 @@ class RuleExtractionClassifier(BaseEstimator):
         self.wd = wd
         self.steepness = steepness
         self.delay = delay
+        self.verbose = verbose
 
     # convert a df to tensor to be used in pytorch
     def df_to_tensor(self, df) -> Tensor:
@@ -76,7 +78,7 @@ class RuleExtractionClassifier(BaseEstimator):
         dl = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         assert not torch.any(model[0].weight.isnan())
         metrics = self.train_mlp(
-            dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay, True
+            dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay
         )
         #            torch.save(model, model_path)
         #            print(f"Saved model to {model_path}")
@@ -100,7 +102,8 @@ class RuleExtractionClassifier(BaseEstimator):
         return q_model, model
 
     def fit(self, X: DataFrame, y: Series):
-        print(f"--- Start fit with {str(self)}")
+        if self.verbose:
+            print(f"--- Start fit with {str(self)}")
         start = timer()
 
         X_tensor = self.df_to_tensor(X)
@@ -120,9 +123,10 @@ class RuleExtractionClassifier(BaseEstimator):
         self.fid_qng = np.mean(nn_pred == q_ng_pred)
         self.fid_rule_set = np.mean(nn_pred == bg_pred)
         end = timer()
-        print(
-            f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {self.fid_qnn} | fid(nn, q_ng) = {self.fid_qng} | fid(nn, rule_set) = {self.fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}\n"
-        )
+        if self.verbose:
+            print(
+                f"{nn_acc = } | {bg_acc = } | fid(nn, qnn) = {self.fid_qnn} | fid(nn, q_ng) = {self.fid_qng} | fid(nn, rule_set) = {self.fid_rule_set} | compl. = {self.bool_graph.complexity()} | seconds = {end - start}\n"
+            )
         return self
 
     def predict(self, X: DataFrame):
@@ -144,7 +148,6 @@ class RuleExtractionClassifier(BaseEstimator):
         l1: float,
         wd: float,
         delay: int,
-        log_metrics: bool,
     ):
         assert not torch.any(model[0].weight.isnan())
         seed = set_seed(seed)
@@ -160,7 +163,7 @@ class RuleExtractionClassifier(BaseEstimator):
         assert not torch.any(model[0].weight.isnan())
         tracker = Tracker(epochs=epochs, delay=delay)
         assert not torch.any(model[0].weight.isnan())
-        if log_metrics:
+        if self.verbose:
             assert not torch.any(model[0].weight.isnan())
             tracker.add_logger(
                 LogMetrics(

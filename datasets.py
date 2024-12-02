@@ -49,7 +49,7 @@ class FileDataset(Dataset):
         # df = copy.deepcopy(df)
         df = df[(df != "?").all(axis=1)]  # remove rows with missing values
         for column in df.columns:
-            if (df[column].dtype == "object" and encode) and column != target:
+            if encode and column != target:
                 # one-hot encode categorical columns
                 df = pd.concat(
                     [
@@ -258,6 +258,8 @@ def get_df(key: str) -> pd.DataFrame:
             return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
         case "monk":
             return get_df_from_uci(id=70)
+        case "balance_scale":
+            return get_df_from_uci(id=12)
         case _:
             raise ValueError
 

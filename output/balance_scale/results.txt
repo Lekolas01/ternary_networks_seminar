@@ -1,0 +1,47 @@
+--- Hyperparameter search ---
+	param_grid = {'layer_width': [10, 6], 'lr': [0.0003, 0.001, 0.003], 'l1': [1e-05, 0.0004, 0.003], 'n_layer': [1, 2], 'steepness': [4, 8, 16]}
+
+	accs = array([1., 1., 1., 1., 1., 1., 1., 1., 1., 1.])
+	complexities = array([14.5, 17. , 17.5, 41. , 14.5, 31. , 13. , 31. , 50. , 25. ])
+	scores = array([0.01742788, 0.01517857, 0.01488095, 0.00618961, 0.01742788,
+       0.00806452, 0.01923077, 0.00806452, 0.00685307, 0.01001603])
+	best_idx = 6
+	best_params = {'steepness': 8, 'n_layer': 2, 'lr': 0.003, 'layer_width': 10, 'l1': 0.003}
+
+------------- RIPPER ---------------
+	Accuracy: 	[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+	mean = 1.0
+	std = 0.0
+
+	Complexity: 	[2 2 2 2 2 2 2 2 2 2]
+	mean = 2.0
+	std = 0.0
+
+	Best model acc: 1.0
+	Best model comply: 2
+	Best model: ['[target_L=False^target_B=False]']
+
+------------- DRE ---------------
+	Accuracy: 	[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+	mean = 1.0
+	std = 0.0
+
+	Complexity: 	[ 5 16 18 13  5  5  5 13 18  5]
+	mean = 10.3
+	std = 5.532630477449222
+
+	Best model acc: 1.0
+	Best model comply: 5
+	Best model: Graph[
+	RuleSet h6 [
+	h6	:= target_B
+	h6	:= target_L
+]
+	RuleSet h11 [
+	h11	:= !h6
+]
+	RuleSet target [
+	target	:= h11
+]
+]
+
