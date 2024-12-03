@@ -22,7 +22,7 @@ from my_logging.loggers import LogMetrics, Tracker
 from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_set import RuleSetGraph
 from train_model import training_loop
-from utilities import plot_1d_dist, set_seed
+from utilities import set_seed
 
 
 class RuleExtractionClassifier(BaseEstimator):
