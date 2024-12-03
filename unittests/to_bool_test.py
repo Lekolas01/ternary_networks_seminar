@@ -37,12 +37,6 @@ class TestToBool(unittest.TestCase):
             model(random_x).float(), neuron_graph(random_input_vars), rel_tol=1e-7
         )
 
-    def test_True(self):
-        b = QuantizedNeuron("b", {"x1": 1.5, "x2": 1.4}, -1.0)
-        q_ng = QuantizedNeuronGraph([b])
-        bg = RuleSetGraph.from_q_neuron_graph(q_ng)
-        assert bg.nodes["b"].to_bool() == Constant(np.array(True))
-
     def test_False(self):
         x1 = Neuron2("x1")
         x2 = Neuron2("x2")

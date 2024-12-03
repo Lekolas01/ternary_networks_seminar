@@ -7,20 +7,11 @@ from typing import Tuple
 
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-from torch import isin
-from torch.utils.data.dataloader import DataLoader
 
 from bool_formula import NOT, Constant, Knowledge, Literal
 from neuron import bool_2_ch
 from node import Graph, Node
-from q_neuron import (
-    Perceptron,
-    QuantizedLayer,
-    QuantizedNeuronGraph,
-    QuantizedNeuronGraph2,
-)
+from q_neuron import Perceptron, QuantizedNeuronGraph
 from utilities import flatten
 
 
@@ -40,15 +31,14 @@ class Dp:
         assert 0 <= n_vars
         self.n_vars = n_vars
         self.data: list[list[DpNode]] = [[] for _ in range(self.n_vars + 1)]
-        self.eps = 1e-6
 
-    def find(self, k: int, val: float, eps=1e-6) -> DpNode | None:
+    def find(self, k: int, val: float) -> DpNode | None:
         assert k >= 0, f"k must be >= 0, but got {k}."
         if k > len(self.data):
             return None
         arr = self.data[k]
         for t in arr:
-            if t.min_thr + eps < val < t.max_thr - eps:
+            if t.min_thr < val < t.max_thr:
                 return t
         return None
 
@@ -58,7 +48,7 @@ class Dp:
             self.find(k, val.min_thr) is not None
             or self.find(k, val.max_thr) is not None
         ):
-            print(f"{self.data = }")
+            print(f"{self.data[k] = }")
             print(f"{k = }")
             print(f"{val = }")
             raise ValueError
@@ -222,6 +212,7 @@ class Subproblem:
     def __str__(self) -> str:
         if self.is_const:
             return f"SP({self.key} := {bool_2_ch(self.val)})"
+        return "\n\t".join([f"{self.key}\t:= {r.body()}" for r in self.rules])
         return f"SP({self.key} := {' | '.join(r.body() for r in self.rules)})"
 
     def __repr__(self) -> str:
@@ -236,7 +227,7 @@ class Subproblem:
 
 class RuleSetNeuron(Node):
     def __init__(
-        self, q_neuron: Perceptron, q_ng: QuantizedNeuronGraph2, simplify: bool
+        self, q_neuron: Perceptron, q_ng: QuantizedNeuronGraph, simplify: bool
     ) -> None:
         self.q_neuron = q_neuron
         self.q_ng = q_ng
@@ -374,7 +365,7 @@ class RuleSetNeuron(Node):
                         node.key, [IfThenRule(node.key, [], val=True)]
                     )
                 else:
-                    target_1 = dp.find(k + 1, node.mean, eps=0.0)
+                    target_1 = dp.find(k + 1, node.mean)
                     if target_1 is None:
                         print(f"{dp = }")
                         print(f"{k + 1 = }")
@@ -382,7 +373,7 @@ class RuleSetNeuron(Node):
                     if target_1 is None:
                         raise ValueError
 
-                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1], eps=0.0)
+                    target_2 = dp.find(k + 1, node.mean + self.n_ins[k][1])
                     assert target_2 is not None
                     rule1 = IfThenRule(node.key, [(target_1.key, True)])
                     rule2 = IfThenRule(
@@ -401,6 +392,13 @@ class RuleSetNeuron(Node):
         for key, sp in self.subproblems.items():
             graph_ins[key] = list(filter(lambda k: k in keys, sp.children()))
         return graph_ins
+
+    def input_rules(self) -> set[str]:
+        ans: set[str] = set()
+        for sp in self.subproblems.values():
+            for child in sp.children():
+                ans.add(child)
+        return ans
 
     def call_order(self) -> list[str]:
         sorter = TopologicalSorter(self.graph_ins())
@@ -437,13 +435,32 @@ class RuleSetGraph(Graph):
         super().__init__(rule_set_neurons)
 
     @classmethod
-    def from_QNG(cls, q_ng: QuantizedNeuronGraph2, simplify=True):
-        rule_neurons = [
-            RuleSetNeuron(q_n, q_ng, simplify)
-            for key, q_n in q_ng.nodes.items()
-            if isinstance(q_n, Perceptron)
-        ]
-        ans = RuleSetGraph(rule_neurons)
+    def from_QNG(cls, q_ng: QuantizedNeuronGraph, simplify=True):
+        # keep track of the needed rule set neurons
+        needed_rule_set_neurons: set[str] = {"target"}
+        rule_set_neurons = []
+
+        q_neurons = list(q_ng.nodes.items())
+        q_neurons.reverse()
+        for key, q_n in q_neurons:
+            if not isinstance(q_n, Perceptron):
+                continue
+            if key not in needed_rule_set_neurons:
+                continue
+            rule_set_neuron = RuleSetNeuron(q_n, q_ng, simplify)
+            graph_ins = rule_set_neuron.input_rules()
+            rule_set_neurons.append(rule_set_neuron)
+            for name in graph_ins:
+                needed_rule_set_neurons.add(name)
+        # rule_neurons = [
+        #     RuleSetNeuron(q_n, q_ng, simplify)
+        #     for key, q_n in q_ng.nodes.items()
+        #     if isinstance(q_n, Perceptron) and key in needed_rule_set_neurons
+        # ]
+        ans = RuleSetGraph(rule_set_neurons)
+
+        if simplify:
+            ans.simplify()
         return ans
 
     def __repr__(self):
@@ -461,3 +478,7 @@ class RuleSetGraph(Graph):
             keys = list(data.columns)
             data = {key: np.array(data[key], dtype=bool) for key in keys}
         return super().__call__(data)
+
+    def simplify(self):
+
+        pass

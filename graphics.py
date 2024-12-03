@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 
 from bool_formula import possible_data
 from neuron import Activation, Neuron, NeuronGraph, possible_sums
-from q_neuron import QuantizedNeuronGraph2
+from q_neuron import QuantizedNeuronGraph
 from utilities import flatten, set_seed
 
 sns.set()
@@ -15,7 +15,7 @@ def plot_neuron_dist(neuron: Neuron, data=None) -> None:
     ng = NeuronGraph([neuron])
     if data is None:
         data = possible_data(neuron.ins)
-    q_ng = QuantizedNeuronGraph2.from_neuron_graph(ng, data)
+    q_ng = QuantizedNeuronGraph.from_neuron_graph(ng, data)
 
     sums = np.array(possible_sums(neuron.ins.values())) + neuron.bias
 

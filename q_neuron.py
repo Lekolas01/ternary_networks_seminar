@@ -77,62 +77,7 @@ class QuantizedNeuronGraph(Graph):
 
     @classmethod
     def from_neuron_graph(cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray]):
-        new_ng = copy.deepcopy(ng)
         q_neuron_graph = QuantizedNeuronGraph([])
-        graph_outs = new_ng.outs()
-        graph_ins = new_ng.ins()
-        for key, neuron in new_ng.neurons.items():
-            ins = graph_ins[key]
-            if key not in new_ng.out_keys:  # non-output nodes
-                outs = graph_outs[neuron.key]
-                data_y = neuron(data)
-                assert isinstance(data_y, np.ndarray)
-                data[key] = data_y
-
-                ck_ans = ckmeans(data_y, (2))
-                cluster = ck_ans.cluster
-                n_cluster = len(np.unique(ck_ans.cluster))
-                assert n_cluster == 2, NotImplementedError
-
-                y_centers = ck_ans.centers
-
-                # the threshold for the two groups lies in between the largest
-                # of the small group and the smallest of the large group
-                max_0 = np.max(data_y[cluster == 0])
-                min_1 = np.min(data_y[cluster == 1])
-                y_thr = (max_0 + min_1) / 2
-                x_thr = neuron.inv_act(y_thr)
-
-                # adjust other weights such that the new q_neuron can have y_centers [-1.0, 1.0]
-                a = y_centers[0]
-                k = y_centers[1] - y_centers[0]
-
-                for out_key in outs:
-                    out_neuron = new_ng.nodes[out_key]
-                    assert isinstance(out_neuron, Neuron)
-                    w = out_neuron.ins[neuron.key]
-                    out_neuron.bias += a * w  # update bias
-                    out_neuron.ins[neuron.key] = w * k  # update weight
-
-                q_neuron = Perceptron(neuron.key, neuron.ins, neuron.bias - x_thr)
-                q_neuron_graph.add(q_neuron)
-            else:  # output nodes
-                q_neuron = Perceptron(neuron.key, neuron.ins, neuron.bias)
-                q_neuron_graph.add(q_neuron)
-
-        return q_neuron_graph
-
-    def __repr__(self):
-        return str(self)
-
-
-class QuantizedNeuronGraph2(Graph):
-    def __init__(self, q_neurons: list[Perceptron]) -> None:
-        super().__init__(q_neurons)
-
-    @classmethod
-    def from_neuron_graph(cls, ng: NeuronGraph, data: MutableMapping[str, np.ndarray]):
-        q_neuron_graph = QuantizedNeuronGraph2([])
         out_key = next(iter(ng.out_keys))
         for key, neuron in ng.neurons.items():
             data[key], q_neuron = from_neuron(neuron, data)
@@ -194,9 +139,7 @@ class QuantizedLayer(nn.Module):
         return str(self)
 
 
-def QNG_from_QNN(
-    model: nn.Sequential, varnames: Sequence[str]
-) -> QuantizedNeuronGraph2:
+def QNG_from_QNN(model: nn.Sequential, varnames: Sequence[str]) -> QuantizedNeuronGraph:
     def key_gen():
         idx = 0
         while True:
@@ -212,8 +155,8 @@ def QNG_from_QNN(
     curr_shape = len(varnames)
     for idx, q_layer in enumerate(model):
         out_features, in_features = q_layer.lin.weight.shape
-        y_low, y_high = q_layer.y_low, q_layer.y_high
-        if y_low.dim() == 0:
+        y_low, y_high = q_layer.y_low.numpy(), q_layer.y_high.numpy()
+        if y_low.ndim == 0:
             y_low, y_high = [y_low.item()], [y_high.item()]
         in_keys = varnames[-curr_shape:]
         assert curr_shape == in_features
@@ -229,13 +172,13 @@ def QNG_from_QNN(
             if idx == len(model) - 1:
                 assert curr_shape == 1
                 q_neuron.key = "target"
-    return QuantizedNeuronGraph2(ans)
+    return QuantizedNeuronGraph(ans)
 
 
-def normalized(q_ng: QuantizedNeuronGraph2) -> QuantizedNeuronGraph2:
+def normalized(q_ng: QuantizedNeuronGraph) -> QuantizedNeuronGraph:
     """Normalize the nodes in the Quantized Neuron graph.
     This does not change the output of the graph."""
-    ans = QuantizedNeuronGraph2([])
+    ans = QuantizedNeuronGraph([])
     order = q_ng.topological_order()
     for key in order:
         neuron = q_ng[key]
@@ -266,7 +209,7 @@ def main():
     neuron_graph = NeuronGraph(neurons[:n_nodes])
     data = possible_data(keys)
     q_neuron_graph = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
-    q_neuron_graph2 = QuantizedNeuronGraph2.from_neuron_graph(neuron_graph, data)
+    q_neuron_graph2 = QuantizedNeuronGraph.from_neuron_graph(neuron_graph, data)
     final_ng = normalized(q_neuron_graph2)
     # bool_graph = BooleanGraph.from_q_neuron_graph(q_neuron_graph)
 

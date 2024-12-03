@@ -1,45 +1,30 @@
 import copy
-import itertools
 import os
-import timeit
+import sys
 from argparse import ArgumentParser, Namespace
 
-import graphviz
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
 import torch
-import torch.nn as nn
 import wittgenstein as lw
-from ckmeans_1d_dp import ckmeans
-from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
-from sklearn.exceptions import NotFittedError
-from sklearn.model_selection import RandomizedSearchCV, cross_val_score
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.utils import shuffle
-from torch import Tensor
-from torch.utils.data import TensorDataset
-from torch.utils.data.dataloader import DataLoader
+from sklearn.base import BaseEstimator
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import KFold, ParameterSampler, train_test_split
 
-from bool_formula import Activation, overlap
 from datasets import FileDataset, get_df
-from generate_parity_dataset import parity_df
-from models.model_collection import ModelFactory, NNSpec
-from q_neuron import QNG_from_QNN, QuantizedLayer
 from rule_extraction import nn_to_rule_set
 from rule_extraction_classifier import RuleExtractionClassifier
-from rule_set import RuleSetGraph
 from utilities import accuracy, set_seed
 
-# Grid Search over NN training hyperparameters
-#   call train_mlp.py
-# For each trained model, extract rule set
-# save all rule sets
-# create graph for rule sets: dimensions are complexity and accuracy
+np.set_printoptions(suppress=True)
+
+
+def custom_score(acc, complexity):
+    return (acc - 0.5) ** 2 / complexity
 
 
 def plot_decision_tree(clf_object, feature_names, class_names):
@@ -54,80 +39,280 @@ def plot_decision_tree(clf_object, feature_names, class_names):
     plt.show()
 
 
-def training_runs(key, f_root, f_data, f_models, f_runs, f_losses):
+def b_plot(
+    x: list,
+    y: list,
+    x_label: str,
+    y_label: str,
+    title="",
+    y_limits: tuple[float, float] | None = None,
+):
+    unique_x = list(set(x))
+    unique_x.sort()
+    ans = {}
+    for x_val in unique_x:
+        ans[str(x_val)] = [a for idx, a in enumerate(y) if x[idx] == x_val]
+
+    sns.boxplot(ans)
+    plt.title(title)
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    if y_limits is None:
+        y_range = max(y) - min(y)
+        y_limits = (min(y) - 0.05 * y_range, max(y) + 0.05 * y_range)
+    plt.ylim(bottom=y_limits[0], top=y_limits[1])
+
+
+def load_dataframe(key: str) -> tuple[DataFrame, Series]:
+    f_data = f"data/{key}.csv"
+    if not os.path.isfile(f_data):
+        print(f"Loading dataset with key {key}")
+        df = get_df(key)
+        ds = FileDataset(df, encode=True)
+        ds.df.to_csv(f_data, index=False)
+        print(f"Saved dataset to {f_data}")
+
+    df = pd.read_csv(f_data)
+    X = df.iloc[:, :-1]
+    y = df.iloc[:, -1]
+    return X, y
+
+
+def rip_compl(ripper_clf: lw.RIPPER) -> int:
+    out_model = str([str(rule) for rule in ripper_clf.ruleset_.rules])
+    n_ors = out_model.count(",")
+    n_ands = out_model.count("^")
+    return 1 + n_ors + n_ands
+
+
+def rip_model_str(ripper_clf: lw.RIPPER):
+    ans = str([str(rule) for rule in ripper_clf.ruleset_.rules]).replace(", ", "\n")
+    return ans
+
+
+def re_clf_complexity(re_clf: RuleExtractionClassifier) -> int:
+    return re_clf.bool_graph.complexity() + 1
+
+
+def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results, alg_name):
+    accs, compls, models = cross_validate(X, y, clf, compl_f, model_str_f, n_splits)
+    scores = custom_score(accs, compls)
+    best_idx = np.argmax(scores)
+    best_acc = accs[best_idx]
+    best_compls = compls[best_idx]
+    best_model = models[best_idx]
+
+    with open(f_results, "a") as text_file:
+        text_file.write(f"------------- {alg_name} ---------------\n")
+        text_file.write(f"\tAccuracy: {stats(accs)}\n")
+        text_file.write(f"\tComplexity: {stats(compls)}\n")
+        text_file.write(f"\tBest model acc: {best_acc}\n")
+        text_file.write(f"\tBest model comply: {best_compls}\n")
+        text_file.write(f"\tBest model: {best_model}\n\n")
+    return accs, compls
+
+
+def cross_validate(
+    X: DataFrame, y: Series, clf: BaseEstimator, compl_func, model_str_func, n_splits=10
+):
+    accs, compls, models = [], [], []
+    kf = KFold(n_splits=n_splits)
+    for _, (train_ids, valid_ids) in enumerate(kf.split(X)):
+        Xtrain = X.loc[train_ids]
+        ytrain = y.loc[train_ids]
+        Xvalid = X.loc[valid_ids]
+        yvalid = y.loc[valid_ids]
+
+        clf.fit(Xtrain, ytrain)
+        accs.append(accuracy_score(clf.predict(Xvalid), yvalid))
+        compls.append(compl_func(clf))
+        models.append(model_str_func(clf))
+    return np.array(accs), np.array(compls), models
+
+
+def find_best_params(
+    X,
+    y,
+    re_clf: RuleExtractionClassifier,
+    param_grid: dict[str, list],
+    n_iter: int,
+    seed=0,
+):
+    n_folds = 2
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=seed
+    )
+
+    # do a random search over the hyperparameter space
+    sampler = list(ParameterSampler(param_grid, n_iter=n_iter, random_state=seed))
+
+    accs, complexities, fidelities = (
+        np.zeros((n_iter, n_folds)),
+        np.zeros((n_iter, n_folds)),
+        np.zeros((n_iter, n_folds)),
+    )
+    for i, sample in enumerate(sampler):
+        re_clf.set_params(**sample)
+        for fold in range(n_folds):
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=seed + fold
+            )
+            re_clf.fit(X_train, y_train)
+            accs[i, fold] = accuracy_score(y_test, re_clf.predict(X_test))
+            complexities[i, fold] = re_clf_complexity(re_clf)
+            fidelities[i, fold] = re_clf.fid_rule_set
+
+    a = accs.mean(axis=1)
+    c = complexities.mean(axis=1)
+    f = fidelities.mean(axis=1)
+    s = custom_score(accs, complexities).mean(axis=1)
+    return (sampler, a, c, f, s)
+
+
+def print_metrics(accs, compls):
+    print(f"\tAccs: {accs}")
+    print(f"\tMean acc: {accs.mean()}")
+    print(f"\tacc std: {accs.std()}")
+    print(f"\tcomplexities: {compls}")
+    print(f"\tMean acc: {compls.mean()}")
+    print(f"\tacc std: {compls.std()}")
+
+
+def stats(arr) -> str:
+    return f"\t{arr}\n\tmean = {np.mean(arr)}\n\tstd = {np.std(arr)}\n"
+
+
+def training_runs(key):
     seed = 1
     set_seed(seed)
-    # Generate dataframe for parity
 
-    os.makedirs(f_models, exist_ok=True)
-    full_df = get_df(key)
-    ds = FileDataset(full_df, encode=list(full_df.columns[:-1]))
-    ds.df.to_csv(f_data, index=False)
-    full_df = pd.read_csv(f_data)
+    X, y = load_dataframe(key)
+    f_outputs = f"output/{key}/"
+    f_results = f_outputs + f"results.txt"
 
-    in_shape = full_df.shape[1] - 1  # -1 for target column
-    X = full_df.iloc[:, :-1]
-    y = full_df.iloc[:, -1]
+    if not os.path.isdir(f_outputs):
+        os.makedirs(f_outputs)
 
-    X, y = shuffle(X, y, random_state=42)
-    # Do a single NN training run on this dataset
-    grid_search_epochs = 300
-    grid_search_delay = 200
-    max_epochs = 8000
-    delay = 800
-    bs = 64
-    wd = 0.0
-
-    l1s = [0.0]
-    lrs = [3e-4, 3e-3]
-    n_layers = [1, 2]
-    runs = DataFrame(
-        columns=["idx", "seed", "lr", "k", "n_layer", "l1", "epochs", "wd"]
-        + ["train_loss", "nn_acc", "bg_acc", "fidelity", "complexity"]
-    )
-
-    # calculate ripper cross validation
-    ripper_clf = lw.RIPPER()
-
-    param_grid = {"prune_size": [0.33, 0.5], "k": [1, 2]}
-    grid_search = RandomizedSearchCV(
-        ripper_clf,
-        param_grid,
-        n_iter=5,
-        scoring="accuracy",
-        error_score="raise",
-        verbose=2,
-    )
-    grid_search.fit(X, y)
-    p = grid_search.best_params_
-    print(f"{p = }")
-    ripper_clf = lw.RIPPER(prune_size=p["prune_size"], k=p["k"])
-    ripper_cv_scores = cross_val_score(ripper_clf, X, y, cv=10, scoring="accuracy")
-    print(f"{ripper_cv_scores = }")
-
-    # calculate best hyperparameters for rule extraction
+    # find best hyperparameter settings
     param_grid = {
-        "k": [8],
-        "lr": [3e-4, 3e-3, 1e-2],
-        "l1": [1e-5, 1e-3],
-        "n_layer": [1, 2, 3],
-        "steepness": [2, 4, 8],
+        "layer_width": [10, 6],
+        "lr": [3e-4, 1e-3, 3e-3],
+        "l1": [1e-5, 4e-4, 3e-3],
+        "n_layer": [1, 2],
+        "steepness": [4, 8, 16],
     }
+
+    delay = 600
+
     re_clf = RuleExtractionClassifier(
-        0.003,  # p["lr"],
-        8,  # p["k"],
-        1,  # p["n_layer"],
-        3e-4,  # p["l1"],
-        max_epochs,
-        0.0,
-        6,  # steepness=p["steepness"],
+        lr=4e-3,
+        layer_width=10,
+        n_layer=1,
+        l1=4e-3,
+        epochs=8000,
+        wd=0.0,
+        steepness=4,
         delay=delay,
+        verbose=True,
     )
-    re_cv_scores = cross_val_score(
-        re_clf, X, y, cv=5, scoring="accuracy", error_score="raise"
+
+    n_iter = 15
+    print(f"Starting Hyperparameter search...")
+    sampler, accs, complexities, fidelities, scores = find_best_params(
+        X, y, re_clf, param_grid, n_iter, seed
     )
-    print(f"{re_cv_scores = }")
-    return runs
+    best_idx = np.argmax(scores)
+    best_params = sampler[best_idx]
+
+    print(f"Hyperparameter search done.")
+
+    print(f"Grid Search Accuracies: {accs = }")
+    print(f"Grid Search Complexities: {complexities = }")
+    print(f"Grid Search Scores:  {scores = }")
+    print(f"Best hyperparameters: {best_params}\n")
+
+    sns.scatterplot(x=complexities, y=accs)
+    plt.title("Rule set complexity / Validation accuracy")
+    plt.xlabel("Complexity")
+    plt.ylabel("Accuracy")
+    plt.xlim(left=-1, right=np.max(complexities) + np.min(complexities) + 1)
+    plt.ylim(bottom=-0.05, top=1.05)
+    plt.savefig(f_outputs + f"compl_acc")
+
+    steepnesses = [sample["steepness"] for sample in sampler]
+    b_plot(
+        steepnesses,
+        fidelities,
+        "Steepness",
+        "Fidelity",
+        title="Steepness / Fidelity NN - rule set",
+    )
+    plt.savefig(f_outputs + f"steepness_fid")
+    plt.figure()
+
+    l1s = [sample["l1"] for sample in sampler]
+    b_plot(
+        l1s,
+        complexities,
+        "L1 coefficient",
+        "Complexity",
+        title="L1 coefficient / rule set complexity",
+    )
+    plt.savefig(f_outputs + f"l1_compl")
+    plt.figure()
+
+    n_layers = [sample["n_layer"] for sample in sampler]
+    b_plot(
+        n_layers,
+        fidelities,
+        "Num of layers",
+        "Fidelity",
+        title="Number of neural net layers / Fidelity NN - rule set",
+    )
+    plt.savefig(f_outputs + f"nlayer_fid")
+    plt.figure()
+
+    with open(f_results, "w") as of:
+
+        of.write("--- Hyperparameter search ---\n")
+        of.write(f"\t{param_grid = }\n\n")
+        of.write(f"\t{accs = }\n")
+        of.write(f"\t{complexities = }\n")
+        of.write(f"\t{scores = }\n")
+        of.write(f"\t{best_idx = }\n")
+        of.write(f"\t{best_params = }\n\n")
+
+    k = 10
+    # delay = 1000
+
+    ripper_clf = lw.RIPPER()
+    ripper_accs, ripper_compls = cross_val_and_log(
+        X, y, ripper_clf, rip_compl, rip_model_str, k, f_results, "RIPPER"
+    )
+
+    re_clf.set_params(**best_params, delay=delay)
+    re_accs, re_compls = cross_val_and_log(
+        X, y, re_clf, re_clf_complexity, lambda clf: clf.bool_graph, k, f_results, "DRE"
+    )
+
+    data = np.zeros((2 * k, 3))
+    data[:k, 0] = ripper_accs
+    data[k:, 0] = re_accs
+    data[:k, 1] = ripper_compls
+    data[k:, 1] = re_compls
+    results = pd.DataFrame(columns=["acc", "compl", "Classifier"])
+    results["acc"] = np.concatenate([re_accs, ripper_accs])
+    results["compl"] = np.concatenate([re_compls, ripper_compls])
+    results["Classifier"] = ["DRE" for _ in range(k)] + ["RIPPER" for _ in range(k)]
+
+    sns.scatterplot(results, x="compl", y="acc", hue="Classifier")
+    plt.title("Comparison DRE - RIPPER")
+    plt.xlabel("Complexity")
+    plt.ylabel("validation Accuracy")
+    plt.savefig(f_outputs + f"cross_val_comparison")
+    plt.figure()
+
+    exit()
 
 
 def main(key: str, retrain=False):
@@ -139,7 +324,7 @@ def main(key: str, retrain=False):
     f_losses = f"{f_root}/losses.csv"
 
     if not os.path.isfile(f_runs) or retrain:
-        runs = training_runs(key, f_root, f_data, f_models, f_runs, f_losses)
+        runs = training_runs(key)
         runs.to_csv()
     else:
         runs = pd.read_csv(f_runs)
@@ -182,14 +367,17 @@ def main(key: str, retrain=False):
         # plt.show()
 
 
-def get_arguments() -> Namespace:
+def get_arguments() -> str:
     parser = ArgumentParser(
         description="Train an MLP on a binary classification task with an ADAM optimizer."
     )
     parser.add_argument("dataset")
-    return parser.parse_args()
+    try:
+        return parser.parse_args().dataset
+    except:
+        return "abcdefg"
 
 
 if __name__ == "__main__":
-    args = get_arguments()
-    main(args.dataset)
+    ds = get_arguments()
+    main(ds)

@@ -1,7 +1,5 @@
-import copy
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 from torch.utils.data.dataset import Dataset
@@ -27,7 +25,7 @@ class FileDataset(Dataset):
         range: tuple[float, float] = (0, 1),
         target="target",
         normalize=False,
-        encode=[],
+        encode: bool = False,
     ):
         """
         path: str
@@ -42,6 +40,8 @@ class FileDataset(Dataset):
             - Must be one of the column names in the dataset.
         normalize: bool
             Whether or not to normalize the numerical columns to mean = 0 and std = 1.
+        encode: bool
+            Whether or not to one-hot encode the categorical features
         """
         assert (
             target in df.columns
@@ -49,10 +49,13 @@ class FileDataset(Dataset):
         # df = copy.deepcopy(df)
         df = df[(df != "?").all(axis=1)]  # remove rows with missing values
         for column in df.columns:
-            if (df[column].dtype == "object" or column in encode) and column != target:
+            if encode and column != target:
                 # one-hot encode categorical columns
                 df = pd.concat(
-                    [df, pd.get_dummies(df[column], prefix=column, drop_first=False)],
+                    [
+                        df,
+                        pd.get_dummies(df[column], prefix=column, drop_first=True),
+                    ],
                     axis=1,
                 )
                 df.drop([column], axis=1, inplace=True)
@@ -87,10 +90,12 @@ class FileDataset(Dataset):
         ix_low, ix_high = int(range[0] * n_rows), int(range[1] * n_rows)
 
         self.x = torch.tensor(
-            df.iloc[ix_low:ix_high, : -self.n_target].values, dtype=torch.float32
+            df.iloc[ix_low:ix_high, : -self.n_target].values.astype(float),
+            dtype=torch.float32,
         )
         self.y = torch.tensor(
-            df.iloc[ix_low:ix_high, -self.n_target].values, dtype=torch.float32
+            df.iloc[ix_low:ix_high, -self.n_target].values.astype(float),
+            dtype=torch.float32,
         )
         self.shape = (len(self.y), self.x.shape[1] + 1)
 
@@ -107,6 +112,7 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
     """
     datasets = []
     from ucimlrepo import fetch_ucirepo
+
     match ds:
         case "adult":
             path = Path("data/adult/adult.csv")
@@ -189,8 +195,10 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
                 "wknck",
                 "wkovl",
                 "wkpos",
-                "wtoeg"
+                "wtoeg",
             ]
+            datasets.append(FileDataset(path=path, target="edible"))
+            datasets.append(FileDataset(path=path, target="edible"))
         case "king_rook-king":
             chess_king_rook_vs_king = fetch_ucirepo(id=23)
             names = [
@@ -199,7 +207,6 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
                 "white-rook-file",
                 "white-rook-rank",
                 "black-king-file",
-
             ]
         case "logical_AND":
             path = Path("data", "generated", ds, "data.csv")
@@ -212,20 +219,32 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
 
 def get_df(key: str) -> pd.DataFrame:
     def get_df_from_uci(id: int) -> pd.DataFrame:
+        print(f"Downloading from UCI with id = {id}")
         temp = fetch_ucirepo(id=id)
+        print(f"Dataset fetched.")
         X = temp.data.features  # type: ignore
         y = temp.data.targets  # type: ignore
-        ans = X.join(y)
+        ans = pd.concat([X, y], axis=1)
         ans.rename(columns={y.columns[0]: "target"}, inplace=True)
         return ans
 
     match key:
+        case "parity4":
+            return parity_df(k=4, shuffle=False, n=1024)
         case "parity10":
-            return parity_df(k=10, shuffle=False, n=1024)
+            return parity_df(k=10, shuffle=True, n=1024)
         case "adult":
-            return get_df_from_uci(2)
+            df = get_df_from_uci(2)
+            # clean up the dataset
+            df["target"].replace("<=50K.", "<=50K", inplace=True)
+            df["target"].replace(">50K.", ">50K", inplace=True)
+            return df
         case "mushroom":
             return get_df_from_uci(73)
+        case "king_rook-king_pawn":
+            return get_df_from_uci(22)
+        case "king_rook-king":
+            return get_df_from_uci(23)
         case "car_evaluation":
             ans = get_df_from_uci(19)
             # the most common output is unacc;
@@ -239,6 +258,8 @@ def get_df(key: str) -> pd.DataFrame:
             return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
         case "monk":
             return get_df_from_uci(id=70)
+        case "balance_scale":
+            return get_df_from_uci(id=12)
         case _:
             raise ValueError
 
