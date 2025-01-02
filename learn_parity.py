@@ -372,10 +372,7 @@ def get_arguments() -> str:
         description="Train an MLP on a binary classification task with an ADAM optimizer."
     )
     parser.add_argument("dataset")
-    try:
-        return parser.parse_args().dataset
-    except:
-        return "abcdefg"
+    return parser.parse_args().dataset
 
 
 if __name__ == "__main__":

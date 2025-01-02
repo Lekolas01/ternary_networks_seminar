@@ -260,6 +260,12 @@ def get_df(key: str) -> pd.DataFrame:
             return get_df_from_uci(id=70)
         case "balance_scale":
             return get_df_from_uci(id=12)
+        case "tic-tac-toe":
+            return get_df_from_uci(id=101)
+        case "connect-4":
+            return get_df_from_uci(id=26)
+        case "vote":
+            return get_df_from_uci(id=105)
         case _:
             raise ValueError
 
