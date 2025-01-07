@@ -71,7 +71,9 @@ class LogMetrics(Logger):
             "valid_acc": f"Valid: {(self.t.valid_acc[-1] * 100):.2f}%",
         }
 
-        bar = "\r" + utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
+        bar = (
+            "\r" + utilities.progress_bar(self.t.epoch, self.t.epochs, width=30) + " |"
+        )
         for metric in self.metrics:
             bar += f"{m_format[metric]}\t"
         end = "\n" if self.t.stop_condition() else "\r"
@@ -137,7 +139,7 @@ class LogModel(Logger):
 class Tracker:
     """Tracks useful information on the current epoch."""
 
-    def __init__(self, epochs: int = 0, delay=100, *loggers: Logger):
+    def __init__(self, epochs: int = 0, epoch_delay=100, *loggers: Logger):
         """
         Parameters
         ----------
@@ -145,7 +147,7 @@ class Tracker:
             List of loggers used for logging training information.
         """
         self.epochs = epochs
-        self.delay = delay
+        self.delay = epoch_delay
         self.loggers = []
         for logger in loggers:
             self.add_logger(logger)
@@ -175,6 +177,7 @@ class Tracker:
             logger.training_start()
 
     def epoch_start(self):
+        self.batches = 0
         for logger in self.loggers:
             logger.epoch_start()
 
@@ -183,6 +186,7 @@ class Tracker:
             logger.batch_start()
 
     def batch_end(self):
+        self.batches += 1
         for logger in self.loggers:
             logger.batch_end()
 
@@ -223,9 +227,9 @@ class Tracker:
         valid_stop_delay = self.delay
         eps = 3e-4
         if (
-            len(self.mean_train_loss) >= valid_stop_delay
-            and self.mean_valid_loss[-valid_stop_delay]
-            <= mean(self.mean_valid_loss[-valid_stop_delay:-1]) + eps
+            len(self.mean_train_loss) > valid_stop_delay
+            and self.mean_valid_loss[-valid_stop_delay - 1]
+            <= mean(self.mean_valid_loss[-valid_stop_delay:]) + eps
         ):
             self.stop_training = True
 

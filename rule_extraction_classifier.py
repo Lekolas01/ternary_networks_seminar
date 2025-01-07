@@ -1,4 +1,5 @@
 import copy
+import math
 import os
 import timeit
 from timeit import default_timer as timer
@@ -55,9 +56,6 @@ class RuleExtractionClassifier(BaseEstimator):
     def df_to_tensor(self, df) -> Tensor:
         return torch.from_numpy(df.values.astype(np.float32)).to(self.device)
 
-    def convert_to_rule_set(self, model: Sequential, dl: DataLoader):
-        pass
-
     def train_qnn(self, X: Tensor, y: Tensor) -> tuple[Sequential, Sequential]:
         _, n_features = X.shape
         spec: NNSpec = [
@@ -69,14 +67,11 @@ class RuleExtractionClassifier(BaseEstimator):
         spec.insert(0, (n_features, self.layer_width - 1, Activation.TANH))
 
         model = ModelFactory.get_model_by_spec(spec, steepness=self.steepness)
-        if torch.any(model[0].weight.isnan()):
-            print(spec)
         assert not torch.any(model[0].weight.isnan())
 
         dataset = TensorDataset(X, y)
         # model_path = f"temp/testing_model.pth"
         dl = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        assert not torch.any(model[0].weight.isnan())
         metrics = self.train_mlp(
             dl, model, 1, self.lr, self.epochs, self.l1, self.wd, self.delay
         )
@@ -91,14 +86,6 @@ class RuleExtractionClassifier(BaseEstimator):
         while any(isinstance(l, nn.Linear) for l in q_model):
             assert torch.all(torch.isclose(model(X), nn_out))
             q_model = quantize_first_lin_layer(q_model, X)
-            # qnn_out = q_model(X)
-            # nn_pred = np.array(np.round(nn_out.detach().numpy()), dtype=bool)
-            # qnn_pred = np.array(np.round(qnn_out.detach().numpy()), dtype=bool)
-            # y_arr = np.array(y.detach().numpy(), dtype=bool)
-            # nn_acc = np.mean(nn_pred == y_arr)
-            # qnn_acc = np.mean(qnn_pred == y_arr)
-            # fidelity = np.mean(nn_pred == qnn_pred)
-            # print(f"{nn_acc = } | {qnn_acc = } | {fidelity = }")
         return q_model, model
 
     def fit(self, X: DataFrame, y: Series):
@@ -161,7 +148,7 @@ class RuleExtractionClassifier(BaseEstimator):
             weight_decay=wd,
         )
         assert not torch.any(model[0].weight.isnan())
-        tracker = Tracker(epochs=epochs, delay=delay)
+        tracker = Tracker(epochs=epochs, epoch_delay=math.ceil(delay / len(dl)))
         assert not torch.any(model[0].weight.isnan())
         if self.verbose:
             assert not torch.any(model[0].weight.isnan())

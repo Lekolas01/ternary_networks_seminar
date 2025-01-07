@@ -37,12 +37,8 @@ def train(
         y_hat = model(X)
         optim.zero_grad()
         assert not torch.any(model[0].weight.isnan())
-        try:
-            assert not torch.any(model[0].weight.isnan())
-            loss = loss_fn(y_hat, y.float())
-            assert not torch.any(model[0].weight.isnan())
-        except:
-            temp = 0
+        loss = loss_fn(y_hat, y.float())
+        assert not torch.any(model[0].weight.isnan())
         if lambda1 != 0:
             assert not torch.any(model[0].weight.isnan())
             # don't regularize bias
@@ -54,13 +50,7 @@ def train(
             assert not torch.any(model[0].weight.isnan())
         losses.append(loss.item())
         assert not torch.any(model[0].weight.isnan())
-        try:
-            assert not torch.any(model[0].weight.isnan())
-            loss.backward()
-            assert not torch.any(model[0].weight.isnan())
-        except:
-            print("hi")
-            temp = 0
+        loss.backward()
         assert not torch.any(model[0].weight.isnan())
         optim.step()
         assert not torch.any(model[0].weight.isnan())

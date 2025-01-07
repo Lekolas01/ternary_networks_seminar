@@ -270,7 +270,7 @@ class RuleSetNeuron(Node):
                 return found
 
             # if already positive, return True
-            if threshold >= 0.0:
+            if threshold >= 0:
                 ans = DpNode("rename_me", 0.0, float("inf"))
                 dp.insert(k, ans)
                 return ans
@@ -281,6 +281,7 @@ class RuleSetNeuron(Node):
                 return ans
 
             weight = self.n_ins[k][1]
+            assert weight > 0
 
             # set to False
             n1 = to_bool_rec(k + 1, threshold, dp)
@@ -289,7 +290,7 @@ class RuleSetNeuron(Node):
                 max(n1.min_thr, n2.min_thr - weight),
                 min(n1.max_thr, n2.max_thr - weight),
             )
-            assert new_min < new_max
+            assert new_min < new_max, f"{new_min} is not <= {new_max}."
             ans = DpNode("rename_me", new_min, new_max)
             dp.insert(k, ans)
             return ans

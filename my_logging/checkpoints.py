@@ -108,7 +108,7 @@ class Configs(Logger):
             )
 
 
-class BestModels(Models):
+class BestModels(Logger):
     """
     Keeps track of/saves the best models w.r.t. to a metric.
     """

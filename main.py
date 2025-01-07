@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from config import Configuration, Grid, read_grid
 from datasets import get_dataset
-from models.factory import ModelFactory
+from models.model_collection import ModelFactory
 from my_logging.checkpoints import Checkpoints
 from my_logging.loggers import Plotter, Tracker
 from train_model import training_loop

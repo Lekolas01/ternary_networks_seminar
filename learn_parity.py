@@ -138,7 +138,7 @@ def find_best_params(
     n_iter: int,
     seed=0,
 ):
-    n_folds = 2
+    n_folds = 1
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=seed
     )
@@ -216,7 +216,7 @@ def training_runs(key):
         verbose=True,
     )
 
-    n_iter = 15
+    n_iter = 5
     print(f"Starting Hyperparameter search...")
     sampler, accs, complexities, fidelities, scores = find_best_params(
         X, y, re_clf, param_grid, n_iter, seed
