@@ -1,0 +1,19 @@
+{
+    "acc": [
+        0.9884393063583815,
+        0.9942196531791907,
+        0.9942196531791907,
+        0.9884057971014493,
+        0.9797101449275363
+    ],
+    "complexity": [
+        35,
+        33,
+        42,
+        33,
+        28
+    ],
+    "best_model_acc": 0.9797101449275363,
+    "best_model_compl": 28,
+    "best_model": "[[persons_2=True] V [safety_low=True] V [maint_vhigh=True^buying_med=False^buying_low=False] V [buying_vhigh=True^maint_high=True] V [lug_boot_small=True^safety_high=False^buying_low=False^buying_med=False] V [lug_boot_small=True^safety_high=False^maint_vhigh=True] V [lug_boot_small=True^doors_2=True^persons_4=False] V [safety_high=False^lug_boot_med=True^doors_3=True^persons_4=True] V [safety_high=False^lug_boot_small=True^maint_high=True^buying_low=False] V [maint_vhigh=True^doors_2=True^safety_high=False]]"
+}

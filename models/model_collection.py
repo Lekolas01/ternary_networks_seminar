@@ -10,7 +10,7 @@ NNSpec = list[tuple[int, int, Activation]]
 class SteepTanh(nn.Module):
     def __init__(self, k: float):
         super(SteepTanh, self).__init__()
-        self.k = k
+        self.register_buffer("k", torch.tensor(k), persistent=True)
 
     def forward(self, x):
         # return 2 / (1 + torch.exp(-self.k * x)) - 1 # not numerically stable???

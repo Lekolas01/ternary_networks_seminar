@@ -1,0 +1,13 @@
+{
+    "acc": [
+        0.9603340292275574,
+        1.0
+    ],
+    "complexity": [
+        29,
+        25
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 25,
+    "best_model": "[[middle-middle-square_x=True^top-right-square_o=False^bottom-left-square_o=False] V [bottom-right-square_o=False^middle-middle-square_o=False^top-left-square_o=False] V [top-left-square_x=True^top-middle-square_x=True^top-right-square_x=True] V [bottom-left-square_x=True^middle-left-square_x=True^top-left-square_x=True] V [middle-middle-square_x=True^middle-left-square_o=False^middle-right-square_x=True^middle-left-square_x=True] V [bottom-right-square_x=True^top-right-square_x=True^middle-right-square_x=True] V [bottom-middle-square_x=True^middle-middle-square_x=True^top-middle-square_x=True] V [bottom-right-square_x=True^bottom-middle-square_x=True^bottom-left-square_x=True]]"
+}

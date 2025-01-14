@@ -1,0 +1,47 @@
+------------- RIPPER ---------------
+	Accuracy: 	[0.19624217 0.69311065]
+	mean = 0.44467640918580376
+	std = 0.24843423799582465
+
+	Complexity: 	[40  1]
+	mean = 20.5
+	std = 19.5
+
+	Best model acc: 0.6931106471816284
+	Best model comply: 1
+	Best model: []
+
+------------- RIPPER ---------------
+	Accuracy: 	[0.19624217 0.69311065]
+	mean = 0.44467640918580376
+	std = 0.24843423799582465
+
+	Complexity: 	[37  1]
+	mean = 19.0
+	std = 18.0
+
+	Best model acc: 0.6931106471816284
+	Best model comply: 1
+	Best model: []
+
+------------- RIPPER ---------------
+	Accuracy: 	[0.99164927 1.        ]
+	mean = 0.9958246346555324
+	std = 0.004175365344467663
+
+	Complexity: 	[29 28]
+	mean = 28.5
+	std = 0.5
+
+	Best model acc: 1.0
+	Best model comply: 28
+	Best model: ['[middle-middle-square_x=True^bottom-left-square_o=False^top-right-square_o=False]'
+'[middle-middle-square_o=False^top-left-square_o=False^bottom-right-square_o=False]'
+'[top-right-square_x=True^top-middle-square_o=False^top-left-square_x=True^top-middle-square_x=True]'
+'[bottom-left-square_x=True^middle-middle-square_o=False^top-right-square_o=False]'
+'[middle-middle-square_x=True^top-middle-square_x=True^bottom-middle-square_x=True]'
+'[bottom-left-square_x=True^middle-left-square_x=True^top-left-square_x=True]'
+'[bottom-right-square_x=True^bottom-left-square_x=True^bottom-middle-square_x=True]'
+'[middle-right-square_x=True^middle-middle-square_x=True^middle-left-square_x=True]'
+'[bottom-right-square_x=True^top-right-square_x=True^middle-right-square_x=True]']
+

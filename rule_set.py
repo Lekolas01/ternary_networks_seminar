@@ -290,7 +290,7 @@ class RuleSetNeuron(Node):
                 max(n1.min_thr, n2.min_thr - weight),
                 min(n1.max_thr, n2.max_thr - weight),
             )
-            assert new_min < new_max, f"{new_min} is not <= {new_max}."
+            assert new_min <= new_max, f"{new_min} is not <= {new_max}."
             ans = DpNode("rename_me", new_min, new_max)
             dp.insert(k, ans)
             return ans
@@ -368,7 +368,7 @@ class RuleSetNeuron(Node):
                 else:
                     target_1 = dp.find(k + 1, node.mean)
                     if target_1 is None:
-                        print(f"{dp = }")
+                        # print(f"{dp = }")
                         print(f"{k + 1 = }")
                         print(f"{node.mean = }")
                     if target_1 is None:
@@ -437,6 +437,7 @@ class RuleSetGraph(Graph):
 
     @classmethod
     def from_QNG(cls, q_ng: QuantizedNeuronGraph, simplify=True):
+        prune_thr = 0.04
         # keep track of the needed rule set neurons
         needed_rule_set_neurons: set[str] = {"target"}
         rule_set_neurons = []
@@ -448,6 +449,9 @@ class RuleSetGraph(Graph):
                 continue
             if key not in needed_rule_set_neurons:
                 continue
+            print(f"Transforming neuron {q_n} into ruleset... ")
+            q_n.prune(prune_thr)
+            print(f"After removing little needed variables: {q_n}")
             rule_set_neuron = RuleSetNeuron(q_n, q_ng, simplify)
             graph_ins = rule_set_neuron.input_rules()
             rule_set_neurons.append(rule_set_neuron)

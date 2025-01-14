@@ -1,0 +1,106 @@
+------------- RIPPER ---------------
+	Accuracy: 	[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+	mean = 1.0
+	std = 0.0
+
+	Complexity: 	[2 2 2 2 2 2 2 2 2 2]
+	mean = 2.0
+	std = 0.0
+
+	Best model acc: 1.0
+	Best model comply: 2
+	Best model: ['[target_loss=False^target_draw=False]']
+
+------------- RIPPER ---------------
+	Accuracy: 	[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+	mean = 1.0
+	std = 0.0
+
+	Complexity: 	[2 2 2 2 2 2 2 2 2 2]
+	mean = 2.0
+	std = 0.0
+
+	Best model acc: 1.0
+	Best model comply: 2
+	Best model: ['[target_loss=False^target_draw=False]']
+
+------------- RIPPER ---------------
+	Accuracy: 	[1. 1. 1. 1. 1. 1. 1. 1. 1. 1.]
+	mean = 1.0
+	std = 0.0
+
+	Complexity: 	[2 2 2 2 2 2 2 2 2 2]
+	mean = 2.0
+	std = 0.0
+
+	Best model acc: 1.0
+	Best model comply: 2
+	Best model: ['[target_loss=False^target_draw=False]']
+
+------------- RIPPER ---------------
+	Accuracy: 	[0.57082803 0.65255492]
+	mean = 0.6116914733254004
+	std = 0.04086344407645881
+
+	Complexity: 	[492 500]
+	mean = 496.0
+	std = 4.0
+
+	Best model acc: 0.6525549174018592
+	Best model comply: 500
+	Best model: ['[c1_x=False^b1_o=True^a1_x=False^d3_o=False^a1_o=True^a2_x=False]'
+'[d1_o=False^d3_o=False^d2_x=True^c3_o=False^e1_x=False]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^a1_o=True^c3_o=False^b2_o=False^f2_o=False^e2_o=False^e3_o=False^a2_x=False]'
+'[d1_o=False^d3_o=False^b1_x=False^c1_x=False^b1_o=True^a1_x=False^c3_o=False^c1_o=True^g2_x=False^e1_x=False]'
+'[d1_o=False^d3_o=False^g1_o=True^c1_o=False^g2_x=False^g2_o=True]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^b1_o=True^c1_x=False^b2_o=False^c3_o=False^e2_o=False^f2_o=False^a2_x=False]'
+'[a1_o=True^b1_x=False^g1_x=False^a2_x=False^d3_o=False^f1_x=False^c3_o=False^c2_o=False]'
+'[a1_x=False^b1_x=False^g1_x=False^d3_o=False^c3_o=False^b1_o=True^d2_x=True]'
+'[d1_o=False^d3_o=False^a1_o=True^b1_x=False^c1_x=False^a3_x=False^b1_o=True]'
+'[d1_o=False^d3_o=False^a1_o=True^b1_x=False^g1_x=False^a2_x=False^f1_x=False^c5_x=False^g1_o=True]'
+'[a1_x=False^b1_x=False^g1_x=False^d3_o=False^c3_o=False^c2_x=True^f2_o=False^e3_o=False^e1_o=True]'
+'[d1_o=False^d3_o=False^g1_x=False^a1_x=False^b1_x=False^a1_o=True^a3_o=True^a5_x=False^e1_o=False]'
+'[d1_o=False^d3_o=False^c1_x=False^b1_x=False^a1_x=False^g2_x=False^d3_x=True^d4_o=False^a1_o=True]'
+'[d1_o=False^d3_o=False^g1_o=True^c1_o=False^g2_x=False^c3_x=True^c5_x=False^a1_x=False]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^c3_o=False^c2_x=True^f2_o=False^b3_o=False^e1_x=False^f4_o=False^b2_o=False]'
+'[d1_o=False^d3_o=False^g1_x=False^a1_x=False^b1_x=False^c1_x=False^b1_o=True^g2_x=False^c3_o=False^b2_o=False^d6_x=False^d3_x=True]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^c3_o=False^a1_o=True^a3_x=True^e1_o=False^b3_o=False^a5_x=False]'
+'[d1_o=False^d3_o=False^g1_x=False^a1_x=False^f1_x=False^c3_o=False^c2_x=True^b1_x=False^f2_o=False^e3_o=False^g2_x=False]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^c1_x=False^b1_o=True^d2_o=False^g2_x=False^b4_o=False^c3_o=False^b2_x=True]'
+'[d1_o=False^d3_o=False^c1_x=False^b1_x=False^a1_x=False^g2_x=False^d2_x=True^e3_o=False]'
+'[a1_x=False^b1_x=False^d3_o=False^g1_x=False^c3_o=False^b1_o=True^c2_x=True^e3_o=False^d2_o=False]'
+'[a1_x=False^d3_o=False^c3_o=False^c2_x=True^f2_o=False^a1_o=True^b3_o=False^g2_o=False]'
+'[d1_o=False^d3_o=False^c3_x=True^c4_o=False^e2_o=False^b2_o=False^a1_x=False^f2_o=False^d2_o=False^c1_o=True]'
+'[d1_o=False^d3_o=False^g1_x=False^f1_x=False^g1_o=True^g2_x=False^a1_x=False^f1_o=True^c3_o=False]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^a1_x=False^a1_o=True^a2_x=False^c2_o=True^b1_o=True^c3_x=True]'
+'[d1_o=False^d3_o=False^c2_o=False^d3_x=True^d4_o=False^a2_o=True]'
+'[a1_x=False^b1_x=False^d3_o=False^d2_x=True^c3_o=False^e3_o=False^g3_o=False^a2_x=False^d3_x=True]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^e1_o=True^f1_o=True^g1_x=False]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^a1_x=False^e2_x=True^e3_o=False^c3_o=False^c3_x=True]'
+'[d1_o=False^d3_o=False^c2_o=False^c1_x=False^b1_x=False^b1_o=True^d2_o=False^g2_x=False^a2_x=False^b5_x=False^b2_o=True^a1_x=False]'
+'[d1_o=False^d3_o=False^c2_o=False^c3_o=False^d2_o=False^e1_x=False^f2_o=False^b2_o=False^a3_x=False^g2_o=True^b1_x=False]'
+'[d1_o=False^d3_o=False^g1_x=False^a1_x=False^f1_x=False^c3_o=False^d3_x=True^d4_o=False^c2_o=False^b3_x=False]'
+'[d1_o=False^d2_o=False^a1_o=True^d1_x=True^a2_x=False^a2_o=True^a4_x=False]'
+'[b1_o=True^c1_x=False^d2_o=False^d4_o=False^g2_x=False^a1_x=False^d4_x=True^d5_o=False]'
+'[d3_o=False^d2_x=True^c3_o=False^b1_o=True^c2_o=False]'
+'[d3_o=False^d2_x=True^c3_o=False^e3_o=False^g3_o=False^a3_o=False^e2_o=False^e1_x=False^b2_o=False^a1_x=False^f4_o=False^a3_x=False]'
+'[d1_o=False^d3_o=False^c3_x=True^c4_o=False^e2_o=False^b2_o=False^f2_o=False^d2_o=False^b1_o=False^a3_x=False^c4_x=True]'
+'[d1_o=False^d3_o=False^g1_o=True^c1_o=False^g2_x=False^a2_x=False^e2_x=True]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^c1_x=False^b1_o=True^c1_o=True^g2_x=False^a2_x=False^d2_o=True^b2_x=False]'
+'[d1_o=False^d3_o=False^g1_x=False^a1_x=False^f1_x=False^c3_o=False^b2_x=True^b3_o=False^e1_x=False^e3_o=False^f2_o=False^c1_x=False]'
+'[d1_o=False^d3_o=False^b1_x=False^c1_x=False^b1_o=True^d2_o=False^g2_x=False^e1_x=False^b4_o=False^c3_o=False^c1_o=True^f1_x=False]'
+'[d1_o=False^d3_o=False^c3_x=True^c4_o=False^e2_o=False^b2_o=False^f2_o=False^d2_o=False^f1_o=False^a2_o=False^b4_o=False]'
+'[d1_o=False^d3_o=False^b1_x=False^c1_x=False^c2_o=False^a2_o=True^a3_o=True]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^a1_x=False^a1_o=True^a2_x=False^c4_o=False^c2_o=True^e1_o=False^a4_x=False^e1_x=False]'
+'[a1_x=False^b1_x=False^d3_o=False^g1_x=False^c3_o=False^b1_o=True^d1_x=False^e1_x=False^d1_o=True^d2_o=False^g3_x=False^e1_o=True]'
+'[a1_x=False^b1_x=False^g1_x=False^d3_o=False^c3_o=False^b1_o=True^d1_x=False^f2_x=True^b2_o=False^f3_o=False^f3_x=False]'
+'[d1_o=False^d3_o=False^c2_o=False^d2_o=False^e1_o=True^e2_o=False^b2_o=False^a1_x=False^c4_o=False^a2_x=False]'
+'[a1_x=False^b1_x=False^d3_o=False^g1_x=False^c3_o=False^b1_o=True^d1_x=False^e1_x=False^c4_o=False^f2_o=False^g3_x=False^b3_o=False^d1_o=True]'
+'[d1_o=False^d3_o=False^c2_o=False^c3_o=False^d2_o=False^a1_o=True^a3_o=True]'
+'[d1_o=False^d3_o=False^b1_x=False^c1_x=False^b1_o=True^d2_o=False^g2_x=False^b2_o=False^c3_o=False^a1_x=False^a1_o=False]'
+'[d1_o=False^d3_o=False^g1_o=True^c1_o=False^g3_o=True]'
+'[d1_o=False^d3_o=False^g1_x=False^b1_x=False^c1_x=False^c2_o=False^e1_o=True^c1_o=True^a2_x=False^e2_x=False^c4_o=False]'
+'[a1_x=False^b1_x=False^g1_x=False^d3_o=False^d2_x=True^d3_x=True]'
+'[d1_o=False^d3_o=False^g2_o=True^g3_o=True^b1_o=False^a1_x=False]'
+'[c1_x=False^d3_o=False^d2_x=True^e3_o=False^c3_o=False]']
+

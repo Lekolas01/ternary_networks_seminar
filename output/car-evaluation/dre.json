@@ -1,0 +1,19 @@
+{
+    "acc": [
+        0.9393063583815029,
+        0.8872832369942196,
+        0.8959537572254336,
+        0.9188405797101449,
+        0.927536231884058
+    ],
+    "complexity": [
+        173,
+        199,
+        203,
+        674,
+        295
+    ],
+    "best_model_acc": 0.9393063583815029,
+    "best_model_compl": 173,
+    "best_model": "Graph[\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= persons_4\n\th4_1\t:= !safety_low, h4_4\n\th4_4\t:= doors_3\n\th4_4\t:= safety_med\n]\n\tRuleSet h3 [\n\th3\t:= h3_1\n\th3\t:= safety_high, h3_2\n\th3_1\t:= h3_3\n\th3_1\t:= lug_boot_big, h3_4\n\th3_2\t:= h3_5\n\th3_2\t:= lug_boot_big\n\th3_3\t:= h3_7\n\th3_3\t:= !lug_boot_small, h3_8\n\th3_4\t:= h3_9\n\th3_4\t:= !lug_boot_small\n\th3_5\t:= h3_10\n\th3_5\t:= !lug_boot_small\n\th3_7\t:= !doors_2, h3_13\n\th3_8\t:= h3_14\n\th3_8\t:= !doors_2, h3_16\n\th3_9\t:= h3_15\n\th3_9\t:= !doors_2, h3_17\n\th3_10\t:= h3_16\n\th3_10\t:= !doors_2\n\th3_13\t:= buying_vhigh, h3_21\n\th3_14\t:= h3_20\n\th3_14\t:= buying_vhigh, h3_23\n\th3_15\t:= h3_22\n\th3_15\t:= buying_vhigh, h3_24\n\th3_16\t:= h3_24\n\th3_16\t:= buying_vhigh, h3_25\n\th3_17\t:= h3_25\n\th3_17\t:= buying_vhigh\n\th3_20\t:= maint_vhigh, h3_28\n\th3_21\t:= maint_vhigh, h3_29\n\th3_22\t:= h3_28\n\th3_22\t:= maint_vhigh, h3_30\n\th3_23\t:= h3_28\n\th3_23\t:= maint_vhigh, h3_31\n\th3_24\t:= h3_30\n\th3_24\t:= maint_vhigh, h3_32\n\th3_25\t:= h3_32\n\th3_25\t:= maint_vhigh\n\th3_28\t:= doors_5more, h3_35\n\th3_29\t:= doors_5more, h3_36\n\th3_30\t:= h3_35\n\th3_30\t:= doors_5more, h3_36\n\th3_31\t:= h3_35\n\th3_31\t:= doors_5more\n\th3_32\t:= h3_36\n\th3_32\t:= doors_5more\n\th3_35\t:= doors_4, persons_4\n\th3_36\t:= persons_4\n\th3_36\t:= doors_4\n]\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= !persons_more, h2_2\n\th2_1\t:= !doors_2, h2_4\n\th2_2\t:= h2_5\n\th2_2\t:= !doors_2, h2_6\n\th2_4\t:= !lug_boot_small, h2_9\n\th2_5\t:= h2_8\n\th2_5\t:= !lug_boot_small, h2_10\n\th2_6\t:= h2_11\n\th2_6\t:= !lug_boot_small\n\th2_8\t:= !buying_low, h2_14\n\th2_9\t:= !buying_low, maint_vhigh\n\th2_10\t:= maint_vhigh\n\th2_10\t:= !buying_low\n\th2_11\t:= h2_16\n\th2_11\t:= !buying_low\n\th2_14\t:= maint_vhigh, buying_vhigh\n\th2_16\t:= buying_vhigh\n\th2_16\t:= maint_vhigh\n]\n\tRuleSet h1 [\n\th1\t:= h1_1\n\th1\t:= persons_2, h1_2\n\th1_1\t:= h1_3\n\th1_1\t:= safety_low, h1_4\n\th1_2\t:= h1_4\n\th1_2\t:= safety_low\n\th1_3\t:= h1_6\n\th1_3\t:= buying_vhigh, h1_7\n\th1_4\t:= h1_8\n\th1_4\t:= buying_vhigh\n\th1_6\t:= h1_10\n\th1_6\t:= maint_vhigh, h1_11\n\th1_7\t:= h1_11\n\th1_7\t:= maint_vhigh\n\th1_8\t:= h1_12\n\th1_8\t:= maint_vhigh\n\th1_10\t:= !buying_low, h1_15\n\th1_11\t:= h1_15\n\th1_11\t:= !buying_low, h1_16\n\th1_12\t:= h1_16\n\th1_12\t:= !buying_low\n\th1_15\t:= doors_2, !safety_high\n\th1_16\t:= !safety_high\n\th1_16\t:= doors_2\n]\n\tRuleSet h9 [\n\th9\t:= h9_1\n\th9\t:= h1, h9_2\n\th9_1\t:= h9_3\n\th9_1\t:= h2, h9_4\n\th9_2\t:= h9_4\n\th9_2\t:= h2\n\th9_3\t:= !h3, !h4\n\th9_4\t:= !h4\n\th9_4\t:= !h3\n]\n\tRuleSet h8 [\n\th8\t:= h8_1\n\th8\t:= h2, h8_2\n\th8_1\t:= h8_3\n\th8_1\t:= h1, h8_4\n\th8_2\t:= h8_4\n\th8_2\t:= h1\n\th8_3\t:= !h3, !h4\n\th8_4\t:= !h4\n\th8_4\t:= !h3\n]\n\tRuleSet h6 [\n\th6\t:= h6_1\n\th6\t:= h1, h6_2\n\th6_1\t:= h6_3\n\th6_1\t:= h2, h6_4\n\th6_2\t:= h6_4\n\th6_2\t:= h2\n\th6_3\t:= !h3, !h4\n\th6_4\t:= !h4\n\th6_4\t:= !h3\n]\n\tRuleSet target [\n\ttarget\t:= target_1\n\ttarget\t:= h8\n\ttarget_1\t:= h6, h9\n]\n]"
+}

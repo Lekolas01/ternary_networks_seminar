@@ -15,6 +15,8 @@ the training samples.
 We also show the tree structure of a model built on all of the features.
 """
 
+from inspect import Parameter
+
 import torch
 
 # %%
@@ -179,3 +181,69 @@ rs = RuleSetNeuron(q_neuron, QuantizedNeuronGraph([q_neuron]), True)
 print(rs)
 
 # %%
+a = SteepTanh(10)
+print(a.state_dict())
+b = torch.tensor(3)
+print(b)
+print(b.shape)
+m = nn.Linear()
+m = torch.nn.utils.skip_init()
+
+
+# %%
+import torch.nn as nn
+
+
+def debug_input(m, inputs):
+    # Allows for examination and modification of the input before the forward pass.
+    # Note that inputs are always wrapped in a tuple.
+    print(m.weight)
+    print(m.weight.shape)
+    return inputs[0]
+
+
+def forward_hook(m, inputs, output):
+    # Allows for examination of inputs / outputs and modification of the outputs
+    # after the forward pass. Note that inputs are always wrapped in a tuple while outputs
+    # are passed as-is.
+    print(f"{output = }")
+    ans = torch.sign(output.detach())
+    print(f"{output = }")
+    print(f"{ans = }")
+    return ans
+
+
+class Temp(nn.Module):
+    def __init__(self, in_features, out_features):
+        super().__init__()
+        self.l1 = nn.Linear(in_features, out_features)
+        self.act = nn.Tanh()
+        self.l1.register_forward_pre_hook(debug_input)
+        self.act_handle = self.act.register_forward_hook(forward_hook)
+
+    def forward(self, x):
+        return self.act(self.l1(x))
+
+
+N = 10
+D = 3
+
+x = 2 * torch.rand((N, D)) - 1
+y = 2 * torch.rand((D, 3)) - 1
+a = nn.Linear(10, 20)
+print(f"{a.weight = }")
+print(f"{a.weight.t() = }")
+print(f"{a.bias = }")
+print(f"{a.bias.t() = }")
+m = Temp(D, 1)
+# print(f"{x.shape = }")
+# print(f"{x = }")
+# print(f"{m(x) = }")
+# forward_hook_handle = m.register_forward_hook(forward_hook)
+
+# %%
+a = {"a": 0.5, "b": 0.3}
+c = list(a.items())
+print(c)
+c.sort(key=lambda x: x[1])
+print(c)

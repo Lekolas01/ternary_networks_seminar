@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import torch
 from torch.utils.data.dataset import Dataset
@@ -54,7 +55,7 @@ class FileDataset(Dataset):
                 df = pd.concat(
                     [
                         df,
-                        pd.get_dummies(df[column], prefix=column, drop_first=True),
+                        pd.get_dummies(df[column], prefix=column, drop_first=False),
                     ],
                     axis=1,
                 )
@@ -241,11 +242,11 @@ def get_df(key: str) -> pd.DataFrame:
             return df
         case "mushroom":
             return get_df_from_uci(73)
-        case "king_rook-king_pawn":
+        case "king-rook-king-pawn":
             return get_df_from_uci(22)
-        case "king_rook-king":
+        case "king-rook-king":
             return get_df_from_uci(23)
-        case "car_evaluation":
+        case "car-evaluation":
             ans = get_df_from_uci(19)
             # the most common output is unacc;
             # make it the positive class and the other columns the negative class
@@ -256,14 +257,35 @@ def get_df(key: str) -> pd.DataFrame:
             e = ExpressionEvaluator()
             fn = e.parse("(a | b) & (c | d) & (e | (f & g))")
             return gen_data(fn, dead_cols=3, shuffle=True, n=1024)
-        case "monk":
+        case "monk-1":
             return get_df_from_uci(id=70)
-        case "balance_scale":
-            return get_df_from_uci(id=12)
+        case "monk-2":
+            df = get_df_from_uci(id=70)
+            # replace the target variable in each row
+            for i in range(df.shape[0]):
+                df.iloc[i, -1] = sum(df.iloc[i, :-1] == 1) == 2
+            return df
+        case "monk-3":
+            df = get_df_from_uci(id=70)
+            # replace the target variable in each row
+            for i in range(df.shape[0]):
+                df.iloc[i, -1] = (df.iloc[i, 4] == 3 and df.iloc[i, 3] == 1) or (
+                    df.iloc[i, 4] != 4 and df.iloc[i, 1] != 3
+                )
+            return df
+        case "balance-scale":
+            df = get_df_from_uci(id=12)
+            df.loc[df["target"] != "L", "target"] = 0
+            df.loc[df["target"] == "L", "target"] = 1
+            return df
         case "tic-tac-toe":
-            return get_df_from_uci(id=101)
+            df = get_df_from_uci(id=101)
+            return df
         case "connect-4":
-            return get_df_from_uci(id=26)
+            df = get_df_from_uci(id=26)
+            df.loc[df["target"] != "win", "target"] = 0
+            df.loc[df["target"] == "win", "target"] = 1
+            return df
         case "vote":
             return get_df_from_uci(id=105)
         case _:

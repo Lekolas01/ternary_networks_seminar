@@ -1,0 +1,21 @@
+------------- RIPPER ---------------
+	Accuracy: 	[1.         0.96868476]
+	mean = 0.9843423799582464
+	std = 0.01565762004175364
+
+	Complexity: 	[29 31]
+	mean = 30.0
+	std = 1.0
+
+	Best model acc: 1.0
+	Best model comply: 29
+	Best model: ['[middle-middle-square_o=False^top-left-square_o=False^bottom-right-square_o=False]'
+'[top-right-square_o=False^middle-middle-square_o=False^bottom-left-square_o=False]'
+'[bottom-middle-square_o=False^middle-middle-square_x=True^top-middle-square_o=False^middle-left-square_o=False^bottom-left-square_o=True]'
+'[bottom-left-square_x=True^top-left-square_x=True^middle-left-square_x=True]'
+'[top-right-square_x=True^middle-right-square_x=True^bottom-right-square_x=True]'
+'[bottom-middle-square_x=True^bottom-left-square_x=True^bottom-right-square_x=True]'
+'[top-middle-square_x=True^top-left-square_x=True^top-right-square_x=True]'
+'[middle-middle-square_x=True^bottom-middle-square_x=True^top-middle-square_x=True]'
+'[middle-middle-square_x=True^middle-left-square_x=True^middle-right-square_x=True]']
+

@@ -1,0 +1,29 @@
+{
+    "acc": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+    ],
+    "complexity": [
+        12,
+        11,
+        11,
+        12,
+        12,
+        11,
+        12,
+        12,
+        12,
+        10
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 10,
+    "best_model": "[[odor_n=False^bruises_f=True] V [odor_f=True] V [odor_p=True] V [spore-print-color_r=True] V [gill-size_b=False^stalk-surface-below-ring_y=True] V [cap-surface_g=True] V [habitat_l=True^cap-color_w=True]]"
+}

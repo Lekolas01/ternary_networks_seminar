@@ -1,0 +1,29 @@
+{
+    "acc": [
+        0.985239852398524,
+        0.990159901599016,
+        0.991389913899139,
+        0.996309963099631,
+        0.9963054187192119,
+        0.9852216748768473,
+        0.9950738916256158,
+        0.9975369458128078,
+        0.9963054187192119,
+        0.9938423645320197
+    ],
+    "complexity": [
+        34,
+        16,
+        35,
+        23,
+        32,
+        42,
+        20,
+        24,
+        24,
+        24
+    ],
+    "best_model_acc": 0.990159901599016,
+    "best_model_compl": 16,
+    "best_model": "Graph[\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= !spore-print-color_r, h4_2\n\th4_1\t:= h4_3\n\th4_1\t:= odor_n, h4_4\n\th4_2\t:= h4_4\n\th4_2\t:= odor_n\n\th4_3\t:= odor_a, odor_l\n\th4_4\t:= odor_l\n\th4_4\t:= odor_a\n]\n\tRuleSet h6 [\n\th6\t:= !h4\n]\n\tRuleSet h12 [\n\th12\t:= h6\n]\n\tRuleSet target [\n\ttarget\t:= h12\n]\n]"
+}

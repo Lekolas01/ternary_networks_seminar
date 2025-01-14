@@ -1,7 +1,9 @@
 import copy
+import json
 import os
 import sys
 from argparse import ArgumentParser, Namespace
+from pydoc import text
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,6 +11,7 @@ import pandas as pd
 import seaborn as sns
 import torch
 import wittgenstein as lw
+from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.base import BaseEstimator
@@ -86,12 +89,22 @@ def rip_compl(ripper_clf: lw.RIPPER) -> int:
 
 
 def rip_model_str(ripper_clf: lw.RIPPER):
+    return ripper_clf.ruleset_
     ans = str([str(rule) for rule in ripper_clf.ruleset_.rules]).replace(", ", "\n")
     return ans
 
 
 def re_clf_complexity(re_clf: RuleExtractionClassifier) -> int:
     return re_clf.bool_graph.complexity() + 1
+
+
+class Result:
+    def __init__(self, acc, complexity, best_model_acc, best_model_compl, best_model):
+        self.acc = acc
+        self.complexity = complexity
+        self.best_model_acc = best_model_acc
+        self.best_model_compl = int(best_model_compl)
+        self.best_model = best_model
 
 
 def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results, alg_name):
@@ -102,13 +115,11 @@ def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results, alg_
     best_compls = compls[best_idx]
     best_model = models[best_idx]
 
-    with open(f_results, "a") as text_file:
-        text_file.write(f"------------- {alg_name} ---------------\n")
-        text_file.write(f"\tAccuracy: {stats(accs)}\n")
-        text_file.write(f"\tComplexity: {stats(compls)}\n")
-        text_file.write(f"\tBest model acc: {best_acc}\n")
-        text_file.write(f"\tBest model comply: {best_compls}\n")
-        text_file.write(f"\tBest model: {best_model}\n\n")
+    with open(f_results, "w") as text_file:
+        ans = Result(
+            list(accs), [int(x) for x in compls], best_acc, best_compls, str(best_model)
+        )
+        json.dump(ans.__dict__, text_file, indent=4)
     return accs, compls
 
 
@@ -116,14 +127,15 @@ def cross_validate(
     X: DataFrame, y: Series, clf: BaseEstimator, compl_func, model_str_func, n_splits=10
 ):
     accs, compls, models = [], [], []
-    kf = KFold(n_splits=n_splits)
+    kf = KFold(n_splits=n_splits, shuffle=True)
     for _, (train_ids, valid_ids) in enumerate(kf.split(X)):
         Xtrain = X.loc[train_ids]
         ytrain = y.loc[train_ids]
         Xvalid = X.loc[valid_ids]
         yvalid = y.loc[valid_ids]
-
+        print("Fit start")
         clf.fit(Xtrain, ytrain)
+        print("Fit end")
         accs.append(accuracy_score(clf.predict(Xvalid), yvalid))
         compls.append(compl_func(clf))
         models.append(model_str_func(clf))
@@ -138,7 +150,7 @@ def find_best_params(
     n_iter: int,
     seed=0,
 ):
-    n_folds = 1
+    n_folds = 3
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=seed
     )
@@ -188,7 +200,8 @@ def training_runs(key):
 
     X, y = load_dataframe(key)
     f_outputs = f"output/{key}/"
-    f_results = f_outputs + f"results.txt"
+    f_re_results = f_outputs + f"dre.json"
+    f_ripper = f_outputs + f"ripper.json"
 
     if not os.path.isdir(f_outputs):
         os.makedirs(f_outputs)
@@ -197,12 +210,26 @@ def training_runs(key):
     param_grid = {
         "layer_width": [10, 6],
         "lr": [3e-4, 1e-3, 3e-3],
-        "l1": [1e-5, 4e-4, 3e-3],
-        "n_layer": [1, 2],
+        # "l1": [1e-5, 4e-4, 3e-3, 1e-2],
+        "l1": [2e-3],
+        "n_layer": [1, 2, 3],
         "steepness": [4, 8, 16],
     }
 
-    delay = 600
+    delay = 3000
+    k = 5
+
+    print(f"Data shape = {X.shape}")
+
+    if os.path.isfile(f_ripper) and os.path.getsize(f_ripper) != 0:
+        print(f"RIPPER results already found at {f_ripper}. Model fit skipped.")
+    else:
+        print(f"Could not find RIPPPER results for {key} dataset. Doing fit...")
+        ripper_clf = lw.RIPPER()
+        ripper_accs, ripper_compls = cross_val_and_log(
+            X, y, ripper_clf, rip_compl, rip_model_str, k, f_ripper, "RIPPER"
+        )
+        print(f"Fit done. See results in {f_ripper}.")
 
     re_clf = RuleExtractionClassifier(
         lr=4e-3,
@@ -272,7 +299,7 @@ def training_runs(key):
     plt.savefig(f_outputs + f"nlayer_fid")
     plt.figure()
 
-    with open(f_results, "w") as of:
+    with open(f_re_results, "w") as of:
 
         of.write("--- Hyperparameter search ---\n")
         of.write(f"\t{param_grid = }\n\n")
@@ -282,17 +309,18 @@ def training_runs(key):
         of.write(f"\t{best_idx = }\n")
         of.write(f"\t{best_params = }\n\n")
 
-    k = 10
     # delay = 1000
-
-    ripper_clf = lw.RIPPER()
-    ripper_accs, ripper_compls = cross_val_and_log(
-        X, y, ripper_clf, rip_compl, rip_model_str, k, f_results, "RIPPER"
-    )
 
     re_clf.set_params(**best_params, delay=delay)
     re_accs, re_compls = cross_val_and_log(
-        X, y, re_clf, re_clf_complexity, lambda clf: clf.bool_graph, k, f_results, "DRE"
+        X,
+        y,
+        re_clf,
+        re_clf_complexity,
+        lambda clf: clf.bool_graph,
+        k,
+        f_re_results,
+        "DRE",
     )
 
     data = np.zeros((2 * k, 3))

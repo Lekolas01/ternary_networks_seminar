@@ -1,0 +1,19 @@
+{
+    "acc": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+    ],
+    "complexity": [
+        35,
+        29,
+        34,
+        28,
+        28
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 28,
+    "best_model": "[[e_0=False^a_0=False^d_0=False] V [b_0=False^e_0=False^c_0=False] V [g_0=False^f_0=False^b_0=False^d_0=False] V [e_0=False^c_0=False^a_0=False] V [g_0=False^c_0=False^f_0=False^a_0=False] V [d_0=False^e_0=False^b_0=False] V [g_0=False^f_0=False^c_0=False^b_0=False] V [g_0=False^a_0=False^d_0=False^f_0=False]]"
+}

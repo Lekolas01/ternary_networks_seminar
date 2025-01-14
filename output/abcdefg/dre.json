@@ -1,0 +1,19 @@
+{
+    "acc": [
+        0.9170731707317074,
+        1.0,
+        1.0,
+        1.0,
+        0.8578431372549019
+    ],
+    "complexity": [
+        50,
+        29,
+        43,
+        32,
+        51
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 29,
+    "best_model": "Graph[\n\tRuleSet h3 [\n\th3\t:= h3_1\n\th3\t:= a_1\n\th3_1\t:= b_1\n\th3_1\t:= !b_0\n]\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= e_1\n\th2_1\t:= !f_0, h2_4\n\th2_4\t:= h2_5\n\th2_4\t:= g_1\n\th2_5\t:= !g_0, !e_0\n]\n\tRuleSet h1 [\n\th1\t:= d_0, !c_1\n]\n\tRuleSet h8 [\n\th8\t:= h2, h8_2\n\th8_2\t:= h3, !h1\n]\n\tRuleSet h12 [\n\th12\t:= h8\n]\n\tRuleSet h11 [\n\th11\t:= !h8\n]\n\tRuleSet h10 [\n\th10\t:= h8\n]\n\tRuleSet target [\n\ttarget\t:= target_1\n\ttarget\t:= h12, target_2\n\ttarget_1\t:= !h11, h10\n\ttarget_2\t:= h10\n\ttarget_2\t:= !h11\n]\n]"
+}

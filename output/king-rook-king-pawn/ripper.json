@@ -1,0 +1,19 @@
+{
+    "acc": [
+        0.98125,
+        0.9655712050078247,
+        0.971830985915493,
+        0.9671361502347418,
+        0.9827856025039123
+    ],
+    "complexity": [
+        43,
+        56,
+        41,
+        61,
+        72
+    ],
+    "best_model_acc": 0.971830985915493,
+    "best_model_compl": 41,
+    "best_model": "[[reskr_t=True] V [wkna8_t=False^blxwp_t=False^wkovl_t=True^bkspr_t=True] V [wkna8_t=False^blxwp_t=False^wkovl_t=True^hdchk_n=True^rkxwp_t=False] V [bxqsq_t=True^blxwp_t=False^hdchk_w=True^wkna8_t=False] V [blxwp_t=False^wkna8_t=False^bkspr_t=True] V [blxwp_t=False^wkna8_t=False^mulch_t=True] V [blxwp_t=False^bkxbq_t=False^qxmsq_t=False^skewr_t=False^rxmsq_t=False^reskd_t=False] V [blxwp_t=False^bxqsq_t=True^wkna8_t=False^hdchk_n=False^wknck_t=False^dwipd_t=False] V [blxwp_t=False^bkxwp_t=False^wknck_t=False^bkxbq_t=False^bkon8_t=False^wkovl_t=True^wkpos_t=False^katri_t=False^bknwy_t=False]]"
+}

@@ -1,0 +1,19 @@
+{
+    "acc": [
+        0.944,
+        0.928,
+        0.888,
+        0.936,
+        0.888
+    ],
+    "complexity": [
+        224,
+        241,
+        189,
+        303,
+        84
+    ],
+    "best_model_acc": 0.888,
+    "best_model_compl": 84,
+    "best_model": "Graph[\n\tRuleSet h5 [\n\th5\t:= h5_1\n\th5\t:= !right-weight_1, h5_2\n\th5_1\t:= left-distance_1, h5_4\n\th5_2\t:= h5_5\n\th5_2\t:= left-distance_1, h5_6\n\th5_4\t:= !right-weight_2, h5_9\n\th5_5\t:= h5_8\n\th5_5\t:= !right-weight_2, h5_9\n\th5_6\t:= h5_9\n\th5_6\t:= !right-weight_2\n\th5_8\t:= left-weight_1, !right-distance_1\n\th5_9\t:= !right-distance_1\n\th5_9\t:= left-weight_1\n]\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= right-distance_1, h4_2\n\th4_1\t:= h4_3\n\th4_1\t:= !left-distance_1, h4_4\n\th4_2\t:= h4_4\n\th4_2\t:= !left-distance_1, h4_5\n\th4_3\t:= h4_6\n\th4_3\t:= left-weight_4, h4_7\n\th4_4\t:= h4_7\n\th4_4\t:= left-weight_4, h4_8\n\th4_5\t:= h4_8\n\th4_5\t:= left-weight_4\n\th4_6\t:= left-distance_4, h4_11\n\th4_7\t:= h4_11\n\th4_7\t:= left-distance_4, h4_12\n\th4_8\t:= h4_12\n\th4_8\t:= left-distance_4, h4_13\n\th4_11\t:= !right-distance_4, h4_15\n\th4_12\t:= h4_15\n\th4_12\t:= !right-distance_4, h4_16\n\th4_13\t:= h4_16\n\th4_13\t:= !right-distance_4\n\th4_15\t:= right-weight_1, !left-weight_1\n\th4_16\t:= !left-weight_1\n\th4_16\t:= right-weight_1\n]\n\tRuleSet h3 [\n\th3\t:= h3_1\n\th3\t:= !left-distance_5, h3_2\n\th3_1\t:= h3_3\n\th3_1\t:= !left-weight_5, h3_4\n\th3_2\t:= h3_4\n\th3_2\t:= !left-weight_5\n\th3_3\t:= right-weight_5, right-distance_5\n\th3_4\t:= right-distance_5\n\th3_4\t:= right-weight_5\n]\n\tRuleSet h2 [\n\th2\t:= left-weight_1\n\th2\t:= right-weight_4\n]\n\tRuleSet h7 [\n\th7\t:= h7_1\n\th7\t:= !h4, h7_2\n\th7_1\t:= h3, h7_4\n\th7_2\t:= h7_4\n\th7_2\t:= h3, h7_5\n\th7_4\t:= h5, h2\n\th7_5\t:= h2\n\th7_5\t:= h5\n]\n\tRuleSet h11 [\n\th11\t:= h7\n]\n\tRuleSet target [\n\ttarget\t:= !h11\n]\n]"
+}

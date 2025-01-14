@@ -1,0 +1,13 @@
+{
+    "acc": [
+        0.963302752293578,
+        0.9447004608294931
+    ],
+    "complexity": [
+        5,
+        5
+    ],
+    "best_model_acc": 0.963302752293578,
+    "best_model_compl": 5,
+    "best_model": "[[physician-fee-freeze_y=True^synfuels-corporation-cutback_y=False] V [physician-fee-freeze_y=True^mx-missile_y=False^adoption-of-the-budget-resolution_y=False]]"
+}

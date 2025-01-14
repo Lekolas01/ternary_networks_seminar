@@ -34,7 +34,10 @@ class Perceptron(Node):
         return np.where(ans >= 0, self.y_centers[1], self.y_centers[0])
 
     def __str__(self):
-        params = [f"{self.ins[key]:.3f} * {key}" for key in self.ins]
+        temp = list(self.ins.items())
+        temp.sort(key=lambda x: -abs(x[1]))
+        temp = {k: v for k, v in temp}
+        params = [f"{self.ins[key]:.3f} * {key}" for key in temp]
         cond = str.join("\t+ ", params)
         cond += f"\t+ {self.bias:.3f} >= 0"
         ans = (
@@ -44,6 +47,10 @@ class Perceptron(Node):
             + f" ] ELSE [ {self.y_centers[0]:.3f} ]"
         )
         return ans
+
+    def prune(self, thr: float):
+        # prune inputs with less impact than abs(thr)
+        self.ins = {k: v for k, v in self.ins.items() if abs(v) >= thr}
 
 
 def from_neuron(
