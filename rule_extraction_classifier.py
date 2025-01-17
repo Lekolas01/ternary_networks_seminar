@@ -45,7 +45,7 @@ class RuleExtractionClassifier(BaseEstimator):
         self.n_layer = n_layer
         self.l1 = l1
         self.device = "cpu"
-        self.batch_size = 64
+        self.batch_size = 32
         self.epochs = epochs
         self.wd = wd
         self.steepness = steepness

@@ -1,19 +1,15 @@
 {
     "acc": [
-        1.0,
-        1.0,
-        1.0,
-        1.0,
-        1.0
+        0.6388888888888888,
+        0.6666666666666666,
+        0.7083333333333334
     ],
     "complexity": [
-        91,
-        87,
-        73,
-        175,
-        93
+        4578,
+        1,
+        4232
     ],
-    "best_model_acc": 1.0,
-    "best_model_compl": 73,
-    "best_model": "Graph[\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= a6_2, h4_2\n\th4_1\t:= h4_3\n\th4_1\t:= !a4_1, h4_4\n\th4_2\t:= h4_4\n\th4_2\t:= !a4_1, h4_5\n\th4_3\t:= !a5_1, h4_7\n\th4_4\t:= h4_7\n\th4_4\t:= !a5_1, h4_8\n\th4_5\t:= h4_8\n\th4_5\t:= !a5_1, h4_9\n\th4_7\t:= !a2_1, h4_11\n\th4_8\t:= h4_11\n\th4_8\t:= !a2_1, h4_12\n\th4_9\t:= h4_12\n\th4_9\t:= !a2_1\n\th4_11\t:= !a1_1, h4_15\n\th4_12\t:= h4_15\n\th4_12\t:= !a1_1\n\th4_15\t:= !a3_1\n\th4_15\t:= a3_2\n]\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= !a1_1, h2_2\n\th2_1\t:= !a4_1, h2_4\n\th2_2\t:= h2_4\n\th2_2\t:= !a4_1, h2_5\n\th2_4\t:= !a2_1, h2_7\n\th2_5\t:= h2_7\n\th2_5\t:= !a2_1, h2_8\n\th2_7\t:= !a5_1, h2_10\n\th2_8\t:= h2_10\n\th2_8\t:= !a5_1, h2_11\n\th2_10\t:= a6_2, h2_13\n\th2_11\t:= h2_14\n\th2_11\t:= a6_2\n\th2_13\t:= a3_2, h2_18\n\th2_14\t:= h2_17\n\th2_14\t:= a3_2\n\th2_17\t:= !a3_1, !a6_1\n\th2_18\t:= !a6_1\n\th2_18\t:= !a3_1\n]\n\tRuleSet h14 [\n\th14\t:= h4, !h2\n]\n\tRuleSet h20 [\n\th20\t:= !h14\n]\n\tRuleSet h19 [\n\th19\t:= h14\n]\n\tRuleSet h18 [\n\th18\t:= !h14\n]\n\tRuleSet target [\n\ttarget\t:= target_1\n\ttarget\t:= !h18, target_2\n\ttarget_1\t:= h19, !h20\n\ttarget_2\t:= !h20\n\ttarget_2\t:= h19\n]\n]"
+    "best_model_acc": 0.6666666666666666,
+    "best_model_compl": 1,
+    "best_model": "Graph[\n\tRuleSet target [\n\t\n]\n]"
 }

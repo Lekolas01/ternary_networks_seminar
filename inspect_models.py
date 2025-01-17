@@ -45,9 +45,7 @@ def inspect(dir_path):
     plt.ylabel("Accuracy")
     plt.title(os.path.basename(dir_path))
     plt.show()
-    valid_loader = get_dataset(
-        ds="mushroom"  # , train=False, shuffle=True, batch_size=128
-    )
+    valid_loader = get_dataset(ds="mushroom")
     valid_loader = torch.Dat
     names = valid_loader.dataset.df.columns[1:]
 

@@ -1,0 +1,20 @@
+{
+    "acc": [
+        0.9718574108818011,
+        0.971830985915493,
+        0.9755868544600939
+    ],
+    "complexity": [
+        45,
+        37,
+        35
+    ],
+    "score": [
+        0.004947764804535042,
+        0.006016877818107734,
+        0.0064623673181499
+    ],
+    "best_model_acc": 0.9755868544600939,
+    "best_model_compl": 35,
+    "best_model": "[[reskr_f=False] V [wkna8_f=True^blxwp_f=True^wkovl_f=False^bkspr_f=False] V [wkna8_f=True^blxwp_f=True^wkovl_f=False^hdchk_b=False^rkxwp_f=True] V [wkovl_f=True^wkna8_f=True^bkspr_f=False^blxwp_f=True] V [blxwp_f=True^wkna8_f=True^wkcti_f=True^hdchk_w=True] V [blxwp_f=True^mulch_f=False^wkna8_f=True] V [blxwp_f=True^qxmsq_f=True^bkxbq_f=True^reskd_f=True^katri_f=True^skewr_f=True^wkovl_f=False^bkxwp_f=True^bkon8_f=True^stlmt_f=True] V [hdchk_b=True^qxmsq_f=True^bkxbq_f=True^bxqsq_f=False]]"
+}

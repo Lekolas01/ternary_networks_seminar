@@ -1,0 +1,41 @@
+{
+    "acc": [
+        0.8888888888888888,
+        0.8896604938271605,
+        0.9205246913580247,
+        0.8904320987654321,
+        0.8927469135802469,
+        0.8881172839506173,
+        0.8996913580246914,
+        0.8541666666666666,
+        0.9027777777777778,
+        0.8811728395061729
+    ],
+    "complexity": [
+        518,
+        118,
+        329,
+        156,
+        143,
+        238,
+        158,
+        169,
+        473,
+        123
+    ],
+    "score": [
+        0.00029195862529195855,
+        0.0012867398343188695,
+        0.0005375106870570272,
+        0.0009771616906819236,
+        0.0010786722945930766,
+        0.0006329202777361516,
+        0.0010110960865798862,
+        0.0007422131821170282,
+        0.0003429808420118498,
+        0.001181241736399989
+    ],
+    "best_model_acc": 0.8896604938271605,
+    "best_model_compl": 118,
+    "best_model": "Graph[\n\tRuleSet h5 [\n\th5\t:= !social_problematic, h5_2\n\th5_2\t:= health_recommended, h5_4\n\th5_4\t:= !health_priority\n\th5_4\t:= !finance_inconv\n]\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= health_not_recom, h4_2\n\th4_1\t:= h4_3\n\th4_1\t:= has_nurs_very_crit, h4_4\n\th4_2\t:= h4_4\n\th4_2\t:= has_nurs_very_crit\n\th4_3\t:= h4_6\n\th4_3\t:= !parents_usual, h4_7\n\th4_4\t:= h4_8\n\th4_4\t:= !parents_usual\n\th4_6\t:= h4_10\n\th4_6\t:= has_nurs_critical, h4_11\n\th4_7\t:= h4_11\n\th4_7\t:= has_nurs_critical, h4_12\n\th4_8\t:= h4_13\n\th4_8\t:= has_nurs_critical\n\th4_10\t:= parents_great_pret, h4_16\n\th4_11\t:= h4_16\n\th4_11\t:= parents_great_pret, h4_17\n\th4_12\t:= h4_17\n\th4_12\t:= parents_great_pret, h4_19\n\th4_13\t:= h4_18\n\th4_13\t:= parents_great_pret\n\th4_16\t:= !has_nurs_less_proper, h4_22\n\th4_17\t:= h4_22\n\th4_17\t:= !has_nurs_less_proper, h4_24\n\th4_18\t:= !has_nurs_proper\n\th4_18\t:= !has_nurs_less_proper\n\th4_19\t:= h4_24\n\th4_19\t:= !has_nurs_less_proper\n\th4_22\t:= !has_nurs_proper, finance_inconv\n\th4_24\t:= finance_inconv\n\th4_24\t:= !has_nurs_proper\n]\n\tRuleSet h3 [\n\th3\t:= h3_1\n\th3\t:= form_foster, h3_2\n\th3_1\t:= h3_3\n\th3_1\t:= children_3, h3_4\n\th3_2\t:= h3_4\n\th3_2\t:= children_3\n\th3_3\t:= h3_6\n\th3_3\t:= children_more, h3_7\n\th3_4\t:= h3_7\n\th3_4\t:= children_more\n\th3_6\t:= h3_9\n\th3_6\t:= health_not_recom, h3_10\n\th3_7\t:= h3_11\n\th3_7\t:= health_not_recom\n\th3_9\t:= h3_13\n\th3_9\t:= housing_critical, h3_14\n\th3_10\t:= h3_15\n\th3_10\t:= housing_critical\n\th3_11\t:= h3_16\n\th3_11\t:= housing_critical\n\th3_13\t:= h3_18\n\th3_13\t:= !children_1, h3_19\n\th3_14\t:= h3_19\n\th3_14\t:= !children_1\n\th3_15\t:= h3_20\n\th3_15\t:= !children_1\n\th3_16\t:= h3_21\n\th3_16\t:= !children_1\n\th3_18\t:= !form_complete, h3_24\n\th3_19\t:= h3_24\n\th3_19\t:= !form_complete, h3_26\n\th3_20\t:= form_incomplete\n\th3_20\t:= !form_complete\n\th3_21\t:= h3_26\n\th3_21\t:= !form_complete\n\th3_24\t:= form_incomplete, !housing_less_conv\n\th3_26\t:= !housing_less_conv\n\th3_26\t:= form_incomplete\n]\n\tRuleSet h2 [\n\th2\t:= finance_inconv\n\th2\t:= housing_convenient\n]\n\tRuleSet h6 [\n\th6\t:= h4\n\th6\t:= h5\n]\n\tRuleSet h9 [\n\th9\t:= h9_1\n\th9\t:= !h4\n\th9_1\t:= h5, h9_4\n\th9_4\t:= h2\n\th9_4\t:= !h3\n]\n\tRuleSet h8 [\n\th8\t:= h4, h8_2\n\th8_2\t:= h8_3\n\th8_2\t:= !h5\n\th8_3\t:= h3, !h2\n]\n\tRuleSet target [\n\ttarget\t:= !h8, target_2\n\ttarget_2\t:= !h6\n\ttarget_2\t:= h9\n]\n]"
+}

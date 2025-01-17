@@ -1,0 +1,15 @@
+{
+    "acc": [
+        1.0,
+        1.0,
+        1.0
+    ],
+    "complexity": [
+        20,
+        14,
+        13
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 13,
+    "best_model": "[[a5_1=True] V [a5_3=True^a4_2=False^a1_1=True^a2_1=True] V [a1_3=True^a2_3=True] V [a2_3=False^a1_3=False^a1_1=False^a2_1=False] V [a2_1=True^a1_1=True]]"
+}

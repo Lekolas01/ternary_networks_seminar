@@ -1,9 +1,7 @@
-import copy
 import json
 import os
 import sys
-from argparse import ArgumentParser, Namespace
-from pydoc import text
+from argparse import ArgumentParser
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +9,6 @@ import pandas as pd
 import seaborn as sns
 import torch
 import wittgenstein as lw
-from genericpath import isfile
 from pandas import DataFrame, Series
 from sklearn import tree
 from sklearn.base import BaseEstimator
@@ -21,13 +18,13 @@ from sklearn.model_selection import KFold, ParameterSampler, train_test_split
 from datasets import FileDataset, get_df
 from rule_extraction import nn_to_rule_set
 from rule_extraction_classifier import RuleExtractionClassifier
-from utilities import accuracy, set_seed
+from utilities import set_seed
 
 np.set_printoptions(suppress=True)
 
 
 def custom_score(acc, complexity):
-    return (acc - 0.5) ** 2 / complexity
+    return np.where(acc > 0.6, (acc - 0.5) ** 2 / complexity, -1)
 
 
 def plot_decision_tree(clf_object, feature_names, class_names):
@@ -70,11 +67,11 @@ def load_dataframe(key: str) -> tuple[DataFrame, Series]:
     f_data = f"data/{key}.csv"
     if not os.path.isfile(f_data):
         print(f"Loading dataset with key {key}")
-        df = get_df(key)
-        ds = FileDataset(df, encode=True)
+        df, target_class = get_df(key)
+        ds = FileDataset(df, target_class, encode=True)
         ds.df.to_csv(f_data, index=False)
         print(f"Saved dataset to {f_data}")
-
+    print(f"{f_data  =}")
     df = pd.read_csv(f_data)
     X = df.iloc[:, :-1]
     y = df.iloc[:, -1]
@@ -90,8 +87,6 @@ def rip_compl(ripper_clf: lw.RIPPER) -> int:
 
 def rip_model_str(ripper_clf: lw.RIPPER):
     return ripper_clf.ruleset_
-    ans = str([str(rule) for rule in ripper_clf.ruleset_.rules]).replace(", ", "\n")
-    return ans
 
 
 def re_clf_complexity(re_clf: RuleExtractionClassifier) -> int:
@@ -99,15 +94,18 @@ def re_clf_complexity(re_clf: RuleExtractionClassifier) -> int:
 
 
 class Result:
-    def __init__(self, acc, complexity, best_model_acc, best_model_compl, best_model):
+    def __init__(
+        self, acc, complexity, score, best_model_acc, best_model_compl, best_model
+    ):
         self.acc = acc
         self.complexity = complexity
+        self.score = score
         self.best_model_acc = best_model_acc
         self.best_model_compl = int(best_model_compl)
         self.best_model = best_model
 
 
-def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results, alg_name):
+def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results):
     accs, compls, models = cross_validate(X, y, clf, compl_f, model_str_f, n_splits)
     scores = custom_score(accs, compls)
     best_idx = np.argmax(scores)
@@ -117,7 +115,12 @@ def cross_val_and_log(X, y, clf, compl_f, model_str_f, n_splits, f_results, alg_
 
     with open(f_results, "w") as text_file:
         ans = Result(
-            list(accs), [int(x) for x in compls], best_acc, best_compls, str(best_model)
+            list(accs),
+            [int(x) for x in compls],
+            list(scores),
+            best_acc,
+            best_compls,
+            str(best_model),
         )
         json.dump(ans.__dict__, text_file, indent=4)
     return accs, compls
@@ -133,9 +136,7 @@ def cross_validate(
         ytrain = y.loc[train_ids]
         Xvalid = X.loc[valid_ids]
         yvalid = y.loc[valid_ids]
-        print("Fit start")
         clf.fit(Xtrain, ytrain)
-        print("Fit end")
         accs.append(accuracy_score(clf.predict(Xvalid), yvalid))
         compls.append(compl_func(clf))
         models.append(model_str_func(clf))
@@ -150,7 +151,7 @@ def find_best_params(
     n_iter: int,
     seed=0,
 ):
-    n_folds = 3
+    n_folds = 2
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=seed
     )
@@ -194,12 +195,17 @@ def stats(arr) -> str:
     return f"\t{arr}\n\tmean = {np.mean(arr)}\n\tstd = {np.std(arr)}\n"
 
 
-def training_runs(key):
+def training_runs(key, delay=10000, n_iter=12, k=3):
+    print(f"Fitting {key} dataset...")
+    if key == "parity10":
+        delay = 50000
     seed = 1
     set_seed(seed)
 
     X, y = load_dataframe(key)
-    f_outputs = f"output/{key}/"
+    print(f"Data shape = {X.shape}")
+
+    f_outputs = f"output2/{key}/"
     f_re_results = f_outputs + f"dre.json"
     f_ripper = f_outputs + f"ripper.json"
 
@@ -208,28 +214,28 @@ def training_runs(key):
 
     # find best hyperparameter settings
     param_grid = {
-        "layer_width": [10, 6],
-        "lr": [3e-4, 1e-3, 3e-3],
-        # "l1": [1e-5, 4e-4, 3e-3, 1e-2],
-        "l1": [2e-3],
+        "layer_width": [6, 10],
+        "lr": [1e-4, 1e-3, 3e-3],
+        "l1": [1e-3, 3e-3],
         "n_layer": [1, 2, 3],
-        "steepness": [4, 8, 16],
+        "steepness": [2, 8, 16],
     }
-
-    delay = 3000
-    k = 5
-
-    print(f"Data shape = {X.shape}")
 
     if os.path.isfile(f_ripper) and os.path.getsize(f_ripper) != 0:
         print(f"RIPPER results already found at {f_ripper}. Model fit skipped.")
     else:
-        print(f"Could not find RIPPPER results for {key} dataset. Doing fit...")
+        print(f"Could not find RIPPER results for {key} dataset. Doing fit...")
         ripper_clf = lw.RIPPER()
         ripper_accs, ripper_compls = cross_val_and_log(
-            X, y, ripper_clf, rip_compl, rip_model_str, k, f_ripper, "RIPPER"
+            X, y, ripper_clf, rip_compl, rip_model_str, 10, f_ripper
         )
         print(f"Fit done. See results in {f_ripper}.")
+
+    if os.path.isfile(f_re_results) and os.path.getsize(f_re_results) != 0:
+        print(f"DRE results already found at {f_ripper}. Model fit skipped.")
+        return
+
+    print(f"Could not find DRE results for {key} dataset. Doing fit...")
 
     re_clf = RuleExtractionClassifier(
         lr=4e-3,
@@ -243,7 +249,6 @@ def training_runs(key):
         verbose=True,
     )
 
-    n_iter = 5
     print(f"Starting Hyperparameter search...")
     sampler, accs, complexities, fidelities, scores = find_best_params(
         X, y, re_clf, param_grid, n_iter, seed
@@ -299,29 +304,11 @@ def training_runs(key):
     plt.savefig(f_outputs + f"nlayer_fid")
     plt.figure()
 
-    with open(f_re_results, "w") as of:
-
-        of.write("--- Hyperparameter search ---\n")
-        of.write(f"\t{param_grid = }\n\n")
-        of.write(f"\t{accs = }\n")
-        of.write(f"\t{complexities = }\n")
-        of.write(f"\t{scores = }\n")
-        of.write(f"\t{best_idx = }\n")
-        of.write(f"\t{best_params = }\n\n")
-
-    # delay = 1000
-
     re_clf.set_params(**best_params, delay=delay)
     re_accs, re_compls = cross_val_and_log(
-        X,
-        y,
-        re_clf,
-        re_clf_complexity,
-        lambda clf: clf.bool_graph,
-        k,
-        f_re_results,
-        "DRE",
+        X, y, re_clf, re_clf_complexity, lambda clf: clf.bool_graph, 10, f_re_results
     )
+    return
 
     data = np.zeros((2 * k, 3))
     data[:k, 0] = ripper_accs
@@ -340,22 +327,34 @@ def training_runs(key):
     plt.savefig(f_outputs + f"cross_val_comparison")
     plt.figure()
 
-    exit()
 
-
-def main(key: str, retrain=False):
-    retrain = False
+def main(key: str):
     f_root = f"runs/{key}"
     f_data = f"{f_root}/data.csv"
     f_models = f"{f_root}/models"
     f_runs = f"{f_root}/runs.csv"
     f_losses = f"{f_root}/losses.csv"
 
-    if not os.path.isfile(f_runs) or retrain:
-        runs = training_runs(key)
-        runs.to_csv()
-    else:
-        runs = pd.read_csv(f_runs)
+    keys = [key]
+    if "all" in keys:
+        keys = [
+            "abcdefg",
+            "balance-scale",
+            "car-evaluation",
+            "king-rook-king-pawn",
+            "king-rook-king",
+            "monk-1",
+            "monk-2",
+            "monk-3",
+            "mushroom",
+            "parity10",
+            "tic-tac-toe",
+            "vote",
+        ]
+    for k in keys:
+        runs = training_runs(k)
+    exit()
+    runs.to_csv()
 
     n_runs = runs.shape[0]
     models = [torch.load(f"{f_models}/{idx}.pth") for idx in range(n_runs)]
@@ -399,10 +398,12 @@ def get_arguments() -> str:
     parser = ArgumentParser(
         description="Train an MLP on a binary classification task with an ADAM optimizer."
     )
-    parser.add_argument("dataset")
+    parser.add_argument(
+        "dataset",
+    )
     return parser.parse_args().dataset
 
 
 if __name__ == "__main__":
-    ds = get_arguments()
-    main(ds)
+    for key in sys.argv[1:]:
+        main(key)

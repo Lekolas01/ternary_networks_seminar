@@ -1,0 +1,20 @@
+{
+    "acc": [
+        0.8194444444444444,
+        1.0,
+        1.0
+    ],
+    "complexity": [
+        6,
+        11,
+        12
+    ],
+    "score": [
+        0.017007458847736624,
+        0.022727272727272728,
+        0.020833333333333332
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 11,
+    "best_model": "[[a5_1=True] V [a2_2=False^a1_2=False^a2_1=False^a1_1=False] V [a2_3=False^a1_3=False^a1_1=False^a2_1=False] V [a2_1=True^a1_1=True]]"
+}

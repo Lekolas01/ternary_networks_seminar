@@ -16,6 +16,6 @@ Other algorithms to test:
     + PedC5.0
     + TREPAN
     + RIPPER
-    
+
 
 

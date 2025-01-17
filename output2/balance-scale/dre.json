@@ -1,0 +1,41 @@
+{
+    "acc": [
+        1.0,
+        1.0,
+        0.9682539682539683,
+        1.0,
+        0.9841269841269841,
+        0.9838709677419355,
+        0.967741935483871,
+        0.9838709677419355,
+        1.0,
+        0.9354838709677419
+    ],
+    "complexity": [
+        1003,
+        958,
+        1107,
+        864,
+        1136,
+        818,
+        267,
+        1086,
+        568,
+        459
+    ],
+    "score": [
+        0.0002492522432701894,
+        0.00026096033402922753,
+        0.0001980684541875233,
+        0.00028935185185185184,
+        0.0002063194865844094,
+        0.00028622385504097455,
+        0.0008194101805625384,
+        0.0002155903438522258,
+        0.00044014084507042255,
+        0.00041317255310032434
+    ],
+    "best_model_acc": 0.967741935483871,
+    "best_model_compl": 267,
+    "best_model": "Graph[\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= !left-weight_1, h2_2\n\th2_1\t:= h2_3\n\th2_1\t:= right-distance_1, h2_4\n\th2_2\t:= h2_5\n\th2_2\t:= right-distance_1, h2_6\n\th2_3\t:= h2_7\n\th2_3\t:= right-weight_1, h2_8\n\th2_4\t:= h2_8\n\th2_4\t:= right-weight_1, h2_10\n\th2_5\t:= h2_9\n\th2_5\t:= right-weight_1, h2_11\n\th2_6\t:= h2_11\n\th2_6\t:= right-weight_1, h2_12\n\th2_7\t:= !left-distance_1, h2_14\n\th2_8\t:= h2_14\n\th2_8\t:= !left-distance_1, h2_16\n\th2_9\t:= h2_15\n\th2_9\t:= !left-distance_1, h2_16\n\th2_10\t:= h2_16\n\th2_10\t:= !left-distance_1, h2_18\n\th2_11\t:= h2_17\n\th2_11\t:= !left-distance_1, h2_18\n\th2_12\t:= h2_18\n\th2_12\t:= !left-distance_1, h2_19\n\th2_14\t:= h2_20\n\th2_14\t:= left-distance_5, h2_21\n\th2_15\t:= h2_20\n\th2_15\t:= left-distance_5, h2_22\n\th2_16\t:= h2_23\n\th2_16\t:= left-distance_5, h2_24\n\th2_17\t:= h2_23\n\th2_17\t:= left-distance_5, h2_25\n\th2_18\t:= h2_26\n\th2_18\t:= left-distance_5, h2_27\n\th2_19\t:= h2_28\n\th2_19\t:= left-distance_5\n\th2_20\t:= h2_30\n\th2_20\t:= right-weight_2, h2_31\n\th2_21\t:= h2_31\n\th2_21\t:= right-weight_2, h2_32\n\th2_22\t:= h2_31\n\th2_22\t:= right-weight_2, h2_33\n\th2_23\t:= h2_34\n\th2_23\t:= right-weight_2, h2_35\n\th2_24\t:= h2_35\n\th2_24\t:= right-weight_2, h2_36\n\th2_25\t:= h2_35\n\th2_25\t:= right-weight_2, h2_37\n\th2_26\t:= h2_38\n\th2_26\t:= right-weight_2, h2_39\n\th2_27\t:= h2_39\n\th2_27\t:= right-weight_2, h2_40\n\th2_28\t:= h2_41\n\th2_28\t:= right-weight_2\n\th2_30\t:= right-distance_2, h2_44\n\th2_31\t:= h2_44\n\th2_31\t:= right-distance_2, h2_45\n\th2_32\t:= h2_45\n\th2_32\t:= right-distance_2, h2_46\n\th2_33\t:= h2_45\n\th2_33\t:= right-distance_2, h2_47\n\th2_34\t:= h2_46\n\th2_34\t:= right-distance_2, h2_48\n\th2_35\t:= h2_48\n\th2_35\t:= right-distance_2, h2_49\n\th2_36\t:= h2_49\n\th2_36\t:= right-distance_2, h2_50\n\th2_37\t:= h2_49\n\th2_37\t:= right-distance_2, h2_51\n\th2_38\t:= h2_50\n\th2_38\t:= right-distance_2, h2_52\n\th2_39\t:= h2_52\n\th2_39\t:= right-distance_2, h2_53\n\th2_40\t:= h2_53\n\th2_40\t:= right-distance_2, h2_54\n\th2_41\t:= h2_54\n\th2_41\t:= right-distance_2\n\th2_44\t:= left-distance_4, h2_57\n\th2_45\t:= h2_57\n\th2_45\t:= left-distance_4, h2_58\n\th2_46\t:= h2_58\n\th2_46\t:= left-distance_4, h2_59\n\th2_47\t:= h2_58\n\th2_47\t:= left-distance_4, h2_60\n\th2_48\t:= h2_59\n\th2_48\t:= left-distance_4, h2_61\n\th2_49\t:= h2_61\n\th2_49\t:= left-distance_4, h2_62\n\th2_50\t:= h2_62\n\th2_50\t:= left-distance_4, h2_63\n\th2_51\t:= h2_62\n\th2_51\t:= left-distance_4, h2_64\n\th2_52\t:= h2_63\n\th2_52\t:= left-distance_4, h2_65\n\th2_53\t:= h2_65\n\th2_53\t:= left-distance_4, h2_66\n\th2_54\t:= h2_66\n\th2_54\t:= left-distance_4\n\th2_57\t:= !left-weight_2, h2_69\n\th2_58\t:= h2_69\n\th2_58\t:= !left-weight_2, h2_70\n\th2_59\t:= h2_70\n\th2_59\t:= !left-weight_2, h2_71\n\th2_60\t:= h2_70\n\th2_60\t:= !left-weight_2, h2_72\n\th2_61\t:= h2_71\n\th2_61\t:= !left-weight_2, h2_73\n\th2_62\t:= h2_73\n\th2_62\t:= !left-weight_2, h2_74\n\th2_63\t:= h2_74\n\th2_63\t:= !left-weight_2, h2_75\n\th2_64\t:= h2_74\n\th2_64\t:= !left-weight_2, h2_76\n\th2_65\t:= h2_75\n\th2_65\t:= !left-weight_2, h2_77\n\th2_66\t:= h2_77\n\th2_66\t:= !left-weight_2\n\th2_69\t:= !right-weight_5, h2_80\n\th2_70\t:= h2_80\n\th2_70\t:= !right-weight_5, h2_81\n\th2_71\t:= h2_81\n\th2_71\t:= !right-weight_5, h2_82\n\th2_72\t:= h2_81\n\th2_72\t:= !right-weight_5, h2_83\n\th2_73\t:= h2_82\n\th2_73\t:= !right-weight_5, h2_84\n\th2_74\t:= h2_84\n\th2_74\t:= !right-weight_5, h2_85\n\th2_75\t:= h2_85\n\th2_75\t:= !right-weight_5, h2_87\n\th2_76\t:= h2_86\n\th2_76\t:= !right-weight_5\n\th2_77\t:= h2_87\n\th2_77\t:= !right-weight_5\n\th2_80\t:= !right-distance_5, h2_90\n\th2_81\t:= h2_90\n\th2_81\t:= !right-distance_5, h2_91\n\th2_82\t:= h2_91\n\th2_82\t:= !right-distance_5, h2_92\n\th2_83\t:= h2_91\n\th2_83\t:= !right-distance_5, h2_93\n\th2_84\t:= h2_92\n\th2_84\t:= !right-distance_5, h2_94\n\th2_85\t:= h2_94\n\th2_85\t:= !right-distance_5, h2_96\n\th2_86\t:= h2_95\n\th2_86\t:= !right-distance_5\n\th2_87\t:= h2_96\n\th2_87\t:= !right-distance_5\n\th2_90\t:= left-weight_5, h2_99\n\th2_91\t:= h2_99\n\th2_91\t:= left-weight_5, h2_100\n\th2_92\t:= h2_100\n\th2_92\t:= left-weight_5, h2_101\n\th2_93\t:= h2_100\n\th2_93\t:= left-weight_5, h2_102\n\th2_94\t:= h2_101\n\th2_94\t:= left-weight_5, h2_104\n\th2_95\t:= h2_103\n\th2_95\t:= left-weight_5\n\th2_96\t:= h2_104\n\th2_96\t:= left-weight_5\n\th2_99\t:= !right-distance_4, h2_107\n\th2_100\t:= h2_107\n\th2_100\t:= !right-distance_4, h2_108\n\th2_101\t:= h2_108\n\th2_101\t:= !right-distance_4, h2_110\n\th2_102\t:= h2_108\n\th2_102\t:= !right-distance_4\n\th2_103\t:= h2_109\n\th2_103\t:= !right-distance_4\n\th2_104\t:= h2_110\n\th2_104\t:= !right-distance_4\n\th2_107\t:= !right-weight_4, h2_113\n\th2_108\t:= h2_113\n\th2_108\t:= !right-weight_4, h2_115\n\th2_109\t:= left-weight_4\n\th2_109\t:= !right-weight_4\n\th2_110\t:= h2_115\n\th2_110\t:= !right-weight_4\n\th2_113\t:= left-weight_4, !left-distance_2\n\th2_115\t:= !left-distance_2\n\th2_115\t:= left-weight_4\n]\n\tRuleSet h17 [\n\th17\t:= !h2\n]\n\tRuleSet target [\n\ttarget\t:= !h17\n]\n]"
+}

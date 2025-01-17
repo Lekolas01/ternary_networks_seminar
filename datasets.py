@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -17,12 +18,10 @@ class FileDataset(Dataset):
     The features can be either numerical or categorical.
     """
 
-    def prepare_df(self, df: pd.DataFrame, target: str):
-        raise NotImplementedError()
-
     def __init__(
         self,
         df: pd.DataFrame,
+        target_class=None,
         range: tuple[float, float] = (0, 1),
         target="target",
         normalize=False,
@@ -52,10 +51,17 @@ class FileDataset(Dataset):
         for column in df.columns:
             if encode and column != target:
                 # one-hot encode categorical columns
+                # do a dummy encoding only if the feature is binary.
+                n_uniques = len(df[column].unique())
+                if n_uniques == 1:
+                    warnings.warn(
+                        f"Column {column} is always the same value. Consider removing this feature."
+                    )
+                is_binary = n_uniques == 2
                 df = pd.concat(
                     [
                         df,
-                        pd.get_dummies(df[column], prefix=column, drop_first=False),
+                        pd.get_dummies(df[column], prefix=column, drop_first=is_binary),
                     ],
                     axis=1,
                 )
@@ -67,24 +73,14 @@ class FileDataset(Dataset):
                 df[column] = (df[column] - mean) / std
 
         self.n_target = 0
-        if len(df[target].unique()) > 2:
-            dummies = [df, pd.get_dummies(df[target], prefix=target, drop_first=False)]
-            df = pd.concat(
-                dummies,
-                axis=1,
-            )
-            df.drop([target], axis=1, inplace=True)
-            self.n_target = len(dummies)
-        elif len(df[target].unique()) == 2:
-            df = pd.concat(
-                [df, pd.get_dummies(df[target], prefix=target, drop_first=True)],
-                axis=1,
-            )
-            df.drop([target], axis=1, inplace=True)
-            df.rename(columns={df.columns[-1]: "target"}, inplace=True)
-            self.n_target = 1
-        else:
-            raise ValueError("Must have more than one constant target value.")
+        # take the most prevalent target class against the rest
+        if target_class is None:
+            temp = dict(df[target].value_counts())
+            target_class = max(temp, key=temp.get)
+
+        old_target = df.pop("target")
+        df.insert(len(df.columns), "target", old_target != target_class)
+        self.n_target = 1
 
         self.df = df
         n_rows = len(df)
@@ -218,8 +214,10 @@ def get_dataset(ds: str) -> tuple[FileDataset, FileDataset]:
     return datasets[0], datasets[1]
 
 
-def get_df(key: str) -> pd.DataFrame:
-    def get_df_from_uci(id: int) -> pd.DataFrame:
+def get_df(key: str) -> tuple[pd.DataFrame, str | None]:
+    def get_df_from_uci(
+        id: int, target_class: str | None = None
+    ) -> tuple[pd.DataFrame, str | None]:
         print(f"Downloading from UCI with id = {id}")
         temp = fetch_ucirepo(id=id)
         print(f"Dataset fetched.")
@@ -227,19 +225,26 @@ def get_df(key: str) -> pd.DataFrame:
         y = temp.data.targets  # type: ignore
         ans = pd.concat([X, y], axis=1)
         ans.rename(columns={y.columns[0]: "target"}, inplace=True)
-        return ans
+        return (ans, target_class)
 
     match key:
-        case "parity4":
-            return parity_df(k=4, shuffle=False, n=1024)
+        case "breast-cancer":
+            return get_df_from_uci(id=14)
+        case "npha":
+            temp = get_df_from_uci(id=936)
+            return temp
+        case "nursery":
+            return get_df_from_uci(76, target_class="priority")
+        case "solar-flare":
+            return get_df_from_uci(id=89)
         case "parity10":
-            return parity_df(k=10, shuffle=True, n=1024)
+            return (parity_df(k=10, shuffle=False, n=1024), None)
         case "adult":
-            df = get_df_from_uci(2)
+            df, var = get_df_from_uci(2)
             # clean up the dataset
             df["target"].replace("<=50K.", "<=50K", inplace=True)
             df["target"].replace(">50K.", ">50K", inplace=True)
-            return df
+            return df, var
         case "mushroom":
             return get_df_from_uci(73)
         case "king-rook-king-pawn":
@@ -289,6 +294,7 @@ def get_df(key: str) -> pd.DataFrame:
         case "vote":
             return get_df_from_uci(id=105)
         case _:
+            print("ValueError! Could not find key")
             raise ValueError
 
 

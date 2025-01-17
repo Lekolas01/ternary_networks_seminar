@@ -1,0 +1,20 @@
+{
+    "acc": [
+        0.9941520467836257,
+        1.0,
+        1.0
+    ],
+    "complexity": [
+        30,
+        35,
+        29
+    ],
+    "score": [
+        0.008139541511348219,
+        0.007142857142857143,
+        0.008620689655172414
+    ],
+    "best_model_acc": 1.0,
+    "best_model_compl": 29,
+    "best_model": "[[e_1=True^c_1=True^a_1=True] V [e_1=True^d_1=True^b_1=True] V [f_1=True^g_1=True^b_1=True^d_1=True] V [f_1=True^c_1=True^g_1=True^b_1=True] V [e_1=True^a_1=True^d_1=True] V [c_1=True^d_1=False^e_1=True^b_1=True] V [c_1=True^g_1=True^f_1=True^a_1=True] V [f_1=True^d_1=True^a_1=True^g_1=True]]"
+}

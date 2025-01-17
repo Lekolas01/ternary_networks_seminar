@@ -1,3 +1,4 @@
+import json
 import math
 import random
 from collections.abc import Iterable
@@ -21,6 +22,19 @@ def plot_nn_dist(model: nn.Sequential):
     for i in range(n_plots):
         sns.histplot(params[i], ax=axs[i])
     plt.show()
+
+
+def print_metrics(alg: str, problem: str):
+    with open(f"output2/{alg}/{problem}.json", "r") as f:
+        t = json.load(f)
+        print(f"mean_acc = {round(sum(t['acc']) / len(t['acc']), 2)}")
+        print(f"std_acc = {round(np.std(t['acc']), 2)}")
+        print(
+            f"mean_compl = {int(round(sum(t['complexity']) / len(t['complexity']), 0))}"
+        )
+        print(f"std_compl = {int(round(np.std(t['complexity']), 0))}")
+        print(f"best_model_acc: {round(t['best_model_acc'], 2)}")
+        print(f"best_model_compl: {round(t['best_model_compl'], 0)}")
 
 
 def accuracy(model: nn.Module, data_loader: DataLoader, device: Device) -> float:
@@ -121,17 +135,29 @@ def main():
     # for i in tqdm(range(100), desc="Loading...", ascii=False):
     #     sleep(0.05)
     # print()
-    for i in range(101):
-        print(progress_bar(i, 100), end="\r")
-        sleep(0.02)
-    print()
-    print("\u2713")
-    print("\u2500")
-    print("\u2587")
-    print("\u2588")
-    print("\u2589")
-    print("\u2590")
-    print("\u2591")
+
+    problems = [
+        "abcdefg",
+        "balance-scale",
+        "car-evaluation",
+        "king-rook-king-pawn",
+        "king-rook-king",
+        "monk-1",
+        "monk-2",
+        "monk-3",
+        "mushroom",
+        "parity10",
+        "tic-tac-toe",
+        "vote",
+    ]
+    for problem in problems:
+        print(f"----------- {problem} -----------")
+        for alg in ["dre", "ripper"]:
+            print(f"\t{alg}:")
+            try:
+                print_metrics(problem, alg)
+            except:
+                print(f"Could not find files for {problem}")
 
 
 if __name__ == "__main__":

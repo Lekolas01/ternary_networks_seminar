@@ -1,0 +1,20 @@
+{
+    "acc": [
+        0.9991445680068435,
+        0.999251497005988,
+        0.9997861420017109
+    ],
+    "complexity": [
+        18,
+        15,
+        19
+    ],
+    "score": [
+        0.0138414055428188,
+        0.01661680381751467,
+        0.013146641459839702
+    ],
+    "best_model_acc": 0.999251497005988,
+    "best_model_compl": 15,
+    "best_model": "[[white-rook-file_a=True^black-king-file_a=True^black-king-rank_1=True^white-king-file_c=True^white-rook-rank_2=False] V [black-king-file_a=True^white-rook-file_a=True^black-king-rank_2=True^white-king-rank_2=True^white-king-file_c=True] V [black-king-file_d=True^white-rook-rank_1=True^white-king-rank_3=True^black-king-rank_1=True^white-king-file_c=False]]"
+}

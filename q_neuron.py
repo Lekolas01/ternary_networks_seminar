@@ -172,7 +172,10 @@ def QNG_from_QNN(model: nn.Sequential, varnames: Sequence[str]) -> QuantizedNeur
         bias = q_layer.lin.bias.tolist()
         for j in range(curr_shape):
             new_name = next(names)
-            ins = {key: weight[j][i] for i, key in enumerate(in_keys)}
+            try:
+                ins = {key: weight[j][i] for i, key in enumerate(in_keys)}
+            except:
+                temp = 0
             q_neuron = Perceptron(new_name, ins, bias[j], [y_low[j], y_high[j]])
             ans.append(q_neuron)
             varnames.append(new_name)

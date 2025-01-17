@@ -1,0 +1,41 @@
+{
+    "acc": [
+        0.8875,
+        0.8625,
+        0.59375,
+        0.775,
+        0.903125,
+        0.890625,
+        0.8871473354231975,
+        0.7648902821316614,
+        0.6300940438871473,
+        0.9153605015673981
+    ],
+    "complexity": [
+        64,
+        88,
+        82,
+        144,
+        95,
+        108,
+        63,
+        95,
+        91,
+        63
+    ],
+    "score": [
+        0.0023461914062499994,
+        0.0014932528409090913,
+        -1.0,
+        0.0005251736111111112,
+        0.001710629111842105,
+        0.0014128508391203704,
+        0.002379096179766377,
+        0.0007385985428188548,
+        0.00018598307972429674,
+        0.002738481686703501
+    ],
+    "best_model_acc": 0.9153605015673981,
+    "best_model_compl": 63,
+    "best_model": "Graph[\n\tRuleSet h5 [\n\th5\t:= h5_1\n\th5\t:= reskr_t, h5_2\n\th5_1\t:= h5_3\n\th5_1\t:= !wkna8_t, h5_4\n\th5_2\t:= h5_5\n\th5_2\t:= !wkna8_t\n\th5_3\t:= !reskr_f, h5_8\n\th5_4\t:= h5_9\n\th5_4\t:= !reskr_f, h5_10\n\th5_5\t:= h5_10\n\th5_5\t:= !reskr_f\n\th5_8\t:= wkna8_f, h5_14\n\th5_9\t:= h5_13\n\th5_9\t:= wkna8_f, h5_14\n\th5_10\t:= h5_14\n\th5_10\t:= wkna8_f\n\th5_13\t:= !blxwp_t, blxwp_f\n\th5_14\t:= blxwp_f\n\th5_14\t:= !blxwp_t\n]\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= reskr_t, h4_2\n\th4_1\t:= !reskr_f, h4_4\n\th4_2\t:= h4_5\n\th4_2\t:= !reskr_f\n\th4_4\t:= !blxwp_t, !wkcti_t\n\th4_5\t:= !wkcti_t\n\th4_5\t:= !blxwp_t\n]\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= hdchk_b, h2_2\n\th2_1\t:= !wkna8_t, !wkovl_t\n\th2_2\t:= !wkovl_t\n\th2_2\t:= !wkna8_t\n]\n\tRuleSet h8 [\n\th8\t:= h5\n\th8\t:= h4\n]\n\tRuleSet h6 [\n\th6\t:= h5\n\th6\t:= h4\n]\n\tRuleSet h7 [\n\th7\t:= h7_1\n\th7\t:= h5, h7_2\n\th7_1\t:= h4, !h2\n\th7_2\t:= !h2\n\th7_2\t:= h4\n]\n\tRuleSet target [\n\ttarget\t:= target_1\n\ttarget\t:= h7, target_2\n\ttarget_1\t:= h8, h6\n\ttarget_2\t:= h6\n\ttarget_2\t:= h8\n]\n]"
+}

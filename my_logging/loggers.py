@@ -1,3 +1,4 @@
+import sys
 import time
 from abc import ABC
 from datetime import datetime
@@ -9,7 +10,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import torch
 import torch.nn as nn
-import sys
 from torch.utils.data.dataloader import DataLoader
 
 import utilities
@@ -225,7 +225,7 @@ class Tracker:
             self.stop_training = True
         # stop early if validation error hasn't decreased for a decent amount of time
         valid_stop_delay = self.delay
-        eps = 3e-4
+        eps = 3e-5
         if (
             len(self.mean_train_loss) > valid_stop_delay
             and self.mean_valid_loss[-valid_stop_delay - 1]
