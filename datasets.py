@@ -21,7 +21,7 @@ class FileDataset(Dataset):
     def __init__(
         self,
         df: pd.DataFrame,
-        target_class=None,
+        most_common_class=None,
         range: tuple[float, float] = (0, 1),
         target="target",
         normalize=False,
@@ -49,6 +49,10 @@ class FileDataset(Dataset):
         # df = copy.deepcopy(df)
         df = df[(df != "?").all(axis=1)]  # remove rows with missing values
         for column in df.columns:
+            # replace all NaNs with the most common value
+            temp = dict(df[column].value_counts())
+            most_common_class = max(temp, key=temp.get)
+            df[column] = df[column].fillna(most_common_class)
             if encode and column != target:
                 # one-hot encode categorical columns
                 # do a dummy encoding only if the feature is binary.
@@ -74,12 +78,12 @@ class FileDataset(Dataset):
 
         self.n_target = 0
         # take the most prevalent target class against the rest
-        if target_class is None:
+        if most_common_class is None:
             temp = dict(df[target].value_counts())
-            target_class = max(temp, key=temp.get)
+            most_common_class = max(temp, key=temp.get)
 
         old_target = df.pop("target")
-        df.insert(len(df.columns), "target", old_target != target_class)
+        df.insert(len(df.columns), "target", old_target != most_common_class)
         self.n_target = 1
 
         self.df = df
@@ -225,6 +229,7 @@ def get_df(key: str) -> tuple[pd.DataFrame, str | None]:
         y = temp.data.targets  # type: ignore
         ans = pd.concat([X, y], axis=1)
         ans.rename(columns={y.columns[0]: "target"}, inplace=True)
+        ans.to_csv(f"uci_data/{key}.csv", index=False)
         return (ans, target_class)
 
     match key:
@@ -235,8 +240,15 @@ def get_df(key: str) -> tuple[pd.DataFrame, str | None]:
             return temp
         case "nursery":
             return get_df_from_uci(76, target_class="priority")
+        case "lymphography":
+            temp = get_df_from_uci(63)
+            # remove column "no. of nodes in" because it contains only NaNs
+            
+            return temp
         case "solar-flare":
             return get_df_from_uci(id=89)
+        case "primary-tumor":
+            return get_df_from_uci(id=83)
         case "parity10":
             return (parity_df(k=10, shuffle=False, n=1024), None)
         case "adult":

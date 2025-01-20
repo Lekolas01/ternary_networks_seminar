@@ -1,41 +1,41 @@
 {
     "acc": [
-        0.6206896551724138,
         0.7586206896551724,
-        0.7586206896551724,
-        0.7241379310344828,
-        0.7241379310344828,
         0.6551724137931034,
+        0.7586206896551724,
+        0.7931034482758621,
+        0.6896551724137931,
+        0.6896551724137931,
         0.6071428571428571,
-        0.8214285714285714,
-        0.75,
-        0.6071428571428571
+        0.7857142857142857,
+        0.7857142857142857,
+        0.7142857142857143
     ],
     "complexity": [
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1,
-        1
+        369,
+        159,
+        327,
+        139,
+        111,
+        147,
+        302,
+        238,
+        391,
+        179
     ],
     "score": [
+        0.00018125924422145525,
         -1.0,
-        0.06688466111771699,
-        0.06688466111771699,
-        0.05023781212841855,
-        0.05023781212841855,
+        0.0002045402480664128,
+        0.000618054902094971,
         -1.0,
         -1.0,
-        0.10331632653061222,
-        0.0625,
+        -1.0,
+        0.00034299434059338016,
+        0.00020877916383944882,
         -1.0
     ],
-    "best_model_acc": 0.8214285714285714,
-    "best_model_compl": 1,
-    "best_model": "Graph[\n\tRuleSet target [\n\t\n]\n]"
+    "best_model_acc": 0.7931034482758621,
+    "best_model_compl": 139,
+    "best_model": "Graph[\n\tRuleSet h5 [\n\th5\t:= h5_1\n\th5\t:= deg-malig_2\n\th5_1\t:= h5_3\n\th5_1\t:= deg-malig_1, h5_4\n\th5_3\t:= tumor-size_14-Oct, !irradiat_yes\n\th5_4\t:= !irradiat_yes\n\th5_4\t:= tumor-size_14-Oct\n]\n\tRuleSet h4 [\n\th4\t:= h4_1\n\th4\t:= !tumor-size_50-54, h4_2\n\th4_1\t:= h4_3\n\th4_1\t:= age_50-59, h4_4\n\th4_2\t:= h4_5\n\th4_2\t:= age_50-59, h4_6\n\th4_3\t:= h4_7\n\th4_3\t:= deg-malig_2, h4_8\n\th4_4\t:= h4_8\n\th4_4\t:= deg-malig_2, h4_9\n\th4_5\t:= h4_8\n\th4_5\t:= deg-malig_2, h4_10\n\th4_6\t:= h4_10\n\th4_6\t:= deg-malig_2\n\th4_7\t:= h4_12\n\th4_7\t:= menopause_lt40, h4_13\n\th4_8\t:= h4_13\n\th4_8\t:= menopause_lt40, h4_14\n\th4_9\t:= h4_15\n\th4_9\t:= menopause_lt40\n\th4_10\t:= h4_16\n\th4_10\t:= menopause_lt40\n\th4_12\t:= h4_18\n\th4_12\t:= !irradiat_yes, h4_19\n\th4_13\t:= h4_19\n\th4_13\t:= !irradiat_yes, h4_20\n\th4_14\t:= h4_20\n\th4_14\t:= !irradiat_yes, h4_22\n\th4_15\t:= h4_21\n\th4_15\t:= !irradiat_yes\n\th4_16\t:= h4_22\n\th4_16\t:= !irradiat_yes\n\th4_18\t:= h4_24\n\th4_18\t:= tumor-size_14-Oct, h4_25\n\th4_19\t:= h4_25\n\th4_19\t:= tumor-size_14-Oct, h4_26\n\th4_20\t:= h4_26\n\th4_20\t:= tumor-size_14-Oct, h4_28\n\th4_21\t:= h4_27\n\th4_21\t:= tumor-size_14-Oct\n\th4_22\t:= h4_28\n\th4_22\t:= tumor-size_14-Oct\n\th4_24\t:= breast-quad_central, h4_31\n\th4_25\t:= h4_31\n\th4_25\t:= breast-quad_central, h4_32\n\th4_26\t:= h4_32\n\th4_26\t:= breast-quad_central, h4_33\n\th4_27\t:= h4_32\n\th4_27\t:= breast-quad_central\n\th4_28\t:= h4_33\n\th4_28\t:= breast-quad_central\n\th4_31\t:= !deg-malig_3, h4_36\n\th4_32\t:= h4_36\n\th4_32\t:= !deg-malig_3, h4_37\n\th4_33\t:= h4_37\n\th4_33\t:= !deg-malig_3\n\th4_36\t:= breast-quad_left_up, deg-malig_1\n\th4_37\t:= deg-malig_1\n\th4_37\t:= breast-quad_left_up\n]\n\tRuleSet h3 [\n\th3\t:= h3_1\n\th3\t:= breast-quad_central\n\th3_1\t:= !node-caps_yes\n\th3_1\t:= breast_right\n]\n\tRuleSet h2 [\n\th2\t:= h2_1\n\th2\t:= tumor-size_40-44\n\th2_1\t:= h2_3\n\th2_1\t:= inv-nodes_0-2\n\th2_3\t:= h2_5\n\th2_3\t:= deg-malig_1\n\th2_5\t:= h2_7\n\th2_5\t:= breast_right\n\th2_7\t:= age_50-59\n\th2_7\t:= deg-malig_2\n]\n\tRuleSet h1 [\n\th1\t:= h1_1\n\th1\t:= tumor-size_14-Oct, h1_2\n\th1_1\t:= age_40-49, h1_4\n\th1_2\t:= h1_5\n\th1_2\t:= age_40-49, h1_6\n\th1_4\t:= !age_30-39, h1_9\n\th1_5\t:= h1_8\n\th1_5\t:= !age_30-39, h1_9\n\th1_6\t:= h1_9\n\th1_6\t:= !age_30-39\n\th1_8\t:= inv-nodes_0-2, !breast-quad_right_up\n\th1_9\t:= !breast-quad_right_up\n\th1_9\t:= inv-nodes_0-2\n]\n\tRuleSet target [\n\ttarget\t:= target_1\n\ttarget\t:= !h4, target_2\n\ttarget_1\t:= !h2, target_4\n\ttarget_2\t:= target_4\n\ttarget_2\t:= !h2, target_5\n\ttarget_4\t:= !h1, target_7\n\ttarget_5\t:= target_7\n\ttarget_5\t:= !h1, target_8\n\ttarget_7\t:= !h5, !h3\n\ttarget_8\t:= !h3\n\ttarget_8\t:= !h5\n]\n]"
 }

@@ -437,7 +437,7 @@ class RuleSetGraph(Graph):
 
     @classmethod
     def from_QNG(cls, q_ng: QuantizedNeuronGraph, simplify=True):
-        prune_thr = 0.12
+        prune_thr = 0.04
         # keep track of the needed rule set neurons
         needed_rule_set_neurons: set[str] = {"target"}
         rule_set_neurons = []

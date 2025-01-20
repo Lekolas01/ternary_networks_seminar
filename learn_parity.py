@@ -24,7 +24,7 @@ np.set_printoptions(suppress=True)
 
 
 def custom_score(acc, complexity):
-    return np.where(acc > 0.6, (acc - 0.5) ** 2 / complexity, -1)
+    return np.where(acc > 0.75, (acc - 0.5) ** 2 / complexity, -1)
 
 
 def plot_decision_tree(clf_object, feature_names, class_names):
@@ -53,6 +53,7 @@ def b_plot(
     for x_val in unique_x:
         ans[str(x_val)] = [a for idx, a in enumerate(y) if x[idx] == x_val]
 
+    print(f"{ans = }")
     sns.boxplot(ans)
     plt.title(title)
     plt.xlabel(x_label)
@@ -272,37 +273,37 @@ def training_runs(key, delay=10000, n_iter=12, k=3):
     plt.savefig(f_outputs + f"compl_acc")
 
     steepnesses = [sample["steepness"] for sample in sampler]
-    b_plot(
-        steepnesses,
-        fidelities,
-        "Steepness",
-        "Fidelity",
-        title="Steepness / Fidelity NN - rule set",
-    )
-    plt.savefig(f_outputs + f"steepness_fid")
-    plt.figure()
+    # b_plot(
+    #     steepnesses,
+    #     fidelities,
+    #     "Steepness",
+    #     "Fidelity",
+    #     title="Steepness / Fidelity NN - rule set",
+    # )
+    # plt.savefig(f_outputs + f"steepness_fid")
+    # plt.figure()
 
     l1s = [sample["l1"] for sample in sampler]
-    b_plot(
-        l1s,
-        complexities,
-        "L1 coefficient",
-        "Complexity",
-        title="L1 coefficient / rule set complexity",
-    )
-    plt.savefig(f_outputs + f"l1_compl")
-    plt.figure()
+    # b_plot(
+    #     l1s,
+    #     complexities,
+    #     "L1 coefficient",
+    #     "Complexity",
+    #     title="L1 coefficient / rule set complexity",
+    # )
+    # plt.savefig(f_outputs + f"l1_compl")
+    # plt.figure()
 
     n_layers = [sample["n_layer"] for sample in sampler]
-    b_plot(
-        n_layers,
-        fidelities,
-        "Num of layers",
-        "Fidelity",
-        title="Number of neural net layers / Fidelity NN - rule set",
-    )
-    plt.savefig(f_outputs + f"nlayer_fid")
-    plt.figure()
+    # b_plot(
+    #     n_layers,
+    #     fidelities,
+    #     "Num of layers",
+    #     "Fidelity",
+    #     title="Number of neural net layers / Fidelity NN - rule set",
+    # )
+    # plt.savefig(f_outputs + f"nlayer_fid")
+    # plt.figure()
 
     re_clf.set_params(**best_params, delay=delay)
     re_accs, re_compls = cross_val_and_log(
